@@ -4,39 +4,38 @@ import fs from 'fs';
 import { SyncEngine } from './engine';
 import { AppConfig } from './config';
 
+function getIconPath(): string {
+  const candidates = [
+    path.join(__dirname, '../dist/tray-icon.png'),
+    path.join(__dirname, '../public/tray-icon.png'),
+    path.join(app.getAppPath(), 'dist/tray-icon.png'),
+    path.join(app.getAppPath(), 'public/tray-icon.png'),
+    path.join(process.resourcesPath, 'tray-icon.png')
+  ];
+
+  for (const p of candidates) {
+    try {
+      if (fs.existsSync(p)) {
+        return p;
+      }
+    } catch {}
+  }
+  return '';
+}
+
 export function createTray(
   getMainWindow: () => BrowserWindow | null,
   engine: SyncEngine,
   config: AppConfig
 ): Tray {
-  // Create a clean 16x16 native icon programmatically if file doesn't exist
   let icon: nativeImage;
-  const iconPath = path.join(__dirname, '../public/tray-icon.png');
+  const iconPath = getIconPath();
 
-  if (fs.existsSync(iconPath)) {
+  if (iconPath) {
     icon = nativeImage.createFromPath(iconPath);
   } else {
-    // 16x16 default icon buffer (blue dot circle)
-    const size = 16;
-    const canvasBuffer = Buffer.alloc(size * size * 4);
-    for (let y = 0; y < size; y++) {
-      for (let x = 0; x < size; x++) {
-        const dx = x - size / 2;
-        const dy = y - size / 2;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        const idx = (y * size + x) * 4;
-        if (dist <= size / 2 - 1) {
-          // #007aff (Mac accent blue)
-          canvasBuffer[idx] = 0x00;     // B
-          canvasBuffer[idx + 1] = 0x7a; // G
-          canvasBuffer[idx + 2] = 0xff; // R
-          canvasBuffer[idx + 3] = 0xff; // A
-        } else {
-          canvasBuffer[idx + 3] = 0x00; // Transparent
-        }
-      }
-    }
-    icon = nativeImage.createFromBuffer(canvasBuffer, { width: size, height: size });
+    // Fallback icon
+    icon = nativeImage.createEmpty();
   }
 
   const tray = new Tray(icon);

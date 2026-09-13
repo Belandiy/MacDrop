@@ -1,67 +1,46 @@
-import struct
-import zlib
 import os
+import sys
 
-def make_png(width, height, get_pixel):
-    raw_data = bytearray()
-    for y in range(height):
-      raw_data.append(0)  # filter type 0: None
-      for x in range(width):
-        r, g, b, a = get_pixel(x, y, width, height)
-        raw_data.extend([r, g, b, a])
+try:
+    from PIL import Image
+except ImportError:
+    import subprocess
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "Pillow"])
+    from PIL import Image
 
-    compressed = zlib.compress(bytes(raw_data), 9)
-
-    def chunk(chunk_type, data):
-      length = struct.pack('>I', len(data))
-      c_type = chunk_type.encode('ascii')
-      crc = struct.pack('>I', zlib.crc32(c_type + data) & 0xFFFFFFFF)
-      return length + c_type + data + crc
-
-    png_header = b'\x89PNG\r\n\x1a\n'
-    ihdr_data = (
-        struct.pack('>II', width, height)
-        + b'\x08\x06\x00\x00\x00'  # 8-bit depth, RGBA, deflate, no filter, no interlace
-    )
-    ihdr = chunk('IHDR', ihdr_data)
-    idat = chunk('IDAT', compressed)
-    iend = chunk('IEND', b'')
-
-    return png_header + ihdr + idat + iend
-
-def circle_pixel(x, y, w, h):
-    cx, cy = w / 2.0, h / 2.0
-    r = min(w, h) / 2.0 - 1.0
-    dist = ((x - cx) ** 2 + (y - cy) ** 2) ** 0.5
-    if dist <= r:
-        # Apple blue gradient
-        factor = (y / float(h))
-        red = int(0x00 * (1 - factor) + 0x00 * factor)
-        green = int(0x7A * (1 - factor) + 0x55 * factor)
-        blue = int(0xFF * (1 - factor) + 0xEB * factor)
-        return (red, green, blue, 255)
-    elif dist <= r + 1.0:
-        alpha = int(255 * (r + 1.0 - dist))
-        return (0, 122, 255, alpha)
+def generate():
+    os.makedirs('public', exist_ok=True)
+    
+    logo_path = 'MacDrop_app_logo_design_20260913131606.jpeg'
+    if not os.path.exists(logo_path):
+        logo_path = 'public/logo.png'
+    
+    if os.path.exists(logo_path):
+        img = Image.open(logo_path).convert('RGBA')
     else:
-        return (0, 0, 0, 0)
+        # Fallback create 1024x1024
+        img = Image.new('RGBA', (1024, 1024), (0, 122, 255, 255))
 
-os.makedirs('public', exist_ok=True)
+    # Ensure at least 1024x1024 for macOS Retina and electron-builder
+    if img.size[0] < 1024 or img.size[1] < 1024:
+        img = img.resize((1024, 1024), Image.Resampling.LANCZOS)
 
-# 256x256 main icon
-icon_256 = make_png(256, 256, circle_pixel)
-with open('public/icon.png', 'wb') as f:
-    f.write(icon_256)
+    # 1. Main 1024x1024 icon for macOS & Linux & Windows
+    img.save('public/icon.png', 'PNG')
 
-# 16x16 tray icon
-icon_16 = make_png(16, 16, circle_pixel)
-with open('public/tray-icon.png', 'wb') as f:
-    f.write(icon_16)
+    # 2. Windows multi-size .ico
+    ico_sizes = [(16, 16), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)]
+    img.save('public/icon.ico', format='ICO', sizes=ico_sizes)
 
-# Also create public/icon.ico from 256x256 PNG
-ico_header = struct.pack('<HHH', 0, 1, 1) # reserved, type 1 (ico), 1 image
-ico_entry = struct.pack('<BBBBHHII', 0, 0, 0, 0, 1, 32, len(icon_256), 6 + 16) # width 0=256, height 0=256, 256 colors=0, reserved=0, color planes=1, bpp=32, size, offset
-with open('public/icon.ico', 'wb') as f:
-    f.write(ico_header + ico_entry + icon_256)
+    # 3. Tray icon 32x32
+    tray = img.resize((32, 32), Image.Resampling.LANCZOS)
+    tray.save('public/tray-icon.png', 'PNG')
 
-print("Icons generated successfully!")
+    # 4. App UI logo 128x128
+    ui_logo = img.resize((128, 128), Image.Resampling.LANCZOS)
+    ui_logo.save('public/logo.png', 'PNG')
+
+    print('Icons successfully generated: 1024x1024 icon.png, multi-size icon.ico, tray-icon.png')
+
+if __name__ == '__main__':
+    generate()
