@@ -35,6 +35,11 @@ export interface MacDropApi {
   onStatusUpdate: (callback: (status: any) => void) => () => void;
   onProgressUpdate: (callback: (progress: any) => void) => () => void;
   platform: string;
+  version: string;
+  checkForUpdates: () => Promise<any>;
+  installUpdate: () => Promise<void>;
+  onUpdateAvailable: (callback: (version: string) => void) => () => void;
+  onUpdateDownloaded: (callback: (version: string) => void) => () => void;
 }
 
 declare global {

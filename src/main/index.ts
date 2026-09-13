@@ -5,6 +5,7 @@ import { SyncEngine } from './engine';
 import { PeerDiscovery } from './discovery';
 import { createTray } from './tray';
 import { setupIpc } from './ipc';
+import { setupAutoUpdater } from './updater';
 
 // Disable standard menu bar completely
 Menu.setApplicationMenu(null);
@@ -83,6 +84,7 @@ app.whenReady().then(() => {
   createWindow();
   tray = createTray(() => mainWindow, engine, config);
   setupIpc(engine, discovery, config, () => mainWindow);
+  setupAutoUpdater(() => mainWindow);
 
   // Relay engine and discovery events to renderer
   engine.on('status-changed', (status) => {

@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
+import packageJson from '../../package.json';
 
 export interface MacDropApi {
   getConfig: () => Promise<any>;
@@ -24,6 +25,11 @@ export interface MacDropApi {
   onStatusUpdate: (callback: (status: any) => void) => () => void;
   onProgressUpdate: (callback: (progress: any) => void) => () => void;
   platform: string;
+  version: string;
+  checkForUpdates: () => Promise<any>;
+  installUpdate: () => Promise<void>;
+  onUpdateAvailable: (callback: (version: string) => void) => () => void;
+  onUpdateDownloaded: (callback: (version: string) => void) => () => void;
 }
 
 const api: MacDropApi = {
@@ -68,7 +74,20 @@ const api: MacDropApi = {
     ipcRenderer.on('progress-update', handler);
     return () => ipcRenderer.removeListener('progress-update', handler);
   },
-  platform: process.platform
+  platform: process.platform,
+  version: packageJson.version,
+  checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
+  installUpdate: () => ipcRenderer.invoke('install-update'),
+  onUpdateAvailable: (callback) => {
+    const handler = (_: any, ver: string) => callback(ver);
+    ipcRenderer.on('update-available', handler);
+    return () => ipcRenderer.removeListener('update-available', handler);
+  },
+  onUpdateDownloaded: (callback) => {
+    const handler = (_: any, ver: string) => callback(ver);
+    ipcRenderer.on('update-downloaded', handler);
+    return () => ipcRenderer.removeListener('update-downloaded', handler);
+  }
 };
 
 contextBridge.exposeInMainWorld('macdrop', api);

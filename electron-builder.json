@@ -4,6 +4,11 @@
   "directories": {
     "output": "release"
   },
+  "publish": {
+    "provider": "github",
+    "owner": "Belandiy",
+    "repo": "MacDrop"
+  },
   "files": [
     "dist/**/*",
     "dist-electron/**/*",
