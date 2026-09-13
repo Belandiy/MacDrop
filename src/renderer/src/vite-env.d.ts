@@ -46,6 +46,8 @@ export interface MacDropApi {
   onUpdateAvailable: (callback: (version: string) => void) => () => void;
   onUpdateDownloaded: (callback: (version: string) => void) => () => void;
   cancelTransfer?: () => Promise<boolean>;
+  respondPairingRequest?: (requestId: string, approved: boolean) => Promise<boolean>;
+  onPairingRequest?: (callback: (request: { requestId: string; deviceId: string; deviceName: string; ip: string; port: number }) => void) => () => void;
 }
 
 declare global {

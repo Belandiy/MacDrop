@@ -164,6 +164,15 @@ app.whenReady().then(() => {
     mainWindow?.webContents.send('progress-update', progress);
   });
 
+  engine.on('pairing-request', (req) => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
+      mainWindow.webContents.send('pairing-request', req);
+    }
+  });
+
   discovery.on('peers-changed', (peers) => {
     mainWindow?.webContents.send('peers-update', peers);
   });
