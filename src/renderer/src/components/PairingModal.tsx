@@ -1,0 +1,185 @@
+import React, { useState } from 'react';
+import { QRCodeSVG } from 'qrcode.react';
+import { X, Copy, Check, QrCode, KeyRound, ShieldCheck, Laptop, Monitor } from 'lucide-react';
+
+interface PairingModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  deviceId: string;
+  deviceName: string;
+  platform: string;
+  onPairWithCode: (code: string) => Promise<boolean>;
+}
+
+export const PairingModal: React.FC<PairingModalProps> = ({
+  isOpen,
+  onClose,
+  deviceId,
+  deviceName,
+  platform,
+  onPairWithCode
+}) => {
+  const [copied, setCopied] = useState(false);
+  const [inputCode, setInputCode] = useState('');
+  const [activeTab, setActiveTab] = useState<'myCode' | 'enterCode'>('myCode');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+
+  if (!isOpen) return null;
+
+  const isMac = platform === 'darwin';
+  const otherPlatformName = isMac ? 'Windows ПК' : 'Mac';
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(deviceId);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleConnect = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inputCode.trim()) return;
+
+    setIsSubmitting(true);
+    setError(null);
+    try {
+      const ok = await onPairWithCode(inputCode.trim());
+      if (ok) {
+        setSuccess(true);
+        setTimeout(() => {
+          setSuccess(false);
+          onClose();
+        }, 1500);
+      } else {
+        setError('Не удалось подключиться. Проверьте код и сеть.');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Ошибка соединения');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="bg-[#242426] border border-white/10 rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
+          <div className="flex items-center gap-2">
+            <QrCode className="w-5 h-5 text-blue-400" />
+            <h2 className="text-sm font-semibold text-white">Связать Mac и ПК</h2>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex border-b border-white/10 bg-[#1c1c1e]">
+          <button
+            onClick={() => setActiveTab('myCode')}
+            className={`flex-1 py-2.5 text-xs font-medium text-center transition-colors flex items-center justify-center gap-1.5 ${
+              activeTab === 'myCode'
+                ? 'text-blue-400 border-b-2 border-blue-500 bg-white/5'
+                : 'text-zinc-400 hover:text-zinc-200'
+            }`}
+          >
+            <KeyRound className="w-3.5 h-3.5" />
+            <span>Код этого устройства</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('enterCode')}
+            className={`flex-1 py-2.5 text-xs font-medium text-center transition-colors flex items-center justify-center gap-1.5 ${
+              activeTab === 'enterCode'
+                ? 'text-blue-400 border-b-2 border-blue-500 bg-white/5'
+                : 'text-zinc-400 hover:text-zinc-200'
+            }`}
+          >
+            {isMac ? <Monitor className="w-3.5 h-3.5" /> : <Laptop className="w-3.5 h-3.5" />}
+            <span>Ввести код {otherPlatformName}</span>
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="p-5">
+          {activeTab === 'myCode' ? (
+            <div className="flex flex-col items-center text-center">
+              {/* QR Code Container */}
+              <div className="bg-white p-3 rounded-2xl shadow-md mb-4">
+                <QRCodeSVG
+                  value={`macdrop://${deviceId}`}
+                  size={140}
+                  level="M"
+                  includeMargin={false}
+                />
+              </div>
+
+              <div className="text-xs text-zinc-400 mb-2">
+                Код для подключения с {otherPlatformName}:
+              </div>
+
+              <div className="flex items-center gap-2 bg-[#1c1c1e] px-4 py-2 rounded-xl border border-white/10 w-full justify-between">
+                <span className="font-mono font-bold text-base text-white tracking-widest">
+                  {deviceId}
+                </span>
+                <button
+                  onClick={handleCopy}
+                  className="text-zinc-400 hover:text-blue-400 transition-colors p-1"
+                  title="Скопировать"
+                >
+                  {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                </button>
+              </div>
+
+              <p className="text-[11px] text-zinc-400 mt-4 leading-relaxed flex items-center gap-1.5 text-left">
+                <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>
+                  Введите этот код на {otherPlatformName}. Настройка выполняется 1 раз.
+                </span>
+              </p>
+            </div>
+          ) : (
+            <form onSubmit={handleConnect} className="flex flex-col gap-3">
+              <div className="text-xs text-zinc-300">
+                Введите код, показанный в окне MacDrop на вашем {otherPlatformName}:
+              </div>
+
+              <input
+                type="text"
+                placeholder={isMac ? "Например: PC-4921" : "Например: MAC-8120"}
+                value={inputCode}
+                onChange={(e) => setInputCode(e.target.value)}
+                className="bg-[#1c1c1e] border border-white/15 rounded-xl px-3.5 py-2.5 text-sm text-white font-mono tracking-wider focus:outline-none focus:border-blue-500 transition-colors placeholder:text-zinc-600"
+              />
+
+              {error && (
+                <div className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg p-2">
+                  {error}
+                </div>
+              )}
+
+              {success && (
+                <div className="text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-2 flex items-center gap-1.5">
+                  <Check className="w-4 h-4" />
+                  <span>Устройства успешно связаны!</span>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={isSubmitting || !inputCode.trim()}
+                className="mt-2 w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-semibold py-2.5 rounded-xl transition-colors shadow-lg shadow-blue-500/20"
+              >
+                {isSubmitting ? 'Подключение...' : `Подключить ${otherPlatformName}`}
+              </button>
+            </form>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
