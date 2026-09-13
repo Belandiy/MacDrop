@@ -15,7 +15,8 @@ import {
   Copy,
   Clock,
   HardDrive,
-  Ban
+  Ban,
+  AlertCircle
 } from 'lucide-react';
 
 export interface PairedDevice {
@@ -82,6 +83,10 @@ export const DeviceDetailView: React.FC<DeviceDetailViewProps> = ({
   const [copiedId, setCopiedId] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
+  const [sendNotice, setSendNotice] = useState<{
+    type: 'success' | 'warning' | 'error';
+    message: string;
+  } | null>(null);
 
   const isMac = device.id.startsWith('MAC') || device.originalName.toLowerCase().includes('mac');
 
@@ -141,9 +146,24 @@ export const DeviceDetailView: React.FC<DeviceDetailViewProps> = ({
   const handlePickAndSend = async () => {
     if (window.macdrop?.pickAndSendFiles) {
       setIsSending(true);
+      setSendNotice(null);
       try {
         await window.macdrop.pickAndSendFiles(device.id);
         await loadHistory();
+      } catch (err: any) {
+        const msg = err?.message || '';
+        if (msg.includes('отключил приём') || msg.includes('выключен приём') || msg.includes('403')) {
+          setSendNotice({
+            type: 'warning',
+            message: 'У этого устройства выключен приём файлов'
+          });
+        } else {
+          setSendNotice({
+            type: 'error',
+            message: msg || 'Ошибка отправки файла'
+          });
+        }
+        setTimeout(() => setSendNotice(null), 4500);
       } finally {
         setIsSending(false);
       }
@@ -169,11 +189,57 @@ export const DeviceDetailView: React.FC<DeviceDetailViewProps> = ({
 
       if (paths.length > 0 && window.macdrop?.sendDroppedFiles) {
         setIsSending(true);
+        setSendNotice(null);
         try {
-          await window.macdrop.sendDroppedFiles(paths, device.id);
+          const results = await window.macdrop.sendDroppedFiles(paths, device.id);
+          if (Array.isArray(results) && results.length > 0) {
+            const blocked = results.find(
+              (r) =>
+                r.error &&
+                (r.error.includes('отключил приём') ||
+                  r.error.includes('выключен приём') ||
+                  r.error.includes('403'))
+            );
+            const failed = results.find((r) => !r.success);
+
+            if (blocked) {
+              setSendNotice({
+                type: 'warning',
+                message: 'У этого устройства выключен приём файлов'
+              });
+            } else if (failed) {
+              setSendNotice({
+                type: 'error',
+                message: failed.error || 'Ошибка отправки файла'
+              });
+            } else {
+              setSendNotice({
+                type: 'success',
+                message: `Файл(ы) успешно отправлены!`
+              });
+            }
+          }
           await loadHistory();
+        } catch (err: any) {
+          const msg = err?.message || '';
+          if (
+            msg.includes('отключил приём') ||
+            msg.includes('выключен приём') ||
+            msg.includes('403')
+          ) {
+            setSendNotice({
+              type: 'warning',
+              message: 'У этого устройства выключен приём файлов'
+            });
+          } else {
+            setSendNotice({
+              type: 'error',
+              message: msg || 'Ошибка отправки файла'
+            });
+          }
         } finally {
           setIsSending(false);
+          setTimeout(() => setSendNotice(null), 4500);
         }
       }
     }
@@ -367,6 +433,28 @@ export const DeviceDetailView: React.FC<DeviceDetailViewProps> = ({
             </button>
           </div>
         </div>
+
+        {/* Notice Banner (Warning if receiving is disabled / Error / Success) */}
+        {sendNotice && (
+          <div
+            className={`p-2.5 rounded-xl border text-xs flex items-center gap-2 animate-in fade-in duration-200 ${
+              sendNotice.type === 'warning'
+                ? 'bg-amber-500/15 border-amber-500/30 text-amber-300'
+                : sendNotice.type === 'error'
+                ? 'bg-red-500/15 border-red-500/30 text-red-300'
+                : 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
+            }`}
+          >
+            {sendNotice.type === 'warning' ? (
+              <Ban className="w-4 h-4 text-amber-400 shrink-0" />
+            ) : sendNotice.type === 'error' ? (
+              <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+            ) : (
+              <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+            )}
+            <span className="font-medium">{sendNotice.message}</span>
+          </div>
+        )}
 
         {/* Action Buttons: Send File & Delete Link */}
         <div className="flex items-center gap-2 pt-2">

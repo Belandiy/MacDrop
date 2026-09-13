@@ -101,8 +101,9 @@ export default function App() {
   const handleFilesDropped = async (paths: string[]) => {
     if (window.macdrop) {
       const targetId = selectedDevice?.id || (devices.length > 0 ? devices[0].id : undefined);
-      await window.macdrop.sendDroppedFiles(paths, targetId);
+      return await window.macdrop.sendDroppedFiles(paths, targetId);
     }
+    return [];
   };
 
   const handleToggleAutoStart = async (enable: boolean) => {

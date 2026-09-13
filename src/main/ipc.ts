@@ -148,12 +148,15 @@ export function setupIpc(
       if (fs.existsSync(srcPath)) {
         try {
           const filename = path.basename(srcPath);
+          await engine.sendItem(srcPath, targetDeviceId);
+
           const destPath = path.join(config.targetFolder, filename);
           if (path.resolve(srcPath) !== path.resolve(destPath)) {
-            fs.cpSync(srcPath, destPath, { recursive: true });
+            try {
+              fs.cpSync(srcPath, destPath, { recursive: true });
+            } catch {}
           }
 
-          await engine.sendItem(srcPath, targetDeviceId);
           results.push({ name: filename, success: true });
         } catch (e: any) {
           console.error('Send error:', e);

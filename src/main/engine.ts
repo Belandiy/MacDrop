@@ -483,22 +483,32 @@ export class SyncEngine extends EventEmitter {
           res.on('data', chunk => { errBody += chunk; });
           res.on('end', () => {
             let errorMsg = `Устройство вернуло ошибку HTTP ${res.statusCode}`;
+            let isReceiveDisabled = res.statusCode === 403;
             try {
               const parsed = JSON.parse(errBody);
-              if (parsed.error) errorMsg = parsed.error;
+              if (parsed.error) {
+                errorMsg = parsed.error;
+                if (errorMsg.includes('отключил приём') || errorMsg.includes('выключен приём')) {
+                  isReceiveDisabled = true;
+                }
+              }
             } catch {}
-            this.history.push({
-              id: Math.random().toString(36).substring(7),
-              filename,
-              size: stat.size,
-              timestamp: Date.now(),
-              direction: 'outgoing',
-              status: 'failed',
-              peerDeviceId: peer?.id,
-              peerName
-            });
-            this.saveHistory();
-            this.emit('status-changed', this.getStatus());
+
+            // Не засоряем журнал, если у получателя приём файлов временно отключен
+            if (!isReceiveDisabled) {
+              this.history.push({
+                id: Math.random().toString(36).substring(7),
+                filename,
+                size: stat.size,
+                timestamp: Date.now(),
+                direction: 'outgoing',
+                status: 'failed',
+                peerDeviceId: peer?.id,
+                peerName
+              });
+              this.saveHistory();
+              this.emit('status-changed', this.getStatus());
+            }
             reject(new Error(errorMsg));
           });
         }
