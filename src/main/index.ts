@@ -1,9 +1,12 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, Menu } from 'electron';
 import path from 'path';
 import { loadConfig } from './config';
 import { SyncEngine } from './engine';
 import { createTray } from './tray';
 import { setupIpc } from './ipc';
+
+// Disable standard menu bar completely
+Menu.setApplicationMenu(null);
 
 // Prevent multiple instances
 const gotTheLock = app.requestSingleInstanceLock();
@@ -20,14 +23,15 @@ const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 440,
-    height: 640,
+    height: 660,
     minWidth: 400,
     minHeight: 550,
     resizable: true,
     title: 'MacDrop',
-    frame: process.platform !== 'win32',
-    titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
+    frame: false,
+    autoHideMenuBar: true,
     backgroundColor: '#1c1c1e',
+    icon: path.join(__dirname, '../dist/tray-icon.png'),
     show: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),

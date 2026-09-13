@@ -132,7 +132,7 @@ export default function App() {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-[#1c1c1e] text-white">
+    <div className="flex flex-col h-screen bg-[#1c1c1e] text-white select-none">
       <Header
         onOpenSettings={() => setIsSettingsOpen(true)}
         onOpenPairing={() => setIsPairingOpen(true)}

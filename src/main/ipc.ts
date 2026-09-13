@@ -72,4 +72,14 @@ export function setupIpc(engine: SyncEngine, config: AppConfig, getMainWindow: (
     });
     return enable;
   });
+
+  ipcMain.on('minimize-window', () => {
+    const win = getMainWindow();
+    win?.minimize();
+  });
+
+  ipcMain.on('close-window', () => {
+    const win = getMainWindow();
+    win?.hide();
+  });
 }
