@@ -92,14 +92,20 @@ export class PeerDiscovery extends EventEmitter {
     this.socket.on('message', (msg, rinfo) => {
       try {
         const data = JSON.parse(msg.toString('utf-8'));
-        if (data && data.deviceId && data.deviceId !== this.deviceId) {
+        if (data && typeof data.deviceId === 'string' && data.deviceId.length <= 64 && data.deviceId !== this.deviceId) {
           const peer: DiscoveredPeer = {
-            deviceId: data.deviceId,
-            deviceName: data.deviceName || 'Устройство',
+            deviceId: data.deviceId.slice(0, 64),
+            deviceName: typeof data.deviceName === 'string' ? data.deviceName.slice(0, 64) : 'Устройство',
             ip: rinfo.address,
-            port: data.port || 8384,
+            port: typeof data.port === 'number' && data.port > 0 && data.port < 65536 ? data.port : 8384,
             lastSeen: Date.now()
           };
+
+          // Prevent DoS memory exhaustion: limit cache to 50 peers
+          if (this.peers.size >= 50 && !this.peers.has(peer.deviceId)) {
+            const oldestKey = this.peers.keys().next().value;
+            if (oldestKey) this.peers.delete(oldestKey);
+          }
 
           const isNew = !this.peers.has(peer.deviceId);
           this.peers.set(peer.deviceId, peer);

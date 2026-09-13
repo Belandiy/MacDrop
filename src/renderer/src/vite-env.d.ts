@@ -6,9 +6,13 @@ export interface PairedDevice {
   customName: string;
   ip: string;
   port: number;
+  remoteIp?: string;
+  remotePort?: number;
   pairedAt: string;
   lastSeen?: number;
   receiveEnabled?: boolean;
+  connectionMode?: 'local' | 'remote' | 'offline';
+  authToken?: string;
 }
 
 export interface MacDropApi {
@@ -36,10 +40,12 @@ export interface MacDropApi {
   onProgressUpdate: (callback: (progress: any) => void) => () => void;
   platform: string;
   version: string;
+  getUpnpStatus: () => Promise<any>;
   checkForUpdates: () => Promise<any>;
   installUpdate: () => Promise<void>;
   onUpdateAvailable: (callback: (version: string) => void) => () => void;
   onUpdateDownloaded: (callback: (version: string) => void) => () => void;
+  cancelTransfer?: () => Promise<boolean>;
 }
 
 declare global {

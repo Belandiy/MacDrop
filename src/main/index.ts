@@ -1,11 +1,13 @@
-import { app, BrowserWindow, Menu } from 'electron';
+import { app, BrowserWindow, Menu, nativeImage } from 'electron';
 import path from 'path';
+import fs from 'fs';
 import { loadConfig } from './config';
 import { SyncEngine } from './engine';
 import { PeerDiscovery } from './discovery';
 import { createTray } from './tray';
 import { setupIpc } from './ipc';
 import { setupAutoUpdater } from './updater';
+import { UpnpManager } from './upnp';
 
 // Disable standard menu bar completely
 Menu.setApplicationMenu(null);
@@ -19,11 +21,53 @@ if (!gotTheLock) {
 let mainWindow: BrowserWindow | null = null;
 let engine: SyncEngine | null = null;
 let discovery: PeerDiscovery | null = null;
+let upnp: UpnpManager | null = null;
 let tray: any = null;
 
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 
+function getAppIcon(): Electron.NativeImage | string {
+  const iconName = process.platform === 'win32' ? 'icon.ico' : 'icon.png';
+  const candidates = [
+    path.join(process.resourcesPath, iconName),
+    path.join(process.resourcesPath, 'public', iconName),
+    path.join(__dirname, '../../public', iconName),
+    path.join(__dirname, '../public', iconName),
+    path.join(__dirname, '../dist', iconName),
+    path.join(app.getAppPath(), 'public', iconName),
+    path.join(app.getAppPath(), iconName)
+  ];
+  for (const cand of candidates) {
+    try {
+      if (fs.existsSync(cand)) {
+        const img = nativeImage.createFromPath(cand);
+        if (!img.isEmpty()) return img;
+        return cand;
+      }
+    } catch {}
+  }
+  // Fallback for Windows if ico loading failed
+  if (process.platform === 'win32') {
+    const pngCandidates = [
+      path.join(process.resourcesPath, 'icon.png'),
+      path.join(process.resourcesPath, 'public', 'icon.png'),
+      path.join(__dirname, '../../public/icon.png'),
+      path.join(app.getAppPath(), 'public/icon.png')
+    ];
+    for (const cand of pngCandidates) {
+      try {
+        if (fs.existsSync(cand)) {
+          const img = nativeImage.createFromPath(cand);
+          if (!img.isEmpty()) return img;
+        }
+      } catch {}
+    }
+  }
+  return path.join(app.getAppPath(), 'public', iconName);
+}
+
 function createWindow() {
+  const appIcon = getAppIcon();
   mainWindow = new BrowserWindow({
     width: 440,
     height: 660,
@@ -34,7 +78,7 @@ function createWindow() {
     frame: false,
     autoHideMenuBar: true,
     backgroundColor: '#1c1c1e',
-    icon: path.join(__dirname, '../dist/tray-icon.png'),
+    icon: appIcon,
     show: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -42,6 +86,10 @@ function createWindow() {
       contextIsolation: true
     }
   });
+
+  if (typeof appIcon !== 'string') {
+    mainWindow.setIcon(appIcon);
+  }
 
   if (isDev && process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL']);
@@ -63,6 +111,16 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  if (process.platform === 'win32') {
+    // Only bind to global com.andrey.macdrop if running from installed location (Program Files)
+    // To prevent Windows taskbar from binding unpacked/portable exe to stale shortcuts
+    if (process.execPath.toLowerCase().includes('program files')) {
+      app.setAppUserModelId('com.andrey.macdrop');
+    } else {
+      app.setAppUserModelId(`com.andrey.macdrop.${app.getVersion()}`);
+    }
+  }
+
   const config = loadConfig();
   engine = new SyncEngine(config);
   engine.start();
@@ -85,6 +143,17 @@ app.whenReady().then(() => {
   tray = createTray(() => mainWindow, engine, config);
   setupIpc(engine, discovery, config, () => mainWindow);
   setupAutoUpdater(() => mainWindow);
+
+  // Initialize UPnP Port Forwarding
+  upnp = new UpnpManager(config.apiPort || 8384);
+  if (config.upnpEnabled !== false) {
+    upnp.start().then(status => {
+      engine?.setUpnpStatus(status);
+    });
+    upnp.on('status', status => {
+      engine?.setUpnpStatus(status);
+    });
+  }
 
   // Relay engine and discovery events to renderer
   engine.on('status-changed', (status) => {
@@ -110,6 +179,7 @@ app.whenReady().then(() => {
 
 app.on('before-quit', () => {
   (app as any).isQuitting = true;
+  upnp?.stop();
   engine?.stop();
 });
 

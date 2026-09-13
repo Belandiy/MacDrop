@@ -26,10 +26,12 @@ export interface MacDropApi {
   onProgressUpdate: (callback: (progress: any) => void) => () => void;
   platform: string;
   version: string;
+  getUpnpStatus: () => Promise<any>;
   checkForUpdates: () => Promise<any>;
   installUpdate: () => Promise<void>;
   onUpdateAvailable: (callback: (version: string) => void) => () => void;
   onUpdateDownloaded: (callback: (version: string) => void) => () => void;
+  cancelTransfer: () => Promise<boolean>;
 }
 
 const api: MacDropApi = {
@@ -48,6 +50,7 @@ const api: MacDropApi = {
   },
   sendDroppedFiles: (filePaths, targetDeviceId) => ipcRenderer.invoke('send-dropped-files', { filePaths, targetDeviceId }),
   pickAndSendFiles: (targetDeviceId) => ipcRenderer.invoke('pick-and-send-files', targetDeviceId),
+  cancelTransfer: () => ipcRenderer.invoke('cancel-transfer'),
   updateDeviceName: (deviceId, newName) => ipcRenderer.invoke('update-device-name', { deviceId, newName }),
   removeDevice: (deviceId) => ipcRenderer.invoke('remove-device', deviceId),
   toggleDeviceReceive: (deviceId, enabled) => ipcRenderer.invoke('toggle-device-receive', { deviceId, enabled }),
@@ -76,6 +79,7 @@ const api: MacDropApi = {
   },
   platform: process.platform,
   version: packageJson.version,
+  getUpnpStatus: () => ipcRenderer.invoke('get-upnp-status'),
   checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
   installUpdate: () => ipcRenderer.invoke('install-update'),
   onUpdateAvailable: (callback) => {

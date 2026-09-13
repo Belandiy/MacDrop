@@ -66,3 +66,5 @@ $RECYCLE.BIN/
 # Temporary / crash dumps
 *.dmp
 *.crash
+
+GEMINI.md

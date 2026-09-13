@@ -8,7 +8,9 @@ import {
   ArrowUpCircle,
   RefreshCw,
   Wifi,
-  Send
+  Send,
+  Globe,
+  X
 } from 'lucide-react';
 import { PairedDevice } from './DeviceDetailView';
 
@@ -105,7 +107,15 @@ export const DeviceList: React.FC<DeviceListProps> = ({
                     }`}>
                       {isMac ? <Laptop className="w-4.5 h-4.5" /> : <Monitor className="w-4.5 h-4.5" />}
                     </div>
-                    <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[#1c1c1e] bg-emerald-500 shadow-sm shadow-emerald-500/50" />
+                    {device.connectionMode === 'remote' ? (
+                      <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-[#1c1c1e] bg-blue-500 shadow-sm shadow-blue-500/50 flex items-center justify-center" title="В сети (Удалённо через Интернет)">
+                        <Globe className="w-2 h-2 text-white" />
+                      </span>
+                    ) : device.connectionMode === 'offline' ? (
+                      <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[#1c1c1e] bg-zinc-500 shadow-sm" title="Не в сети" />
+                    ) : (
+                      <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[#1c1c1e] bg-emerald-500 shadow-sm shadow-emerald-500/50" title="В сети (Wi-Fi)" />
+                    )}
                   </div>
 
                   {/* Device Names */}
@@ -122,6 +132,12 @@ export const DeviceList: React.FC<DeviceListProps> = ({
                       <span className="truncate" title={device.originalName}>{device.originalName}</span>
                       <span>•</span>
                       <span className="font-mono text-zinc-500">{device.id}</span>
+                      {device.connectionMode === 'remote' && (
+                        <>
+                          <span>•</span>
+                          <span className="text-[9px] text-blue-400 bg-blue-500/15 px-1.5 py-0.5 rounded border border-blue-500/25 font-medium">Удалённо</span>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -168,7 +184,23 @@ export const DeviceList: React.FC<DeviceListProps> = ({
                 </span>
               )}
             </div>
-            <span className="text-blue-400 font-semibold">{percent}%</span>
+            <div className="flex items-center gap-2">
+              <span className="text-blue-400 font-semibold">{percent}%</span>
+              <button
+                type="button"
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  if (window.macdrop?.cancelTransfer) {
+                    await window.macdrop.cancelTransfer();
+                  }
+                }}
+                title="Отменить передачу"
+                className="px-1.5 py-0.5 rounded-md bg-red-500/15 hover:bg-red-500/25 active:bg-red-500/40 text-red-400 hover:text-red-300 transition-colors flex items-center gap-1 text-[10px] font-medium"
+              >
+                <X className="w-3 h-3" />
+                <span>Отмена</span>
+              </button>
+            </div>
           </div>
 
           <div className="w-full h-2 bg-zinc-800 rounded-full overflow-hidden">

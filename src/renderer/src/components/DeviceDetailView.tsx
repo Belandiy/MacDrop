@@ -16,7 +16,12 @@ import {
   Clock,
   HardDrive,
   Ban,
-  AlertCircle
+  AlertCircle,
+  Globe,
+  WifiOff,
+  ArrowDownCircle,
+  ArrowUpCircle,
+  RefreshCw
 } from 'lucide-react';
 
 export interface PairedDevice {
@@ -25,9 +30,13 @@ export interface PairedDevice {
   customName: string;
   ip: string;
   port: number;
+  remoteIp?: string;
+  remotePort?: number;
   pairedAt: string;
   lastSeen?: number;
   receiveEnabled?: boolean;
+  connectionMode?: 'local' | 'remote' | 'offline';
+  authToken?: string;
 }
 
 interface TransferItem {
@@ -58,6 +67,10 @@ function formatBytes(bytes: number): string {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
 }
 
+function formatSpeed(bps: number): string {
+  return `${formatBytes(bps)}/с`;
+}
+
 function timeAgo(timestamp: number): string {
   const seconds = Math.floor((Date.now() - timestamp) / 1000);
   if (seconds < 60) return 'только что';
@@ -76,6 +89,10 @@ export const DeviceDetailView: React.FC<DeviceDetailViewProps> = ({
   onOpenFile,
   currentProgress
 }) => {
+  const percent = currentProgress && currentProgress.totalBytes > 0
+    ? Math.min(100, Math.round((currentProgress.bytesTransferred / currentProgress.totalBytes) * 100))
+    : 0;
+
   const [isEditingName, setIsEditingName] = useState(false);
   const [nameInput, setNameInput] = useState(device.customName || device.originalName);
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
@@ -282,7 +299,15 @@ export const DeviceDetailView: React.FC<DeviceDetailViewProps> = ({
               isMac ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/30' : 'bg-blue-500/10 text-blue-400 border border-blue-500/30'
             }`}>
               {isMac ? <Laptop className="w-6 h-6" /> : <Monitor className="w-6 h-6" />}
-              <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-[#2c2c2e] bg-emerald-500 shadow-sm shadow-emerald-500/50" />
+              {device.connectionMode === 'remote' ? (
+                <span className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full border-2 border-[#2c2c2e] bg-blue-500 shadow-sm shadow-blue-500/50 flex items-center justify-center" title="Подключено удалённо">
+                  <Globe className="w-2.5 h-2.5 text-white" />
+                </span>
+              ) : device.connectionMode === 'offline' ? (
+                <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-[#2c2c2e] bg-zinc-500 shadow-sm" title="Не в сети" />
+              ) : (
+                <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-[#2c2c2e] bg-emerald-500 shadow-sm shadow-emerald-500/50" title="В сети (Wi-Fi)" />
+              )}
             </div>
 
             <div>
@@ -337,10 +362,22 @@ export const DeviceDetailView: React.FC<DeviceDetailViewProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-1 rounded-full text-[11px] font-medium">
-            <CheckCircle2 className="w-3 h-3" />
-            <span>Подключено</span>
-          </div>
+          {device.connectionMode === 'remote' ? (
+            <div className="flex items-center gap-1.5 bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2.5 py-1 rounded-full text-[11px] font-medium">
+              <Globe className="w-3 h-3" />
+              <span>В сети (Удалённо)</span>
+            </div>
+          ) : device.connectionMode === 'offline' ? (
+            <div className="flex items-center gap-1.5 bg-zinc-500/10 text-zinc-400 border border-zinc-500/20 px-2.5 py-1 rounded-full text-[11px] font-medium">
+              <WifiOff className="w-3 h-3" />
+              <span>Не в сети</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-1 rounded-full text-[11px] font-medium">
+              <CheckCircle2 className="w-3 h-3" />
+              <span>В сети (Wi-Fi)</span>
+            </div>
+          )}
         </div>
 
         {/* Immutable Device Attributes Grid */}
@@ -376,8 +413,10 @@ export const DeviceDetailView: React.FC<DeviceDetailViewProps> = ({
             <span className="text-[10px] text-zinc-500 uppercase tracking-wider block font-semibold mb-0.5">
               Сетевой адрес
             </span>
-            <span className="text-xs font-mono text-zinc-300">
-              {device.ip}:{device.port || 8384}
+            <span className="text-xs font-mono text-zinc-300 truncate block">
+              {device.connectionMode === 'remote' && device.remoteIp
+                ? `${device.remoteIp}:${device.remotePort || 8384} (WAN)`
+                : `${device.ip}:${device.port || 8384} (LAN)`}
             </span>
           </div>
 
@@ -494,6 +533,56 @@ export const DeviceDetailView: React.FC<DeviceDetailViewProps> = ({
           )}
         </div>
       </div>
+
+      {/* Active Transfer Progress Bar for this device */}
+      {currentProgress && (
+        <div className="bg-[#2c2c2e]/90 border border-white/10 rounded-2xl p-3 shadow-lg animate-in fade-in duration-200">
+          <div className="flex items-center justify-between text-xs mb-1.5">
+            <div className="flex items-center gap-1.5 font-medium text-white truncate max-w-[240px]">
+              {currentProgress.direction === 'incoming' ? (
+                <ArrowDownCircle className="w-4 h-4 text-emerald-400 shrink-0" />
+              ) : (
+                <ArrowUpCircle className="w-4 h-4 text-blue-400 shrink-0" />
+              )}
+              <span className="truncate">{currentProgress.filename}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-blue-400 font-semibold">{percent}%</span>
+              <button
+                type="button"
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  if (window.macdrop?.cancelTransfer) {
+                    await window.macdrop.cancelTransfer();
+                  }
+                }}
+                title="Отменить передачу"
+                className="px-1.5 py-0.5 rounded-md bg-red-500/15 hover:bg-red-500/25 active:bg-red-500/40 text-red-400 hover:text-red-300 transition-colors flex items-center gap-1 text-[10px] font-medium"
+              >
+                <X className="w-3 h-3" />
+                <span>Отмена</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="w-full h-2 bg-zinc-800 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full transition-all duration-300"
+              style={{ width: `${percent}%` }}
+            />
+          </div>
+
+          <div className="flex items-center justify-between text-[11px] text-zinc-400 mt-1.5">
+            <span>
+              {formatBytes(currentProgress.bytesTransferred)} из {formatBytes(currentProgress.totalBytes)}
+            </span>
+            <span className="flex items-center gap-1 text-zinc-300">
+              <RefreshCw className="w-3 h-3 animate-spin text-blue-400" />
+              {formatSpeed(currentProgress.speedBps)}
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Transfer History For This Specific Device */}
       <div className="bg-[#2c2c2e]/90 border border-white/10 rounded-2xl p-4 shadow-lg flex-1 flex flex-col min-h-[220px]">

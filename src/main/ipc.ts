@@ -52,6 +52,10 @@ export function setupIpc(
     return engine.getStatus();
   });
 
+  ipcMain.handle('get-upnp-status', () => {
+    return engine.getUpnpStatus();
+  });
+
   ipcMain.handle('get-discovered-peers', () => {
     return discovery.getPeers();
   });
@@ -68,8 +72,8 @@ export function setupIpc(
     let targetIp = '';
     let targetPort = 8384;
 
-    // 1. Direct IP:port input (e.g. 192.168.0.110 or 192.168.0.110:8384)
-    if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/.test(clean)) {
+    // 1. Direct IP, Hostname, or Tailscale address (e.g. 192.168.0.110, 100.x.x.x, or hostname:8384)
+    if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/.test(clean) || clean.includes(':') || clean.includes('.net') || clean.includes('.local') || clean.includes('.')) {
       const parts = clean.split(':');
       targetIp = parts[0];
       if (parts[1]) targetPort = parseInt(parts[1], 10);
@@ -205,6 +209,10 @@ export function setupIpc(
       openAsHidden: true
     });
     return enable;
+  });
+
+  ipcMain.handle('cancel-transfer', () => {
+    return engine.cancelActiveTransfer();
   });
 
   ipcMain.on('minimize-window', () => {

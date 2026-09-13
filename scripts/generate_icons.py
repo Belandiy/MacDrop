@@ -28,9 +28,9 @@ def generate():
     # 1. Main 1024x1024 icon for macOS & Linux & Windows
     img.save('public/icon.png', 'PNG')
 
-    # 2. Windows multi-size .ico
-    ico_sizes = [(16, 16), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)]
-    img.save('public/icon.ico', format='ICO', sizes=ico_sizes)
+    # 2. Windows multi-size .ico (Win32 compliant DIB BMP format)
+    ico_sizes = [(16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)]
+    img.save('public/icon.ico', format='ICO', sizes=ico_sizes, bitmap_format='bmp')
 
     # 3. Tray icon 32x32
     tray = img.resize((32, 32), Image.Resampling.LANCZOS)

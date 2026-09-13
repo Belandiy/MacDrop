@@ -16,6 +16,17 @@
     "bin/**/*",
     "package.json"
   ],
+  "extraResources": [
+    {
+      "from": "public/icon.ico",
+      "to": "icon.ico"
+    },
+    {
+      "from": "public/icon.png",
+      "to": "icon.png"
+    }
+  ],
+  "afterPack": "scripts/afterPack.js",
   "win": {
     "target": [
       {
@@ -35,7 +46,9 @@
     "allowToChangeInstallationDirectory": true,
     "createDesktopShortcut": true,
     "createStartMenuShortcut": true,
-    "shortcutName": "MacDrop"
+    "shortcutName": "MacDrop",
+    "installerIcon": "public/icon.ico",
+    "uninstallerIcon": "public/icon.ico"
   },
   "mac": {
     "target": [

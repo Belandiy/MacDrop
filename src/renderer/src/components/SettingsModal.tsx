@@ -1,5 +1,5 @@
-import React from 'react';
-import { X, Bell, Power, Unlink, HardDrive } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Bell, Power, Unlink, HardDrive, Globe, CheckCircle2, AlertCircle } from 'lucide-react';
 
 export interface PairedDevice {
   id: string;
@@ -35,6 +35,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onSelectFolder,
   targetFolder
 }) => {
+  const [upnpStatus, setUpnpStatus] = useState<any>(null);
+
+  useEffect(() => {
+    if (isOpen && window.macdrop?.getUpnpStatus) {
+      window.macdrop.getUpnpStatus().then(setUpnpStatus).catch(() => {});
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   return (
@@ -110,6 +118,53 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               onChange={(e) => onToggleNotifications(e.target.checked)}
               className="w-4 h-4 rounded accent-blue-600 cursor-pointer"
             />
+          </div>
+
+          {/* UPnP Remote Access Status */}
+          <div className="flex flex-col gap-2 pt-1 border-t border-white/10">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Globe className="w-3.5 h-3.5 text-blue-400" />
+                <span className="text-xs font-medium text-white">Удалённый доступ (UPnP)</span>
+              </div>
+              {upnpStatus?.active ? (
+                <span className="text-[10px] bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 px-1.5 py-0.5 rounded font-medium flex items-center gap-1">
+                  <CheckCircle2 className="w-2.5 h-2.5" />
+                  <span>Порт {upnpStatus.externalPort || 8384} открыт</span>
+                </span>
+              ) : (
+                <span className="text-[10px] bg-zinc-500/15 text-zinc-400 border border-zinc-500/25 px-1.5 py-0.5 rounded font-medium">
+                  {upnpStatus?.error || 'Поиск роутера...'}
+                </span>
+              )}
+            </div>
+
+            {upnpStatus?.active && (
+              <div className="bg-[#1c1c1e] p-2.5 rounded-xl border border-white/5 text-[11px] space-y-1">
+                <div className="flex items-center justify-between text-zinc-400">
+                  <span>Роутер:</span>
+                  <span className="text-zinc-200 font-medium truncate max-w-[170px]" title={upnpStatus.routerName}>
+                    {upnpStatus.routerName || 'UPnP IGD'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-zinc-400">
+                  <span>Внешний IP:</span>
+                  <span className="font-mono text-zinc-200">
+                    {upnpStatus.wanIp || upnpStatus.publicInternetIp || '—'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between pt-0.5 text-[10px]">
+                  <span>Тип адреса:</span>
+                  {upnpStatus.isPublicIp ? (
+                    <span className="text-emerald-400 font-medium">🟢 Белый IP (доступен отовсюду)</span>
+                  ) : (
+                    <span className="text-amber-400 font-medium" title="Роутер находится за NAT провайдера">
+                      ⚠️ Серый IP (рекомендуется Tailscale)
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Connected Devices Info */}

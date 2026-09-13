@@ -2,10 +2,44 @@ import http from 'http';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
+import crypto from 'crypto';
 import { EventEmitter } from 'events';
 import { AppConfig, PairedDevice, saveConfig } from './config';
 import { Notification, shell } from 'electron';
 import { PeerDiscovery } from './discovery';
+import { isPrivateIp, UpnpStatus } from './upnp';
+
+export function getSafeResolvedPath(baseFolder: string, relPath: string, filename: string): string | null {
+  const sanitizedFilename = path.basename(filename).replace(/[/\\?%*:|"<>]/g, '_').trim();
+  if (!sanitizedFilename || sanitizedFilename === '.' || sanitizedFilename === '..') {
+    return null;
+  }
+
+  const cleanRel = path.normalize(relPath || sanitizedFilename)
+    .replace(/^(\.\.[\/\\])+/, '')
+    .replace(/^[\/\\]+/, '');
+
+  const targetBase = path.resolve(baseFolder);
+  const targetResolved = path.resolve(targetBase, cleanRel);
+
+  if (!targetResolved.startsWith(targetBase + path.sep) && targetResolved !== targetBase) {
+    return null;
+  }
+
+  return targetResolved;
+}
+
+export function getNonConflictingPath(targetPath: string): string {
+  if (!fs.existsSync(targetPath)) return targetPath;
+  const dir = path.dirname(targetPath);
+  const ext = path.extname(targetPath);
+  const base = path.basename(targetPath, ext);
+  let counter = 1;
+  while (fs.existsSync(path.join(dir, `${base} (${counter})${ext}`))) {
+    counter++;
+  }
+  return path.join(dir, `${base} (${counter})${ext}`);
+}
 
 export interface TransferProgress {
   filename: string;
@@ -28,12 +62,28 @@ export interface HistoryItem {
   peerName?: string;
 }
 
+export interface PendingTransfer {
+  transferId: string;
+  filePath: string;
+  filename: string;
+  relPath: string;
+  size: number;
+  targetDeviceId: string;
+  createdAt: number;
+}
+
 export class SyncEngine extends EventEmitter {
   private config: AppConfig;
   private server: http.Server | null = null;
   private currentProgress: TransferProgress | null = null;
   private history: HistoryItem[] = [];
   private discovery?: PeerDiscovery;
+  private upnpStatus: UpnpStatus | null = null;
+  private pendingTransfers: Map<string, PendingTransfer> = new Map();
+  private remotePollTimer: NodeJS.Timeout | null = null;
+  private healthCheckTimer: NodeJS.Timeout | null = null;
+  private isDownloadingRemote = false;
+  private activeCancelHandlers: Set<() => void> = new Set();
 
   constructor(config: AppConfig) {
     super();
@@ -134,6 +184,19 @@ export class SyncEngine extends EventEmitter {
     return false;
   }
 
+  public setUpnpStatus(status: UpnpStatus) {
+    this.upnpStatus = status;
+    if (status.wanIp) {
+      this.config.wanIp = status.wanIp;
+      saveConfig(this.config);
+    }
+    this.emit('status-changed', this.getStatus());
+  }
+
+  public getUpnpStatus(): UpnpStatus | null {
+    return this.upnpStatus;
+  }
+
   public getStatus() {
     const isConnected = this.config.pairedDevices.length > 0;
     return {
@@ -143,7 +206,9 @@ export class SyncEngine extends EventEmitter {
       targetFolder: this.config.targetFolder,
       pairedDevices: this.config.pairedDevices,
       currentProgress: this.currentProgress,
-      recentHistory: [...this.history].reverse().slice(0, 50)
+      recentHistory: [...this.history].reverse().slice(0, 50),
+      upnpStatus: this.upnpStatus,
+      pendingTransfersCount: this.pendingTransfers.size
     };
   }
 
@@ -151,11 +216,40 @@ export class SyncEngine extends EventEmitter {
     return this.history.filter(h => h.peerDeviceId === deviceId).reverse();
   }
 
+  public cancelActiveTransfer(): boolean {
+    let cancelledAny = false;
+
+    if (this.activeCancelHandlers.size > 0) {
+      for (const handler of Array.from(this.activeCancelHandlers)) {
+        try {
+          handler();
+        } catch {}
+      }
+      this.activeCancelHandlers.clear();
+      cancelledAny = true;
+    }
+
+    if (this.pendingTransfers.size > 0) {
+      this.pendingTransfers.clear();
+      cancelledAny = true;
+    }
+
+    if (this.currentProgress) {
+      this.currentProgress = null;
+      this.emit('progress', null);
+      cancelledAny = true;
+    }
+
+    this.emit('remote-transfer-cancelled');
+    this.emit('status-changed', this.getStatus());
+    return cancelledAny;
+  }
+
   public setDiscovery(discovery: PeerDiscovery) {
     this.discovery = discovery;
   }
 
-  public updatePeerAddress(deviceId: string, ip: string, port?: number): boolean {
+  public updatePeerAddress(deviceId: string, ip: string, port?: number, forceRemote = false, remotePort?: number): boolean {
     if (!deviceId || !ip) return false;
     const cleanIp = ip.replace(/^::ffff:/, '').trim();
     if (cleanIp === '127.0.0.1' || cleanIp === '::1') return false;
@@ -163,15 +257,38 @@ export class SyncEngine extends EventEmitter {
     const peer = this.config.pairedDevices.find(d => d.id === deviceId);
     if (peer) {
       let changed = false;
-      if (peer.ip !== cleanIp) {
-        console.log(`Live IP Sync: device ${deviceId} (${peer.customName || peer.originalName}) changed IP from ${peer.ip} to ${cleanIp}`);
-        peer.ip = cleanIp;
-        changed = true;
+      const isPrivate = isPrivateIp(cleanIp);
+
+      if (forceRemote || !isPrivate) {
+        if (peer.remoteIp !== cleanIp) {
+          console.log(`Remote IP Sync: device ${deviceId} remote IP set to ${cleanIp}`);
+          peer.remoteIp = cleanIp;
+          changed = true;
+        }
+        if (remotePort && peer.remotePort !== remotePort) {
+          peer.remotePort = remotePort;
+          changed = true;
+        }
+        if (peer.connectionMode !== 'remote') {
+          peer.connectionMode = 'remote';
+          changed = true;
+        }
+      } else {
+        if (peer.ip !== cleanIp) {
+          console.log(`Live IP Sync: device ${deviceId} (${peer.customName || peer.originalName}) changed IP from ${peer.ip} to ${cleanIp}`);
+          peer.ip = cleanIp;
+          changed = true;
+        }
+        if (port && peer.port !== port) {
+          peer.port = port;
+          changed = true;
+        }
+        if (peer.connectionMode !== 'local') {
+          peer.connectionMode = 'local';
+          changed = true;
+        }
       }
-      if (port && peer.port !== port) {
-        peer.port = port;
-        changed = true;
-      }
+
       peer.lastSeen = Date.now();
       if (changed) {
         saveConfig(this.config);
@@ -224,13 +341,14 @@ export class SyncEngine extends EventEmitter {
   public async resolvePeerIp(peer: PairedDevice): Promise<{ ip: string; port: number }> {
     const port = peer.port || 8384;
 
-    // 1. First check if current peer.ip is reachable
+    // 1. First check if current peer.ip is reachable locally
     if (peer.ip && await this.checkPeerPing(peer.ip, port)) {
       peer.lastSeen = Date.now();
+      peer.connectionMode = 'local';
       return { ip: peer.ip, port };
     }
 
-    console.log(`Device ${peer.id} at ${peer.ip} is unreachable. Searching for updated IP...`);
+    console.log(`Device ${peer.id} at ${peer.ip} is unreachable locally. Searching for updated IP...`);
 
     // 2. Check if discovery recently saw a new IP for this device
     if (this.discovery) {
@@ -240,6 +358,7 @@ export class SyncEngine extends EventEmitter {
         if (await this.checkPeerPing(discovered.ip, dPort)) {
           console.log(`Device ${peer.id} found at new IP in discovery cache: ${discovered.ip}`);
           this.updatePeerAddress(peer.id, discovered.ip, dPort);
+          peer.connectionMode = 'local';
           return { ip: discovered.ip, port: dPort };
         }
       }
@@ -254,18 +373,46 @@ export class SyncEngine extends EventEmitter {
         const mPort = match.port || port;
         console.log(`Device ${peer.id} found at new IP via subnet probe: ${match.ip}`);
         this.updatePeerAddress(peer.id, match.ip, mPort);
+        peer.connectionMode = 'local';
         return { ip: match.ip, port: mPort };
       }
     }
 
+    // 4. Check if peer has a remote / WAN address reachable directly
+    const remoteHost = peer.remoteIp || (this.config.customRemoteHost ? this.config.customRemoteHost : undefined);
+    const remotePort = peer.remotePort || 8384;
+    if (remoteHost && await this.checkPeerPing(remoteHost, remotePort)) {
+      console.log(`Device ${peer.id} found at remote address: ${remoteHost}:${remotePort}`);
+      peer.lastSeen = Date.now();
+      peer.connectionMode = 'remote';
+      return { ip: remoteHost, port: remotePort };
+    }
+
+    // 5. Asymmetric NAT / Cellular: peer cannot receive incoming connections, but is checking in via reverse poll
+    if (peer.lastSeen > Date.now() - 60000 || peer.connectionMode === 'remote') {
+      console.log(`Device ${peer.id} is connected remotely behind cellular NAT. Using reverse transfer queue.`);
+      return { ip: 'REVERSE_PULL', port: 0 };
+    }
+
+    peer.connectionMode = 'offline';
     throw new Error(`Устройство «${peer.customName || peer.originalName}» не в сети или недоступно.`);
   }
 
   public start() {
     this.startLocalServer();
+    this.startHealthCheck();
+    this.startRemotePolling();
   }
 
   public stop() {
+    if (this.healthCheckTimer) {
+      clearInterval(this.healthCheckTimer);
+      this.healthCheckTimer = null;
+    }
+    if (this.remotePollTimer) {
+      clearInterval(this.remotePollTimer);
+      this.remotePollTimer = null;
+    }
     if (this.server) {
       try {
         this.server.close();
@@ -274,13 +421,118 @@ export class SyncEngine extends EventEmitter {
     }
   }
 
+  private startHealthCheck() {
+    if (this.healthCheckTimer) clearInterval(this.healthCheckTimer);
+    this.healthCheckTimer = setInterval(async () => {
+      for (const peer of this.config.pairedDevices) {
+        const localPort = peer.port || 8384;
+        const isLocal = peer.ip && await this.checkPeerPing(peer.ip, localPort);
+        if (isLocal) {
+          if (peer.connectionMode !== 'local') {
+            peer.connectionMode = 'local';
+            peer.lastSeen = Date.now();
+            this.emit('status-changed', this.getStatus());
+          }
+          continue;
+        }
+
+        const remoteHost = peer.remoteIp || this.config.customRemoteHost;
+        const remotePort = peer.remotePort || 8384;
+        const isRemote = remoteHost && await this.checkPeerPing(remoteHost, remotePort);
+        if (isRemote) {
+          if (peer.connectionMode !== 'remote') {
+            peer.connectionMode = 'remote';
+            peer.lastSeen = Date.now();
+            this.emit('status-changed', this.getStatus());
+          }
+          continue;
+        }
+
+        // If not responding to direct ping, check if seen in last 40 seconds (from reverse poll)
+        if (Date.now() - (peer.lastSeen || 0) < 40000) {
+          if (peer.connectionMode !== 'remote') {
+            peer.connectionMode = 'remote';
+            this.emit('status-changed', this.getStatus());
+          }
+        } else {
+          if (peer.connectionMode !== 'offline') {
+            peer.connectionMode = 'offline';
+            this.emit('status-changed', this.getStatus());
+          }
+        }
+      }
+    }, 12000);
+  }
+
+  private startRemotePolling() {
+    if (this.remotePollTimer) clearInterval(this.remotePollTimer);
+    this.remotePollTimer = setInterval(async () => {
+      if (this.isDownloadingRemote) return;
+
+      for (const peer of this.config.pairedDevices) {
+        const targetHost = peer.remoteIp || (peer.connectionMode === 'remote' ? peer.ip : undefined);
+        const targetPort = peer.remotePort || 8384;
+        if (!targetHost || targetHost === '127.0.0.1' || targetHost.startsWith('169.254.')) continue;
+
+        try {
+          const req = http.get({
+            hostname: targetHost,
+            port: targetPort,
+            path: '/api/remote/poll',
+            headers: {
+              'x-device-id': this.config.deviceId,
+              'x-device-name': encodeURIComponent(this.config.deviceName),
+              'x-auth-token': peer.authToken || ''
+            },
+            timeout: 2500
+          }, (res) => {
+            if (res.statusCode === 200) {
+              let body = '';
+              res.on('data', chunk => { body += chunk; });
+              res.on('end', async () => {
+                try {
+                  const data = JSON.parse(body);
+                  peer.lastSeen = Date.now();
+                  if (peer.connectionMode !== 'local') {
+                    peer.connectionMode = 'remote';
+                    this.emit('status-changed', this.getStatus());
+                  }
+
+                  if (Array.isArray(data.pending) && data.pending.length > 0 && !this.isDownloadingRemote) {
+                    for (const item of data.pending) {
+                      try {
+                        this.isDownloadingRemote = true;
+                        await this.downloadPendingRemoteItem(targetHost, targetPort, item, peer.id);
+                      } catch (err) {
+                        console.error('Failed to download pending remote item:', err);
+                      } finally {
+                        this.isDownloadingRemote = false;
+                      }
+                    }
+                  }
+                } catch {}
+              });
+            }
+          });
+
+          req.on('error', () => {});
+          req.on('timeout', () => req.destroy());
+        } catch {}
+      }
+    }, 4000);
+  }
+
   public async pairWithRemote(peerIp: string, peerPort = 8384): Promise<{ success: boolean; peer?: PairedDevice; error?: string }> {
     const cleanIp = peerIp.replace(/^::ffff:/, '').trim();
     return new Promise((resolve) => {
+      const localToken = crypto.randomBytes(24).toString('hex');
       const payload = JSON.stringify({
         deviceId: this.config.deviceId,
         deviceName: this.config.deviceName,
-        port: this.config.apiPort || 8384
+        authToken: localToken,
+        port: this.config.apiPort || 8384,
+        wanIp: this.upnpStatus?.wanIp || this.config.wanIp,
+        remotePort: this.upnpStatus?.externalPort || this.config.apiPort || 8384
       });
 
       const req = http.request({
@@ -302,11 +554,16 @@ export class SyncEngine extends EventEmitter {
               const data = JSON.parse(body);
               const deviceId = data.deviceId || 'Peer';
               const originalName = data.deviceName || 'Устройство';
+              const sharedToken = data.authToken || localToken;
 
               let existing = this.config.pairedDevices.find(d => d.id === deviceId);
               if (existing) {
                 existing.ip = cleanIp;
                 existing.port = peerPort;
+                if (data.wanIp) existing.remoteIp = data.wanIp;
+                if (data.remotePort) existing.remotePort = data.remotePort;
+                existing.connectionMode = isPrivateIp(cleanIp) ? 'local' : 'remote';
+                existing.authToken = sharedToken;
                 existing.lastSeen = Date.now();
               } else {
                 existing = {
@@ -315,6 +572,10 @@ export class SyncEngine extends EventEmitter {
                   customName: originalName,
                   ip: cleanIp,
                   port: peerPort,
+                  remoteIp: data.wanIp,
+                  remotePort: data.remotePort || peerPort,
+                  connectionMode: isPrivateIp(cleanIp) ? 'local' : 'remote',
+                  authToken: sharedToken,
                   pairedAt: new Date().toISOString(),
                   lastSeen: Date.now()
                 };
@@ -352,12 +613,15 @@ export class SyncEngine extends EventEmitter {
   private startLocalServer() {
     const port = this.config.apiPort || 8384;
     this.server = http.createServer(async (req, res) => {
-      res.setHeader('Access-Control-Allow-Origin', '*');
-      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Device-ID, X-Device-Name, X-Filename, X-Relative-Path');
+      // Security: Block any requests from web browsers (CORS / Drive-by attack mitigation)
+      if (req.headers.origin) {
+        res.writeHead(403, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Browser cross-origin requests are forbidden' }));
+        return;
+      }
 
       if (req.method === 'OPTIONS') {
-        res.writeHead(200);
+        res.writeHead(405);
         res.end();
         return;
       }
@@ -375,7 +639,9 @@ export class SyncEngine extends EventEmitter {
           status: 'ok',
           deviceId: this.config.deviceId,
           deviceName: this.config.deviceName,
-          platform: process.platform
+          platform: process.platform,
+          wanIp: this.upnpStatus?.wanIp || this.config.wanIp,
+          remotePort: this.upnpStatus?.externalPort || this.config.apiPort || 8384
         }));
         return;
       }
@@ -392,10 +658,16 @@ export class SyncEngine extends EventEmitter {
               const cleanIp = rawIp.replace(/^::ffff:/, '');
 
               let existing = this.config.pairedDevices.find(d => d.id === data.deviceId);
+              const sharedToken = data.authToken || existing?.authToken || crypto.randomBytes(24).toString('hex');
+
               if (existing) {
                 existing.ip = cleanIp;
                 existing.port = data.port || 8384;
+                if (data.wanIp) existing.remoteIp = data.wanIp;
+                if (data.remotePort) existing.remotePort = data.remotePort;
+                existing.connectionMode = isPrivateIp(cleanIp) ? 'local' : 'remote';
                 existing.originalName = data.deviceName;
+                existing.authToken = sharedToken;
                 existing.lastSeen = Date.now();
               } else {
                 existing = {
@@ -404,6 +676,10 @@ export class SyncEngine extends EventEmitter {
                   customName: data.deviceName,
                   ip: cleanIp,
                   port: data.port || 8384,
+                  remoteIp: data.wanIp,
+                  remotePort: data.remotePort || data.port || 8384,
+                  connectionMode: isPrivateIp(cleanIp) ? 'local' : 'remote',
+                  authToken: sharedToken,
                   pairedAt: new Date().toISOString(),
                   lastSeen: Date.now()
                 };
@@ -419,7 +695,10 @@ export class SyncEngine extends EventEmitter {
               res.end(JSON.stringify({
                 success: true,
                 deviceId: this.config.deviceId,
-                deviceName: this.config.deviceName
+                deviceName: this.config.deviceName,
+                authToken: sharedToken,
+                wanIp: this.upnpStatus?.wanIp || this.config.wanIp,
+                remotePort: this.upnpStatus?.externalPort || this.config.apiPort || 8384
               }));
               return;
             }
@@ -443,8 +722,18 @@ export class SyncEngine extends EventEmitter {
         const relPath = rawRelPath ? decodeURIComponent(rawRelPath) : filename;
         const totalSize = parseInt(req.headers['content-length'] || '0', 10);
 
+        // Security: Block unauthorized / unpaired clients from uploading files
         const peer = this.config.pairedDevices.find(d => d.id === senderId);
-        if (peer && peer.receiveEnabled === false) {
+        if (!peer) {
+          console.warn(`Blocked unauthorized upload attempt from unpaired device: ${senderId}`);
+          res.writeHead(401, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({
+            error: 'Устройство не сопряжено. Выполните сопряжение в MacDrop.'
+          }));
+          return;
+        }
+
+        if (peer.receiveEnabled === false) {
           console.log(`Receiving is disabled for peer ${peer.customName || peer.originalName} (${senderId}).`);
           res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8' });
           res.end(JSON.stringify({
@@ -453,9 +742,29 @@ export class SyncEngine extends EventEmitter {
           return;
         }
 
-        const peerName = peer?.customName || peer?.originalName || (senderId ? `Устройство (${senderId})` : 'Второе устройство');
+        // Security: Verify authToken if established during pairing
+        const reqToken = req.headers['x-auth-token'] as string;
+        if (peer.authToken && reqToken && peer.authToken !== reqToken) {
+          console.warn(`Blocked upload attempt with invalid auth token from ${senderId}`);
+          res.writeHead(401, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({ error: 'Неверный токен авторизации устройства' }));
+          return;
+        }
 
-        const targetPath = path.join(this.config.targetFolder, relPath);
+        const peerName = peer.customName || peer.originalName;
+
+        // Security: Path Traversal defense - ensure resolved path strictly resides within targetFolder
+        const safeTarget = getSafeResolvedPath(this.config.targetFolder, relPath, filename);
+        if (!safeTarget) {
+          console.warn(`Path Traversal attempt blocked from ${senderId}: relPath="${relPath}", filename="${filename}"`);
+          res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({ error: 'Недопустимый путь файла (Path Traversal)' }));
+          return;
+        }
+
+        // Data Integrity: Never overwrite existing files, generate non-conflicting filename
+        const targetPath = getNonConflictingPath(safeTarget);
+        const actualFilename = path.basename(targetPath);
         const targetDir = path.dirname(targetPath);
 
         try {
@@ -466,14 +775,29 @@ export class SyncEngine extends EventEmitter {
           console.error('Failed to create target dir:', targetDir, e);
         }
 
-        console.log(`Receiving from ${peerName}: ${filename} -> ${targetPath}`);
+        console.log(`Receiving from ${peerName}: ${actualFilename} -> ${targetPath}`);
 
         let writtenBytes = 0;
         const startTime = Date.now();
         const writeStream = fs.createWriteStream(targetPath);
 
+        const cancelFn = () => {
+          try { req.destroy(); } catch {}
+          try { writeStream.destroy(); } catch {}
+          try {
+            if (fs.existsSync(targetPath)) fs.unlinkSync(targetPath);
+          } catch {}
+          this.currentProgress = null;
+          this.emit('progress', null);
+        };
+        this.activeCancelHandlers.add(cancelFn);
+
+        const cleanupCancel = () => {
+          this.activeCancelHandlers.delete(cancelFn);
+        };
+
         this.currentProgress = {
-          filename,
+          filename: actualFilename,
           bytesTransferred: 0,
           totalBytes: totalSize,
           speedBps: 0,
@@ -498,12 +822,13 @@ export class SyncEngine extends EventEmitter {
         req.pipe(writeStream);
 
         writeStream.on('finish', () => {
+          cleanupCancel();
           this.currentProgress = null;
           this.emit('progress', null);
 
           this.history.push({
-            id: Math.random().toString(36).substring(7),
-            filename,
+            id: crypto.randomBytes(8).toString('hex'),
+            filename: actualFilename,
             size: totalSize,
             timestamp: Date.now(),
             direction: 'incoming',
@@ -518,7 +843,7 @@ export class SyncEngine extends EventEmitter {
             try {
               const notification = new Notification({
                 title: `MacDrop: Файл от ${peerName}!`,
-                body: `${filename} сохранен в ${path.basename(this.config.targetFolder)}`
+                body: `${actualFilename} сохранен в ${path.basename(this.config.targetFolder)}`
               });
               notification.on('click', () => {
                 shell.showItemInFolder(targetPath);
@@ -532,11 +857,160 @@ export class SyncEngine extends EventEmitter {
         });
 
         writeStream.on('error', (err) => {
+          cleanupCancel();
           console.error('File write stream error:', err);
           this.currentProgress = null;
           this.emit('progress', null);
           res.writeHead(500, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ error: err.message }));
+        });
+
+        req.on('close', () => {
+          cleanupCancel();
+        });
+
+        return;
+      }
+
+      // Remote polling for pending files (Reverse Pull)
+      if (url.pathname === '/api/remote/poll') {
+        const senderId = req.headers['x-device-id'] as string;
+        if (senderId) {
+          const rawIp = req.socket.remoteAddress || '127.0.0.1';
+          this.updatePeerAddress(senderId, rawIp, undefined, true);
+        }
+
+        const peer = this.config.pairedDevices.find(d => d.id === senderId);
+        if (!peer) {
+          res.writeHead(401, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Unpaired peer' }));
+          return;
+        }
+
+        const reqToken = req.headers['x-auth-token'] as string;
+        if (peer.authToken && reqToken && peer.authToken !== reqToken) {
+          res.writeHead(401, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Invalid auth token' }));
+          return;
+        }
+
+        const pendingForPeer = Array.from(this.pendingTransfers.values())
+          .filter(t => t.targetDeviceId === senderId)
+          .map(t => ({
+            transferId: t.transferId,
+            filename: t.filename,
+            relPath: t.relPath,
+            size: t.size
+          }));
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ status: 'ok', pending: pendingForPeer }));
+        return;
+      }
+
+      // Remote download endpoint (Reverse Pull delivery)
+      if (url.pathname.startsWith('/api/remote/download/') && req.method === 'GET') {
+        const transferId = url.pathname.replace('/api/remote/download/', '').trim();
+        const transfer = this.pendingTransfers.get(transferId);
+        if (!transfer || !fs.existsSync(transfer.filePath)) {
+          res.writeHead(404, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Transfer not found or expired' }));
+          return;
+        }
+
+        const senderId = req.headers['x-device-id'] as string;
+        if (senderId && transfer.targetDeviceId && senderId !== transfer.targetDeviceId) {
+          res.writeHead(403, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Unauthorized transfer download' }));
+          return;
+        }
+
+        const peer = this.config.pairedDevices.find(d => d.id === transfer.targetDeviceId);
+        const reqToken = req.headers['x-auth-token'] as string;
+        if (peer?.authToken && reqToken && peer.authToken !== reqToken) {
+          res.writeHead(401, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Invalid auth token' }));
+          return;
+        }
+
+        const peerName = peer?.customName || peer?.originalName || 'Устройство';
+
+        res.writeHead(200, {
+          'Content-Type': 'application/octet-stream',
+          'Content-Length': transfer.size,
+          'Content-Disposition': `attachment; filename="${encodeURIComponent(transfer.filename)}"`,
+          'X-Filename': encodeURIComponent(transfer.filename),
+          'X-Relative-Path': encodeURIComponent(transfer.relPath)
+        });
+
+        this.currentProgress = {
+          filename: transfer.filename,
+          bytesTransferred: 0,
+          totalBytes: transfer.size,
+          speedBps: 0,
+          direction: 'outgoing',
+          peerDeviceId: transfer.targetDeviceId,
+          peerName
+        };
+        this.emit('progress', this.currentProgress);
+
+        const stream = fs.createReadStream(transfer.filePath);
+        let sentBytes = 0;
+        const startTime = Date.now();
+
+        const cancelFn = () => {
+          try { stream.destroy(); } catch {}
+          try { res.destroy(); } catch {}
+        };
+        this.activeCancelHandlers.add(cancelFn);
+
+        const cleanupCancel = () => {
+          this.activeCancelHandlers.delete(cancelFn);
+        };
+
+        stream.on('data', (chunk) => {
+          sentBytes += chunk.length;
+          const elapsed = (Date.now() - startTime) / 1000;
+          const speed = elapsed > 0 ? sentBytes / elapsed : 0;
+          if (this.currentProgress) {
+            this.currentProgress.bytesTransferred = sentBytes;
+            this.currentProgress.speedBps = speed;
+            this.emit('progress', this.currentProgress);
+          }
+        });
+
+        stream.pipe(res);
+
+        res.on('finish', () => {
+          cleanupCancel();
+          this.pendingTransfers.delete(transferId);
+          this.emit('remote-transfer-completed', transferId);
+          this.currentProgress = null;
+          this.emit('progress', null);
+          this.history.push({
+            id: Math.random().toString(36).substring(7),
+            filename: transfer.filename,
+            size: transfer.size,
+            timestamp: Date.now(),
+            direction: 'outgoing',
+            status: 'completed',
+            peerDeviceId: transfer.targetDeviceId,
+            peerName
+          });
+          this.saveHistory();
+          this.emit('status-changed', this.getStatus());
+        });
+
+        res.on('close', () => {
+          cleanupCancel();
+        });
+
+        stream.on('error', (err) => {
+          cleanupCancel();
+          console.error('Remote download stream error:', err);
+          this.currentProgress = null;
+          this.emit('progress', null);
+          res.destroy();
         });
 
         return;
@@ -582,6 +1056,13 @@ export class SyncEngine extends EventEmitter {
     // Resolve active IP (with automatic re-discovery if device changed IP)
     const { ip: peerIp, port: peerPort } = resolvedTarget || await this.resolvePeerIp(peer);
 
+    if (peerIp === 'REVERSE_PULL') {
+      const transferIds = await this.enqueuePendingTransfer(itemPath, peer.id, relativePrefix);
+      const totalBytes = transferIds.reduce((sum, id) => sum + (this.pendingTransfers.get(id)?.size || 0), 0);
+      await this.waitForPendingTransfers(transferIds, peer, path.basename(itemPath), totalBytes);
+      return;
+    }
+
     if (stat.isDirectory()) {
       const entries = fs.readdirSync(itemPath);
       for (const entry of entries) {
@@ -597,6 +1078,9 @@ export class SyncEngine extends EventEmitter {
     const peerName = peer.customName || peer.originalName;
 
     return new Promise((resolve, reject) => {
+      let isCancelled = false;
+      const fileStream = fs.createReadStream(itemPath);
+
       const req = http.request({
         hostname: peerIp,
         port: peerPort,
@@ -608,15 +1092,17 @@ export class SyncEngine extends EventEmitter {
           'x-filename': encodeURIComponent(filename),
           'x-relative-path': encodeURIComponent(relPath),
           'x-device-id': this.config.deviceId,
-          'x-device-name': encodeURIComponent(this.config.deviceName)
+          'x-device-name': encodeURIComponent(this.config.deviceName),
+          'x-auth-token': peer?.authToken || ''
         },
-        timeout: 30000
+        timeout: 60000
       }, (res) => {
+        cleanup();
         if (res.statusCode === 200) {
           this.currentProgress = null;
           this.emit('progress', null);
           this.history.push({
-            id: Math.random().toString(36).substring(7),
+            id: crypto.randomBytes(8).toString('hex'),
             filename,
             size: stat.size,
             timestamp: Date.now(),
@@ -666,13 +1152,34 @@ export class SyncEngine extends EventEmitter {
         }
       });
 
-      req.on('error', (err) => {
+      const cancelFn = () => {
+        isCancelled = true;
+        try { fileStream.destroy(); } catch {}
+        try { req.destroy(new Error('Передача отменена')); } catch {}
         this.currentProgress = null;
         this.emit('progress', null);
-        reject(err);
+      };
+      this.activeCancelHandlers.add(cancelFn);
+
+      const cleanup = () => {
+        this.activeCancelHandlers.delete(cancelFn);
+      };
+
+      req.on('close', () => {
+        cleanup();
       });
 
-      const fileStream = fs.createReadStream(itemPath);
+      req.on('error', (err) => {
+        cleanup();
+        this.currentProgress = null;
+        this.emit('progress', null);
+        if (isCancelled) {
+          reject(new Error('Передача отменена'));
+        } else {
+          reject(err);
+        }
+      });
+
       let sentBytes = 0;
       const startTime = Date.now();
 
@@ -699,6 +1206,280 @@ export class SyncEngine extends EventEmitter {
       });
 
       fileStream.pipe(req);
+    });
+  }
+
+  private async enqueuePendingTransfer(
+    itemPath: string,
+    targetDeviceId: string,
+    relativePrefix = ''
+  ): Promise<string[]> {
+    if (!fs.existsSync(itemPath)) return [];
+    const stat = fs.statSync(itemPath);
+
+    if (stat.isDirectory()) {
+      const ids: string[] = [];
+      const entries = fs.readdirSync(itemPath);
+      for (const entry of entries) {
+        const fullChild = path.join(itemPath, entry);
+        const childRel = path.join(relativePrefix || path.basename(itemPath), entry);
+        const subIds = await this.enqueuePendingTransfer(fullChild, targetDeviceId, childRel);
+        ids.push(...subIds);
+      }
+      return ids;
+    }
+
+    const filename = path.basename(itemPath);
+    const relPath = relativePrefix ? path.join(relativePrefix) : filename;
+    const transferId = Math.random().toString(36).substring(2) + Date.now().toString(36);
+
+    this.pendingTransfers.set(transferId, {
+      transferId,
+      filePath: itemPath,
+      filename,
+      relPath,
+      size: stat.size,
+      targetDeviceId,
+      createdAt: Date.now()
+    });
+
+    const peer = this.config.pairedDevices.find(d => d.id === targetDeviceId);
+    const peerName = peer?.customName || peer?.originalName || 'Устройство';
+
+    console.log(`Queued pending remote transfer ${transferId} (${filename}) for ${peerName}`);
+    this.emit('status-changed', this.getStatus());
+    return [transferId];
+  }
+
+  private async waitForPendingTransfers(
+    transferIds: string[],
+    peer: PairedDevice,
+    overallName: string,
+    totalBytes: number
+  ): Promise<void> {
+    if (transferIds.length === 0) return;
+
+    const peerName = peer.customName || peer.originalName;
+
+    return new Promise((resolve, reject) => {
+      const remaining = new Set(transferIds);
+      let isDone = false;
+
+      this.currentProgress = {
+        filename: overallName,
+        bytesTransferred: 0,
+        totalBytes,
+        speedBps: 0,
+        direction: 'outgoing',
+        peerDeviceId: peer.id,
+        peerName: `${peerName} (Ожидание скачивания...)`
+      };
+      this.emit('progress', this.currentProgress);
+
+      const cleanup = () => {
+        isDone = true;
+        this.activeCancelHandlers.delete(cancelFn);
+        this.off('remote-transfer-completed', onComplete);
+        this.off('remote-transfer-cancelled', onCancel);
+        clearTimeout(timer);
+      };
+
+      const cancelFn = () => {
+        if (isDone) return;
+        cleanup();
+        for (const id of transferIds) {
+          this.pendingTransfers.delete(id);
+        }
+        reject(new Error('Передача отменена'));
+      };
+
+      const onCancel = () => {
+        if (isDone) return;
+        cleanup();
+        reject(new Error('Передача отменена'));
+      };
+
+      const onComplete = (completedId: string) => {
+        if (isDone) return;
+        remaining.delete(completedId);
+        if (remaining.size === 0) {
+          cleanup();
+          this.currentProgress = null;
+          this.emit('progress', null);
+          resolve();
+        }
+      };
+
+      // 90 second timeout if peer never polls / starts download
+      const timer = setTimeout(() => {
+        if (isDone) return;
+        cleanup();
+        for (const id of transferIds) {
+          this.pendingTransfers.delete(id);
+        }
+        this.currentProgress = null;
+        this.emit('progress', null);
+        this.emit('status-changed', this.getStatus());
+        reject(new Error(`Устройство «${peerName}» не запросило файл за отведенное время (таймаут). Убедитесь, что MacDrop запущен на втором устройстве.`));
+      }, 90000);
+
+      this.activeCancelHandlers.add(cancelFn);
+      this.on('remote-transfer-completed', onComplete);
+      this.on('remote-transfer-cancelled', onCancel);
+    });
+  }
+
+  private async downloadPendingRemoteItem(
+    remoteHost: string,
+    remotePort: number,
+    item: { transferId: string; filename: string; relPath: string; size: number },
+    senderDeviceId: string
+  ): Promise<void> {
+    // Security: Path Traversal defense
+    const safeTarget = getSafeResolvedPath(this.config.targetFolder, item.relPath || item.filename, item.filename);
+    if (!safeTarget) {
+      throw new Error(`Недопустимый путь удаленного файла (Path Traversal): ${item.filename}`);
+    }
+
+    // Data Integrity: Never overwrite existing files, generate non-conflicting filename
+    const targetPath = getNonConflictingPath(safeTarget);
+    const actualFilename = path.basename(targetPath);
+    const targetDir = path.dirname(targetPath);
+
+    try {
+      if (!fs.existsSync(targetDir)) {
+        fs.mkdirSync(targetDir, { recursive: true });
+      }
+    } catch (err) {
+      console.error('Failed to create target dir for remote download:', err);
+    }
+
+    const peer = this.config.pairedDevices.find(d => d.id === senderDeviceId);
+    const peerName = peer?.customName || peer?.originalName || 'Устройство';
+
+    return new Promise((resolve, reject) => {
+      let isCancelled = false;
+      let writeStream: fs.WriteStream | null = null;
+
+      const req = http.get({
+        hostname: remoteHost,
+        port: remotePort,
+        path: `/api/remote/download/${item.transferId}`,
+        headers: {
+          'x-device-id': this.config.deviceId,
+          'x-device-name': encodeURIComponent(this.config.deviceName),
+          'x-auth-token': peer?.authToken || ''
+        },
+        timeout: 60000
+      }, (res) => {
+        if (res.statusCode !== 200) {
+          cleanup();
+          reject(new Error(`Remote download HTTP ${res.statusCode}`));
+          return;
+        }
+
+        let receivedBytes = 0;
+        const startTime = Date.now();
+        writeStream = fs.createWriteStream(targetPath);
+
+        this.currentProgress = {
+          filename: actualFilename,
+          bytesTransferred: 0,
+          totalBytes: item.size,
+          speedBps: 0,
+          direction: 'incoming',
+          peerDeviceId: senderDeviceId,
+          peerName
+        };
+        this.emit('progress', this.currentProgress);
+
+        res.on('data', (chunk) => {
+          receivedBytes += chunk.length;
+          const elapsed = (Date.now() - startTime) / 1000;
+          const speed = elapsed > 0 ? receivedBytes / elapsed : 0;
+          if (this.currentProgress) {
+            this.currentProgress.bytesTransferred = receivedBytes;
+            this.currentProgress.speedBps = speed;
+            this.emit('progress', this.currentProgress);
+          }
+        });
+
+        res.pipe(writeStream);
+
+        writeStream.on('finish', () => {
+          cleanup();
+          this.currentProgress = null;
+          this.emit('progress', null);
+          this.history.push({
+            id: crypto.randomBytes(8).toString('hex'),
+            filename: actualFilename,
+            size: item.size,
+            timestamp: Date.now(),
+            direction: 'incoming',
+            status: 'completed',
+            peerDeviceId: senderDeviceId,
+            peerName
+          });
+          this.saveHistory();
+          this.emit('status-changed', this.getStatus());
+
+          if (this.config.notifications && Notification.isSupported()) {
+            try {
+              const notification = new Notification({
+                title: `MacDrop: Файл от ${peerName}!`,
+                body: `${actualFilename} сохранен в ${path.basename(this.config.targetFolder)}`
+              });
+              notification.on('click', () => {
+                shell.showItemInFolder(targetPath);
+              });
+              notification.show();
+            } catch {}
+          }
+          resolve();
+        });
+
+        writeStream.on('error', (err) => {
+          cleanup();
+          this.currentProgress = null;
+          this.emit('progress', null);
+          reject(err);
+        });
+
+        res.on('close', () => {
+          cleanup();
+        });
+      });
+
+      const cancelFn = () => {
+        isCancelled = true;
+        try { req.destroy(); } catch {}
+        try { if (writeStream) (writeStream as any).destroy(); } catch {}
+        try {
+          if (fs.existsSync(targetPath)) fs.unlinkSync(targetPath);
+        } catch {}
+        this.currentProgress = null;
+        this.emit('progress', null);
+      };
+      this.activeCancelHandlers.add(cancelFn);
+
+      const cleanup = () => {
+        this.activeCancelHandlers.delete(cancelFn);
+      };
+
+      req.on('close', () => {
+        cleanup();
+      });
+
+      req.on('error', (err) => {
+        cleanup();
+        this.currentProgress = null;
+        this.emit('progress', null);
+        if (isCancelled) {
+          reject(new Error('Передача отменена'));
+        } else {
+          reject(err);
+        }
+      });
     });
   }
 }

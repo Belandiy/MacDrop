@@ -2,6 +2,7 @@ import { app } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
+import crypto from 'crypto';
 
 export interface PairedDevice {
   id: string;
@@ -9,9 +10,13 @@ export interface PairedDevice {
   customName: string;
   ip: string;
   port: number;
+  remoteIp?: string;
+  remotePort?: number;
   pairedAt: string;
   lastSeen: number;
   receiveEnabled?: boolean;
+  connectionMode?: 'local' | 'remote' | 'offline';
+  authToken?: string;
 }
 
 export interface AppConfig {
@@ -23,6 +28,9 @@ export interface AppConfig {
   pairedDevices: PairedDevice[];
   apiPort: number;
   apiKey: string;
+  upnpEnabled?: boolean;
+  wanIp?: string;
+  customRemoteHost?: string;
 }
 
 const isWin = process.platform === 'win32';
@@ -41,17 +49,12 @@ export function getDefaultFolder(): string {
 }
 
 function generateRandomKey(length = 32): string {
-  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let result = '';
-  for (let i = 0; i < length; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return result;
+  return crypto.randomBytes(Math.ceil(length / 2)).toString('hex').slice(0, length);
 }
 
 function generateShortDeviceId(): string {
   const prefix = isMac ? 'MAC' : 'PC';
-  const num = Math.floor(1000 + Math.random() * 9000);
+  const num = 1000 + (crypto.randomInt ? crypto.randomInt(0, 9000) : (crypto.randomBytes(2).readUInt16BE(0) % 9000));
   return `${prefix}-${num}`;
 }
 
@@ -71,7 +74,8 @@ export function loadConfig(): AppConfig {
     deviceName: os.hostname() || (isMac ? "Andrey's Mac" : "Andrey's PC"),
     pairedDevices: [],
     apiPort: 8384,
-    apiKey: generateRandomKey(32)
+    apiKey: generateRandomKey(32),
+    upnpEnabled: true
   };
 
   if (fs.existsSync(configFile)) {
