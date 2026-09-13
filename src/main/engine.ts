@@ -98,11 +98,19 @@ export class SyncEngine extends EventEmitter {
     this.loadHistory();
   }
 
-  private getHistoryPath(): string {
-    if (this.config.targetFolder) {
-      return path.join(this.config.targetFolder, '.macdrop_history.json');
+  private getServiceDir(): string {
+    const dir = path.join(os.homedir(), '.macdrop');
+    if (!fs.existsSync(dir)) {
+      try {
+        fs.mkdirSync(dir, { recursive: true });
+      } catch {}
     }
-    return path.join(os.homedir(), '.macdrop', '.macdrop_history.json');
+    return dir;
+  }
+
+  private getHistoryPath(): string {
+    // History is strictly internal service data, saved in ~/.macdrop/history.json
+    return path.join(this.getServiceDir(), 'history.json');
   }
 
   private loadHistory() {
@@ -111,14 +119,17 @@ export class SyncEngine extends EventEmitter {
       if (fs.existsSync(p)) {
         const data = fs.readFileSync(p, 'utf-8');
         this.history = JSON.parse(data);
+        this.cleanupDirtyHistoryFiles();
         return;
       }
 
-      // Check legacy paths (e.g. on Desktop or parent directory) to migrate
+      // Check legacy paths (e.g. inside targetFolder or old .macdrop_history.json) to migrate
       const legacyPaths = [
+        path.join(this.getServiceDir(), '.macdrop_history.json'),
+        path.join(this.config.targetFolder, '.macdrop_history.json'),
         path.join(path.dirname(this.config.targetFolder), '.macdrop_history.json'),
         path.join(os.homedir(), 'Desktop', '.macdrop_history.json'),
-        path.join(os.homedir(), '.macdrop_history.json')
+        path.join(os.homedir(), '.macdrop', '.macdrop_history.json')
       ];
 
       for (const leg of legacyPaths) {
@@ -127,11 +138,20 @@ export class SyncEngine extends EventEmitter {
             const data = fs.readFileSync(leg, 'utf-8');
             this.history = JSON.parse(data);
             this.saveHistory();
-            // Clean up old file from Desktop / parent directory
-            fs.unlinkSync(leg);
+            try { fs.unlinkSync(leg); } catch {}
             break;
           } catch {}
         }
+      }
+      this.cleanupDirtyHistoryFiles();
+    } catch {}
+  }
+
+  private cleanupDirtyHistoryFiles() {
+    try {
+      const dirtyFile = path.join(this.config.targetFolder, '.macdrop_history.json');
+      if (fs.existsSync(dirtyFile)) {
+        fs.unlinkSync(dirtyFile);
       }
     } catch {}
   }
@@ -140,6 +160,7 @@ export class SyncEngine extends EventEmitter {
     try {
       const p = this.getHistoryPath();
       fs.writeFileSync(p, JSON.stringify(this.history.slice(-100), null, 2), 'utf-8');
+      this.cleanupDirtyHistoryFiles();
     } catch {}
   }
 

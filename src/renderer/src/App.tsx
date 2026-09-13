@@ -12,11 +12,11 @@ import { RecentTransfers } from './components/RecentTransfers';
 
 export default function App() {
   const [config, setConfig] = useState<any>({
-    targetFolder: 'E:\\MacDrop',
+    targetFolder: window.macdrop?.platform === 'darwin' ? '~/MacDrop' : 'MacDrop',
     autoStart: true,
     notifications: true,
-    deviceId: 'PC-1001',
-    deviceName: 'ПК Андрей',
+    deviceId: 'DEVICE',
+    deviceName: 'MacDrop',
     pairedDevices: []
   });
 
