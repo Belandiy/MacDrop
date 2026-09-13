@@ -2,7 +2,7 @@ import http from 'http';
 import fs from 'fs';
 import path from 'path';
 import { EventEmitter } from 'events';
-import { AppConfig, saveConfig } from './config';
+import { AppConfig, PairedDevice, saveConfig } from './config';
 import { Notification, shell } from 'electron';
 
 export interface TransferProgress {
@@ -11,25 +11,52 @@ export interface TransferProgress {
   totalBytes: number;
   speedBps: number;
   direction: 'incoming' | 'outgoing';
+  peerDeviceId?: string;
+  peerName?: string;
+}
+
+export interface HistoryItem {
+  id: string;
+  filename: string;
+  size: number;
+  timestamp: number;
+  direction: 'incoming' | 'outgoing';
+  status: 'completed' | 'failed';
+  peerDeviceId?: string;
+  peerName?: string;
 }
 
 export class SyncEngine extends EventEmitter {
   private config: AppConfig;
   private server: http.Server | null = null;
-  private isConnected = false;
   private currentProgress: TransferProgress | null = null;
-  private history: Array<{
-    id: string;
-    filename: string;
-    size: number;
-    timestamp: number;
-    direction: 'incoming' | 'outgoing';
-    status: 'completed' | 'failed';
-  }> = [];
+  private history: HistoryItem[] = [];
 
   constructor(config: AppConfig) {
     super();
     this.config = config;
+    this.loadHistory();
+  }
+
+  private getHistoryPath(): string {
+    return path.join(path.dirname(this.config.targetFolder), '.macdrop_history.json');
+  }
+
+  private loadHistory() {
+    try {
+      const p = this.getHistoryPath();
+      if (fs.existsSync(p)) {
+        const data = fs.readFileSync(p, 'utf-8');
+        this.history = JSON.parse(data);
+      }
+    } catch {}
+  }
+
+  private saveHistory() {
+    try {
+      const p = this.getHistoryPath();
+      fs.writeFileSync(p, JSON.stringify(this.history.slice(-100), null, 2), 'utf-8');
+    } catch {}
   }
 
   public updateConfig(newConfig: AppConfig) {
@@ -38,28 +65,63 @@ export class SyncEngine extends EventEmitter {
     saveConfig(this.config);
 
     if (folderChanged) {
-      console.log('Target folder updated to:', this.config.targetFolder);
       if (!fs.existsSync(this.config.targetFolder)) {
-        fs.mkdirSync(this.config.targetFolder, { recursive: true });
+        try {
+          fs.mkdirSync(this.config.targetFolder, { recursive: true });
+        } catch {}
       }
       this.emit('folder-changed', this.config.targetFolder);
     }
   }
 
-  public getHistory() {
-    return this.history;
+  public updateDeviceCustomName(deviceId: string, newCustomName: string): boolean {
+    const dev = this.config.pairedDevices.find(d => d.id === deviceId);
+    if (dev) {
+      dev.customName = newCustomName.trim() || dev.originalName;
+      saveConfig(this.config);
+      this.emit('status-changed', this.getStatus());
+      return true;
+    }
+    return false;
+  }
+
+  public removeDevice(deviceId: string): boolean {
+    const initialLen = this.config.pairedDevices.length;
+    this.config.pairedDevices = this.config.pairedDevices.filter(d => d.id !== deviceId);
+    if (this.config.pairedDevices.length !== initialLen) {
+      saveConfig(this.config);
+      this.emit('status-changed', this.getStatus());
+      return true;
+    }
+    return false;
+  }
+
+  public toggleDeviceReceive(deviceId: string, enabled: boolean): boolean {
+    const dev = this.config.pairedDevices.find(d => d.id === deviceId);
+    if (dev) {
+      dev.receiveEnabled = enabled;
+      saveConfig(this.config);
+      this.emit('status-changed', this.getStatus());
+      return true;
+    }
+    return false;
   }
 
   public getStatus() {
+    const isConnected = this.config.pairedDevices.length > 0;
     return {
-      isConnected: this.isConnected,
+      isConnected,
       deviceName: this.config.deviceName,
       deviceId: this.config.deviceId,
       targetFolder: this.config.targetFolder,
-      pairedDevice: this.config.pairedDevice,
+      pairedDevices: this.config.pairedDevices,
       currentProgress: this.currentProgress,
-      recentHistory: this.history.slice(-10).reverse()
+      recentHistory: [...this.history].reverse().slice(0, 50)
     };
+  }
+
+  public getHistoryForDevice(deviceId: string): HistoryItem[] {
+    return this.history.filter(h => h.peerDeviceId === deviceId).reverse();
   }
 
   public start() {
@@ -68,18 +130,94 @@ export class SyncEngine extends EventEmitter {
 
   public stop() {
     if (this.server) {
-      this.server.close();
+      try {
+        this.server.close();
+      } catch {}
       this.server = null;
     }
+  }
+
+  public async pairWithRemote(peerIp: string, peerPort = 8384): Promise<{ success: boolean; peer?: PairedDevice; error?: string }> {
+    const cleanIp = peerIp.replace(/^::ffff:/, '').trim();
+    return new Promise((resolve) => {
+      const payload = JSON.stringify({
+        deviceId: this.config.deviceId,
+        deviceName: this.config.deviceName,
+        port: this.config.apiPort || 8384
+      });
+
+      const req = http.request({
+        hostname: cleanIp,
+        port: peerPort,
+        path: '/api/pair',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(payload)
+        },
+        timeout: 6000
+      }, (res) => {
+        let body = '';
+        res.on('data', chunk => { body += chunk; });
+        res.on('end', () => {
+          if (res.statusCode === 200) {
+            try {
+              const data = JSON.parse(body);
+              const deviceId = data.deviceId || 'Peer';
+              const originalName = data.deviceName || 'Устройство';
+
+              let existing = this.config.pairedDevices.find(d => d.id === deviceId);
+              if (existing) {
+                existing.ip = cleanIp;
+                existing.port = peerPort;
+                existing.lastSeen = Date.now();
+              } else {
+                existing = {
+                  id: deviceId,
+                  originalName,
+                  customName: originalName,
+                  ip: cleanIp,
+                  port: peerPort,
+                  pairedAt: new Date().toISOString(),
+                  lastSeen: Date.now()
+                };
+                this.config.pairedDevices.push(existing);
+              }
+
+              saveConfig(this.config);
+              this.emit('device-paired', existing);
+              this.emit('status-changed', this.getStatus());
+              resolve({ success: true, peer: existing });
+              return;
+            } catch (err: any) {
+              resolve({ success: false, error: err.message });
+              return;
+            }
+          }
+          resolve({ success: false, error: `Код ответа: HTTP ${res.statusCode}` });
+        });
+      });
+
+      req.on('error', (err) => {
+        resolve({ success: false, error: err.message });
+      });
+
+      req.on('timeout', () => {
+        req.destroy();
+        resolve({ success: false, error: 'Таймаут подключения' });
+      });
+
+      req.write(payload);
+      req.end();
+    });
   }
 
   private startLocalServer() {
     const port = this.config.apiPort || 8384;
     this.server = http.createServer(async (req, res) => {
-      // CORS headers
       res.setHeader('Access-Control-Allow-Origin', '*');
       res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Device-ID, X-Auth-Key, X-Filename');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Device-ID, X-Device-Name, X-Filename, X-Relative-Path');
 
       if (req.method === 'OPTIONS') {
         res.writeHead(200);
@@ -89,7 +227,6 @@ export class SyncEngine extends EventEmitter {
 
       const url = new URL(req.url || '/', `http://${req.headers.host}`);
 
-      // Handshake / Ping endpoint
       if (url.pathname === '/api/ping') {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
@@ -101,7 +238,7 @@ export class SyncEngine extends EventEmitter {
         return;
       }
 
-      // Pairing request
+      // Pairing request from remote device
       if (url.pathname === '/api/pair' && req.method === 'POST') {
         let body = '';
         req.on('data', chunk => { body += chunk; });
@@ -109,14 +246,31 @@ export class SyncEngine extends EventEmitter {
           try {
             const data = JSON.parse(body);
             if (data.deviceId && data.deviceName) {
-              this.config.pairedDevice = {
-                id: data.deviceId,
-                name: data.deviceName,
-                pairedAt: new Date().toISOString()
-              };
-              this.isConnected = true;
+              const rawIp = req.socket.remoteAddress || '127.0.0.1';
+              const cleanIp = rawIp.replace(/^::ffff:/, '');
+
+              let existing = this.config.pairedDevices.find(d => d.id === data.deviceId);
+              if (existing) {
+                existing.ip = cleanIp;
+                existing.port = data.port || 8384;
+                existing.originalName = data.deviceName;
+                existing.lastSeen = Date.now();
+              } else {
+                existing = {
+                  id: data.deviceId,
+                  originalName: data.deviceName,
+                  customName: data.deviceName,
+                  ip: cleanIp,
+                  port: data.port || 8384,
+                  pairedAt: new Date().toISOString(),
+                  lastSeen: Date.now()
+                };
+                this.config.pairedDevices.push(existing);
+              }
+
               saveConfig(this.config);
-              this.emit('device-paired', this.config.pairedDevice);
+              console.log(`Device paired from ${cleanIp}:`, existing);
+              this.emit('device-paired', existing);
               this.emit('status-changed', this.getStatus());
 
               res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -136,12 +290,37 @@ export class SyncEngine extends EventEmitter {
 
       // Incoming file upload stream
       if (url.pathname === '/api/upload' && req.method === 'POST') {
+        const senderId = req.headers['x-device-id'] as string || '';
         const rawFilename = req.headers['x-filename'] as string || `file_${Date.now()}`;
+        const rawRelPath = req.headers['x-relative-path'] as string || '';
         const filename = decodeURIComponent(rawFilename);
+        const relPath = rawRelPath ? decodeURIComponent(rawRelPath) : filename;
         const totalSize = parseInt(req.headers['content-length'] || '0', 10);
-        const targetPath = path.join(this.config.targetFolder, filename);
 
-        console.log(`Receiving incoming file: ${filename} (${totalSize} bytes) -> ${targetPath}`);
+        const peer = this.config.pairedDevices.find(d => d.id === senderId);
+        if (peer && peer.receiveEnabled === false) {
+          console.log(`Receiving is disabled for peer ${peer.customName || peer.originalName} (${senderId}).`);
+          res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({
+            error: `Получатель временно отключил приём файлов с вашего устройства.`
+          }));
+          return;
+        }
+
+        const peerName = peer?.customName || peer?.originalName || (senderId ? `Устройство (${senderId})` : 'Второе устройство');
+
+        const targetPath = path.join(this.config.targetFolder, relPath);
+        const targetDir = path.dirname(targetPath);
+
+        try {
+          if (!fs.existsSync(targetDir)) {
+            fs.mkdirSync(targetDir, { recursive: true });
+          }
+        } catch (e) {
+          console.error('Failed to create target dir:', targetDir, e);
+        }
+
+        console.log(`Receiving from ${peerName}: ${filename} -> ${targetPath}`);
 
         let writtenBytes = 0;
         const startTime = Date.now();
@@ -152,7 +331,9 @@ export class SyncEngine extends EventEmitter {
           bytesTransferred: 0,
           totalBytes: totalSize,
           speedBps: 0,
-          direction: 'incoming'
+          direction: 'incoming',
+          peerDeviceId: senderId,
+          peerName
         };
         this.emit('progress', this.currentProgress);
 
@@ -180,20 +361,24 @@ export class SyncEngine extends EventEmitter {
             size: totalSize,
             timestamp: Date.now(),
             direction: 'incoming',
-            status: 'completed'
+            status: 'completed',
+            peerDeviceId: senderId,
+            peerName
           });
+          this.saveHistory();
           this.emit('status-changed', this.getStatus());
 
           if (this.config.notifications && Notification.isSupported()) {
-            const notification = new Notification({
-              title: 'MacDrop: Файл получен!',
-              body: `${filename} сохранен в ${path.basename(this.config.targetFolder)}`,
-              silent: false
-            });
-            notification.on('click', () => {
-              shell.showItemInFolder(targetPath);
-            });
-            notification.show();
+            try {
+              const notification = new Notification({
+                title: `MacDrop: Файл от ${peerName}!`,
+                body: `${filename} сохранен в ${path.basename(this.config.targetFolder)}`
+              });
+              notification.on('click', () => {
+                shell.showItemInFolder(targetPath);
+              });
+              notification.show();
+            } catch {}
           }
 
           res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -216,42 +401,64 @@ export class SyncEngine extends EventEmitter {
     });
 
     this.server.listen(port, '0.0.0.0', () => {
-      console.log(`MacDrop P2P daemon listening on 0.0.0.0:${port}`);
+      console.log(`MacDrop server listening on port ${port}`);
     });
 
     this.server.on('error', (err: any) => {
       if (err.code === 'EADDRINUSE') {
-        console.warn(`Port ${port} in use, trying ${port + 1}...`);
         this.config.apiPort = port + 1;
         this.server?.listen(this.config.apiPort, '0.0.0.0');
-      } else {
-        console.error('P2P Server error:', err);
       }
     });
   }
 
-  // Send a file to target peer (Mac or PC)
-  public async sendFile(filePath: string, peerAddress = '127.0.0.1:8384'): Promise<boolean> {
-    if (!fs.existsSync(filePath)) {
-      throw new Error(`File not found: ${filePath}`);
+  // Send single file or folder recursively across network to target device
+  public async sendItem(itemPath: string, targetDeviceId?: string, relativePrefix = ''): Promise<void> {
+    if (!fs.existsSync(itemPath)) return;
+    const stat = fs.statSync(itemPath);
+
+    if (stat.isDirectory()) {
+      const entries = fs.readdirSync(itemPath);
+      for (const entry of entries) {
+        const fullChild = path.join(itemPath, entry);
+        const childRel = path.join(relativePrefix || path.basename(itemPath), entry);
+        await this.sendItem(fullChild, targetDeviceId, childRel);
+      }
+      return;
     }
 
-    const stat = fs.statSync(filePath);
-    const filename = path.basename(filePath);
+    let peer: PairedDevice | undefined;
+    if (targetDeviceId) {
+      peer = this.config.pairedDevices.find(d => d.id === targetDeviceId);
+    } else {
+      peer = this.config.pairedDevices[0];
+    }
+
+    if (!peer || !peer.ip) {
+      throw new Error('Нет доступных связанных устройств. Сначала выполните сопряжение.');
+    }
+
+    const peerIp = peer.ip;
+    const peerPort = peer.port || 8384;
+    const filename = path.basename(itemPath);
+    const relPath = relativePrefix ? path.join(relativePrefix) : filename;
+    const peerName = peer.customName || peer.originalName;
 
     return new Promise((resolve, reject) => {
-      const [host, port] = peerAddress.split(':');
       const req = http.request({
-        host,
-        port: parseInt(port || '8384', 10),
+        hostname: peerIp,
+        port: peerPort,
         path: '/api/upload',
         method: 'POST',
         headers: {
           'Content-Type': 'application/octet-stream',
           'Content-Length': stat.size,
           'x-filename': encodeURIComponent(filename),
-          'x-device-id': this.config.deviceId
-        }
+          'x-relative-path': encodeURIComponent(relPath),
+          'x-device-id': this.config.deviceId,
+          'x-device-name': encodeURIComponent(this.config.deviceName)
+        },
+        timeout: 30000
       }, (res) => {
         if (res.statusCode === 200) {
           this.currentProgress = null;
@@ -262,12 +469,38 @@ export class SyncEngine extends EventEmitter {
             size: stat.size,
             timestamp: Date.now(),
             direction: 'outgoing',
-            status: 'completed'
+            status: 'completed',
+            peerDeviceId: peer?.id,
+            peerName
           });
+          this.saveHistory();
           this.emit('status-changed', this.getStatus());
-          resolve(true);
+          resolve();
         } else {
-          reject(new Error(`Server returned HTTP ${res.statusCode}`));
+          this.currentProgress = null;
+          this.emit('progress', null);
+          let errBody = '';
+          res.on('data', chunk => { errBody += chunk; });
+          res.on('end', () => {
+            let errorMsg = `Устройство вернуло ошибку HTTP ${res.statusCode}`;
+            try {
+              const parsed = JSON.parse(errBody);
+              if (parsed.error) errorMsg = parsed.error;
+            } catch {}
+            this.history.push({
+              id: Math.random().toString(36).substring(7),
+              filename,
+              size: stat.size,
+              timestamp: Date.now(),
+              direction: 'outgoing',
+              status: 'failed',
+              peerDeviceId: peer?.id,
+              peerName
+            });
+            this.saveHistory();
+            this.emit('status-changed', this.getStatus());
+            reject(new Error(errorMsg));
+          });
         }
       });
 
@@ -277,7 +510,7 @@ export class SyncEngine extends EventEmitter {
         reject(err);
       });
 
-      const fileStream = fs.createReadStream(filePath);
+      const fileStream = fs.createReadStream(itemPath);
       let sentBytes = 0;
       const startTime = Date.now();
 
@@ -286,7 +519,9 @@ export class SyncEngine extends EventEmitter {
         bytesTransferred: 0,
         totalBytes: stat.size,
         speedBps: 0,
-        direction: 'outgoing'
+        direction: 'outgoing',
+        peerDeviceId: peer?.id,
+        peerName
       };
       this.emit('progress', this.currentProgress);
 

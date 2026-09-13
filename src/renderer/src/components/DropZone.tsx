@@ -4,9 +4,10 @@ import { UploadCloud, FileCheck, Copy } from 'lucide-react';
 interface DropZoneProps {
   onFilesDropped: (filePaths: string[]) => void;
   targetFolder: string;
+  onChooseFiles?: () => void;
 }
 
-export const DropZone: React.FC<DropZoneProps> = ({ onFilesDropped, targetFolder }) => {
+export const DropZone: React.FC<DropZoneProps> = ({ onFilesDropped, targetFolder, onChooseFiles }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [recentDropSuccess, setRecentDropSuccess] = useState<string | null>(null);
 
@@ -29,8 +30,18 @@ export const DropZone: React.FC<DropZoneProps> = ({ onFilesDropped, targetFolder
 
     const files = Array.from(e.dataTransfer.files);
     if (files.length > 0) {
-      // In Electron, File objects have a .path property!
-      const paths = files.map((f: any) => f.path).filter(Boolean);
+      const paths = files
+        .map((f: any) => {
+          if (window.macdrop?.getPathForFile) {
+            try {
+              const p = window.macdrop.getPathForFile(f);
+              if (p) return p;
+            } catch {}
+          }
+          return f.path || '';
+        })
+        .filter(Boolean);
+
       if (paths.length > 0) {
         onFilesDropped(paths);
         setRecentDropSuccess(`Отправлено ${files.length} файл(ов)!`);
@@ -70,9 +81,22 @@ export const DropZone: React.FC<DropZoneProps> = ({ onFilesDropped, targetFolder
           </p>
         </div>
 
+        {onChooseFiles && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onChooseFiles();
+            }}
+            className="text-xs bg-white/10 hover:bg-white/20 active:bg-white/30 text-white font-medium px-3.5 py-1.5 rounded-xl border border-white/10 transition-colors shadow-sm"
+          >
+            Выбрать файл(ы)
+          </button>
+        )}
+
         <div className="text-[11px] text-zinc-400 bg-white/5 px-2.5 py-1 rounded-full mt-1 border border-white/5 flex items-center gap-1">
           <Copy className="w-3 h-3 text-zinc-400" />
-          <span>или просто сохраняйте их в {targetFolder.split(/[\\/]/).filter(Boolean).pop()}</span>
+          <span>или сохраняйте их в {targetFolder.split(/[\\/]/).filter(Boolean).pop()}</span>
         </div>
       </div>
     </div>

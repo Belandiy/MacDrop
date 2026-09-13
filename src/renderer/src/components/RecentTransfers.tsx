@@ -8,6 +8,8 @@ interface TransferItem {
   timestamp: number;
   direction: 'incoming' | 'outgoing';
   status: 'completed' | 'failed';
+  peerDeviceId?: string;
+  peerName?: string;
 }
 
 interface RecentTransfersProps {
@@ -82,6 +84,12 @@ export const RecentTransfers: React.FC<RecentTransfersProps> = ({ items, onOpenF
                   <span>{formatBytes(item.size)}</span>
                   <span>•</span>
                   <span>{timeAgo(item.timestamp)}</span>
+                  {item.peerName && (
+                    <>
+                      <span>•</span>
+                      <span className="text-zinc-500 truncate max-w-[120px]">{item.peerName}</span>
+                    </>
+                  )}
                 </div>
               </div>
             </div>

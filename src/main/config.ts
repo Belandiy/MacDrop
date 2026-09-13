@@ -3,17 +3,24 @@ import path from 'path';
 import fs from 'fs';
 import os from 'os';
 
+export interface PairedDevice {
+  id: string;
+  originalName: string;
+  customName: string;
+  ip: string;
+  port: number;
+  pairedAt: string;
+  lastSeen: number;
+  receiveEnabled?: boolean;
+}
+
 export interface AppConfig {
   targetFolder: string;
   autoStart: boolean;
   notifications: boolean;
   deviceId: string;
   deviceName: string;
-  pairedDevice?: {
-    id: string;
-    name: string;
-    pairedAt: string;
-  };
+  pairedDevices: PairedDevice[];
   apiPort: number;
   apiKey: string;
 }
@@ -27,9 +34,7 @@ export function getDefaultFolder(): string {
       if (fs.existsSync('E:\\')) {
         return 'E:\\MacDrop';
       }
-    } catch {
-      // Disk E not accessible
-    }
+    } catch {}
     return path.join(os.homedir(), 'MacDrop');
   }
   return path.join(os.homedir(), 'Desktop', 'MacDrop');
@@ -64,6 +69,7 @@ export function loadConfig(): AppConfig {
     notifications: true,
     deviceId: generateShortDeviceId(),
     deviceName: os.hostname() || (isMac ? "Andrey's Mac" : "Andrey's PC"),
+    pairedDevices: [],
     apiPort: 8384,
     apiKey: generateRandomKey(32)
   };
@@ -71,7 +77,22 @@ export function loadConfig(): AppConfig {
   if (fs.existsSync(configFile)) {
     try {
       const data = fs.readFileSync(configFile, 'utf-8');
-      config = { ...config, ...JSON.parse(data) };
+      const parsed = JSON.parse(data);
+      config = { ...config, ...parsed };
+
+      // Migrate single pairedDevice to pairedDevices array if needed
+      if ((parsed as any).pairedDevice && (!config.pairedDevices || config.pairedDevices.length === 0)) {
+        const old = (parsed as any).pairedDevice;
+        config.pairedDevices = [{
+          id: old.id,
+          originalName: old.name || 'Устройство',
+          customName: old.name || 'Устройство',
+          ip: old.ip || '127.0.0.1',
+          port: old.port || 8384,
+          pairedAt: old.pairedAt || new Date().toISOString(),
+          lastSeen: Date.now()
+        }];
+      }
     } catch (e) {
       console.error('Error reading settings.json, recreating defaults', e);
     }
@@ -85,7 +106,6 @@ export function loadConfig(): AppConfig {
       fs.mkdirSync(config.targetFolder, { recursive: true });
     }
   } catch (err) {
-    console.error(`Cannot create target folder ${config.targetFolder}, falling back to home dir`, err);
     config.targetFolder = path.join(os.homedir(), 'MacDrop');
     try {
       fs.mkdirSync(config.targetFolder, { recursive: true });

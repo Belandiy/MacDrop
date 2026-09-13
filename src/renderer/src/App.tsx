@@ -1,28 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Header } from './components/Header';
-import { StatusCard } from './components/StatusCard';
+import { DeviceList } from './components/DeviceList';
+import { DeviceDetailView, PairedDevice } from './components/DeviceDetailView';
 import { FolderSection } from './components/FolderSection';
 import { DropZone } from './components/DropZone';
 import { PairingModal } from './components/PairingModal';
 import { SettingsModal } from './components/SettingsModal';
 import { RecentTransfers } from './components/RecentTransfers';
 
-declare global {
-  interface Window {
-    macdrop: {
-      getConfig: () => Promise<any>;
-      saveConfig: (config: any) => Promise<any>;
-      selectFolder: () => Promise<string>;
-      openFolder: () => Promise<boolean>;
-      getStatus: () => Promise<any>;
-      sendDroppedFiles: (filePaths: string[]) => Promise<any>;
-      toggleAutostart: (enable: boolean) => Promise<boolean>;
-      onStatusUpdate: (callback: (status: any) => void) => () => void;
-      onProgressUpdate: (callback: (progress: any) => void) => () => void;
-      platform: string;
-    };
-  }
-}
 
 export default function App() {
   const [config, setConfig] = useState<any>({
@@ -30,23 +15,26 @@ export default function App() {
     autoStart: true,
     notifications: true,
     deviceId: 'PC-1001',
-    deviceName: 'ПК Андрей'
+    deviceName: 'ПК Андрей',
+    pairedDevices: []
   });
 
   const [status, setStatus] = useState<any>({
     isConnected: false,
-    pairedDevice: undefined,
+    pairedDevices: [],
     currentProgress: null,
     recentHistory: []
   });
 
+  const [selectedDevice, setSelectedDevice] = useState<PairedDevice | null>(null);
   const [isPairingOpen, setIsPairingOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [discoveredPeers, setDiscoveredPeers] = useState<any[]>([]);
 
   const platform = window.macdrop?.platform || 'win32';
+  const devices: PairedDevice[] = config.pairedDevices || status.pairedDevices || [];
 
   useEffect(() => {
-    // Load initial configuration and status
     if (window.macdrop) {
       window.macdrop.getConfig().then((cfg) => {
         if (cfg) setConfig(cfg);
@@ -58,6 +46,15 @@ export default function App() {
 
       const unsubStatus = window.macdrop.onStatusUpdate((newStatus) => {
         setStatus((prev: any) => ({ ...prev, ...newStatus }));
+        if (newStatus.pairedDevices) {
+          setConfig((prev: any) => ({ ...prev, pairedDevices: newStatus.pairedDevices }));
+          // Update selectedDevice if it's currently open
+          setSelectedDevice((current) => {
+            if (!current) return null;
+            const updated = newStatus.pairedDevices.find((d: PairedDevice) => d.id === current.id);
+            return updated || null;
+          });
+        }
       });
 
       const unsubProgress = window.macdrop.onProgressUpdate((progress) => {
@@ -68,6 +65,21 @@ export default function App() {
         unsubStatus();
         unsubProgress();
       };
+    }
+  }, []);
+
+  useEffect(() => {
+    if (window.macdrop?.getDiscoveredPeers) {
+      window.macdrop.getDiscoveredPeers().then((peers) => {
+        if (peers) setDiscoveredPeers(peers);
+      });
+    }
+
+    if (window.macdrop?.onPeersUpdate) {
+      const unsubPeers = window.macdrop.onPeersUpdate((peers) => {
+        setDiscoveredPeers(peers || []);
+      });
+      return unsubPeers;
     }
   }, []);
 
@@ -88,7 +100,8 @@ export default function App() {
 
   const handleFilesDropped = async (paths: string[]) => {
     if (window.macdrop) {
-      await window.macdrop.sendDroppedFiles(paths);
+      const targetId = selectedDevice?.id || (devices.length > 0 ? devices[0].id : undefined);
+      await window.macdrop.sendDroppedFiles(paths, targetId);
     }
   };
 
@@ -106,28 +119,64 @@ export default function App() {
     }
   };
 
-  const handlePairWithCode = async (code: string): Promise<boolean> => {
-    // In local demo / network pairing
-    if (window.macdrop) {
-      const updated = await window.macdrop.saveConfig({
-        pairedDevice: {
-          id: code,
-          name: platform === 'darwin' ? 'Windows ПК' : 'MacBook',
-          pairedAt: new Date().toISOString()
-        }
-      });
-      setConfig(updated);
-      setStatus((prev: any) => ({ ...prev, isConnected: true, pairedDevice: updated.pairedDevice }));
-      return true;
+  const handlePairWithCode = async (target: string): Promise<{ success: boolean; error?: string }> => {
+    if (window.macdrop?.pairDevice) {
+      const res = await window.macdrop.pairDevice(target);
+      if (res.success && res.peer) {
+        const newPeer = res.peer;
+        setConfig((prev: any) => {
+          const currentList = prev.pairedDevices || [];
+          const idx = currentList.findIndex((d: any) => d.id === newPeer.id);
+          const updated = idx >= 0
+            ? currentList.map((d: any) => d.id === newPeer.id ? newPeer : d)
+            : [...currentList, newPeer];
+          return { ...prev, pairedDevices: updated };
+        });
+        setStatus((prev: any) => ({
+          ...prev,
+          isConnected: true,
+          pairedDevices: [...(prev.pairedDevices || []).filter((d: any) => d.id !== newPeer.id), newPeer]
+        }));
+        return { success: true };
+      }
+      return { success: false, error: res.error || 'Не удалось подключиться' };
     }
-    return false;
+    return { success: false, error: 'API недоступен' };
   };
 
-  const handleUnpairDevice = async () => {
-    if (window.macdrop) {
-      const updated = await window.macdrop.saveConfig({ pairedDevice: undefined });
-      setConfig(updated);
-      setStatus((prev: any) => ({ ...prev, isConnected: false, pairedDevice: undefined }));
+  const handleUnpairDevice = async (deviceId?: string) => {
+    if (window.macdrop?.unpairDevice) {
+      await window.macdrop.unpairDevice(deviceId);
+      const targetId = deviceId || (devices.length > 0 ? devices[0].id : null);
+      if (targetId) {
+        handleDeviceRemoved(targetId);
+      }
+    }
+  };
+
+  const handleDeviceUpdated = (updated: PairedDevice) => {
+    setConfig((prev: any) => {
+      const currentList = prev.pairedDevices || [];
+      const updatedList = currentList.map((d: PairedDevice) => (d.id === updated.id ? updated : d));
+      return { ...prev, pairedDevices: updatedList };
+    });
+    setSelectedDevice(updated);
+  };
+
+  const handleDeviceRemoved = (deviceId: string) => {
+    setConfig((prev: any) => {
+      const currentList = prev.pairedDevices || [];
+      const updatedList = currentList.filter((d: PairedDevice) => d.id !== deviceId);
+      return { ...prev, pairedDevices: updatedList };
+    });
+    if (selectedDevice?.id === deviceId) {
+      setSelectedDevice(null);
+    }
+  };
+
+  const handleQuickSend = async (deviceId: string) => {
+    if (window.macdrop?.pickAndSendFiles) {
+      await window.macdrop.pickAndSendFiles(deviceId);
     }
   };
 
@@ -140,32 +189,52 @@ export default function App() {
       />
 
       <main className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
-        {/* Status Card (Connected / Syncing) */}
-        <StatusCard
-          isConnected={status.isConnected || !!config.pairedDevice}
-          pairedDevice={status.pairedDevice || config.pairedDevice}
-          currentProgress={status.currentProgress}
-          onOpenPairing={() => setIsPairingOpen(true)}
-        />
+        {selectedDevice ? (
+          /* Device Detail Drill-Down View */
+          <DeviceDetailView
+            device={selectedDevice}
+            onBack={() => setSelectedDevice(null)}
+            onDeviceUpdated={handleDeviceUpdated}
+            onDeviceRemoved={handleDeviceRemoved}
+            onOpenFile={handleOpenFolder}
+            currentProgress={status.currentProgress}
+          />
+        ) : (
+          /* Main Dashboard */
+          <>
+            {/* Connected Devices List */}
+            <DeviceList
+              devices={devices}
+              onSelectDevice={(dev) => setSelectedDevice(dev)}
+              onOpenPairing={() => setIsPairingOpen(true)}
+              onQuickSend={handleQuickSend}
+              currentProgress={status.currentProgress}
+            />
 
-        {/* Drag and Drop Zone */}
-        <DropZone
-          onFilesDropped={handleFilesDropped}
-          targetFolder={config.targetFolder}
-        />
+            {/* Drag and Drop Zone */}
+            <DropZone
+              onFilesDropped={handleFilesDropped}
+              targetFolder={config.targetFolder}
+              onChooseFiles={() => {
+                const targetId = devices.length > 0 ? devices[0].id : undefined;
+                window.macdrop?.pickAndSendFiles(targetId);
+              }}
+            />
 
-        {/* Target Folder Selector */}
-        <FolderSection
-          targetFolder={config.targetFolder}
-          onSelectFolder={handleSelectFolder}
-          onOpenFolder={handleOpenFolder}
-        />
+            {/* Target Folder Selector */}
+            <FolderSection
+              targetFolder={config.targetFolder}
+              onSelectFolder={handleSelectFolder}
+              onOpenFolder={handleOpenFolder}
+            />
 
-        {/* Recent transfers list */}
-        <RecentTransfers
-          items={status.recentHistory || []}
-          onOpenFile={handleOpenFolder}
-        />
+            {/* Global Recent Transfers List */}
+            <RecentTransfers
+              items={status.recentHistory || []}
+              onOpenFile={handleOpenFolder}
+            />
+          </>
+        )}
       </main>
 
       {/* Modals */}
@@ -175,7 +244,9 @@ export default function App() {
         deviceId={config.deviceId}
         deviceName={config.deviceName}
         platform={platform}
+        discoveredPeers={discoveredPeers}
         onPairWithCode={handlePairWithCode}
+        pairedDevices={devices}
       />
 
       <SettingsModal
@@ -183,7 +254,7 @@ export default function App() {
         onClose={() => setIsSettingsOpen(false)}
         autoStart={config.autoStart}
         notifications={config.notifications}
-        pairedDevice={config.pairedDevice}
+        pairedDevices={devices}
         onToggleAutoStart={handleToggleAutoStart}
         onToggleNotifications={handleToggleNotifications}
         onUnpairDevice={handleUnpairDevice}

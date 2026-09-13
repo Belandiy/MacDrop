@@ -2,6 +2,7 @@ import { app, BrowserWindow, Menu } from 'electron';
 import path from 'path';
 import { loadConfig } from './config';
 import { SyncEngine } from './engine';
+import { PeerDiscovery } from './discovery';
 import { createTray } from './tray';
 import { setupIpc } from './ipc';
 
@@ -16,6 +17,7 @@ if (!gotTheLock) {
 
 let mainWindow: BrowserWindow | null = null;
 let engine: SyncEngine | null = null;
+let discovery: PeerDiscovery | null = null;
 let tray: any = null;
 
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
@@ -64,17 +66,24 @@ app.whenReady().then(() => {
   engine = new SyncEngine(config);
   engine.start();
 
+  discovery = new PeerDiscovery(config.deviceId, config.deviceName, config.apiPort || 8384);
+  discovery.start();
+
   createWindow();
   tray = createTray(() => mainWindow, engine, config);
-  setupIpc(engine, config, () => mainWindow);
+  setupIpc(engine, discovery, config, () => mainWindow);
 
-  // Relay engine events to renderer
+  // Relay engine and discovery events to renderer
   engine.on('status-changed', (status) => {
     mainWindow?.webContents.send('status-update', status);
   });
 
   engine.on('progress', (progress) => {
     mainWindow?.webContents.send('progress-update', progress);
+  });
+
+  discovery.on('peers-changed', (peers) => {
+    mainWindow?.webContents.send('peers-update', peers);
   });
 
   app.on('activate', () => {

@@ -37,7 +37,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSettings, onOpenPairing, p
           <div className="flex items-center gap-1.5">
             <h1 className="font-semibold text-base tracking-tight text-white">MacDrop</h1>
             <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400 border border-blue-500/30">
-              v1.0
+              v1.1
             </span>
           </div>
           <div className="flex items-center gap-1 text-[11px] text-zinc-400">

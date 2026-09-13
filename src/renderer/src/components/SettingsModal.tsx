@@ -1,19 +1,24 @@
 import React from 'react';
 import { X, Bell, Power, Unlink, HardDrive } from 'lucide-react';
 
+export interface PairedDevice {
+  id: string;
+  originalName: string;
+  customName: string;
+  ip: string;
+  port: number;
+  pairedAt: string;
+}
+
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
   autoStart: boolean;
   notifications: boolean;
-  pairedDevice?: {
-    id: string;
-    name: string;
-    pairedAt: string;
-  };
+  pairedDevices?: PairedDevice[];
   onToggleAutoStart: (enable: boolean) => void;
   onToggleNotifications: (enable: boolean) => void;
-  onUnpairDevice: () => void;
+  onUnpairDevice: (deviceId?: string) => void;
   onSelectFolder: () => void;
   targetFolder: string;
 }
@@ -23,7 +28,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onClose,
   autoStart,
   notifications,
-  pairedDevice,
+  pairedDevices = [],
   onToggleAutoStart,
   onToggleNotifications,
   onUnpairDevice,
@@ -107,24 +112,39 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             />
           </div>
 
-          {/* Connected Device Info */}
-          {pairedDevice && (
+          {/* Connected Devices Info */}
+          {pairedDevices.length > 0 && (
             <>
               <div className="h-px bg-white/10" />
-              <div className="flex items-center justify-between pt-1">
-                <div>
-                  <div className="text-xs font-medium text-white">Связанное устройство</div>
-                  <div className="text-[11px] text-zinc-400 font-mono">
-                    {pairedDevice.name} ({pairedDevice.id})
-                  </div>
+              <div className="flex flex-col gap-2 pt-1">
+                <div className="text-xs font-medium text-white">
+                  Связанные устройства ({pairedDevices.length})
                 </div>
-                <button
-                  onClick={onUnpairDevice}
-                  className="flex items-center gap-1 text-[11px] text-red-400 hover:text-red-300 bg-red-500/10 hover:bg-red-500/20 px-2.5 py-1.5 rounded-lg border border-red-500/20 transition-colors"
-                >
-                  <Unlink className="w-3 h-3" />
-                  <span>Отвязать</span>
-                </button>
+                <div className="flex flex-col gap-2 max-h-36 overflow-y-auto">
+                  {pairedDevices.map((dev) => (
+                    <div
+                      key={dev.id}
+                      className="flex items-center justify-between p-2 rounded-xl bg-[#1c1c1e] border border-white/5"
+                    >
+                      <div className="truncate">
+                        <div className="text-xs font-medium text-zinc-200 truncate">
+                          {dev.customName || dev.originalName}
+                        </div>
+                        <div className="text-[10px] text-zinc-400 font-mono truncate">
+                          {dev.originalName} • {dev.id}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => onUnpairDevice(dev.id)}
+                        className="flex items-center gap-1 text-[11px] text-red-400 hover:text-red-300 bg-red-500/10 hover:bg-red-500/20 px-2.5 py-1.5 rounded-lg border border-red-500/20 transition-colors shrink-0 ml-2"
+                        title="Разорвать связь с этим устройством"
+                      >
+                        <Unlink className="w-3 h-3" />
+                        <span>Отвязать</span>
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
             </>
           )}

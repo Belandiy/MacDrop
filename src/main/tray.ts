@@ -28,7 +28,7 @@ export function createTray(
   engine: SyncEngine,
   config: AppConfig
 ): Tray {
-  let icon: nativeImage;
+  let icon: Electron.NativeImage;
   const iconPath = getIconPath();
 
   if (iconPath) {
@@ -43,8 +43,9 @@ export function createTray(
 
   const updateMenu = () => {
     const status = engine.getStatus();
-    const statusLabel = status.isConnected
-      ? `🟢 Подключен: ${status.pairedDevice?.name || 'Устройство'}`
+    const devices = status.pairedDevices || [];
+    const statusLabel = devices.length > 0
+      ? `🟢 Подключено (${devices.length}): ${devices[0].customName || devices[0].originalName}`
       : '⚪ Ожидание подключения...';
 
     const contextMenu = Menu.buildFromTemplate([
