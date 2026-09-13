@@ -67,7 +67,18 @@ app.whenReady().then(() => {
   engine.start();
 
   discovery = new PeerDiscovery(config.deviceId, config.deviceName, config.apiPort || 8384);
+  engine.setDiscovery(discovery);
   discovery.start();
+
+  // Live IP sync when discovery detects peers
+  discovery.on('peer-found', (peer) => {
+    engine?.updatePeerAddress(peer.deviceId, peer.ip, peer.port);
+  });
+  discovery.on('peers-changed', (peers) => {
+    for (const p of peers) {
+      engine?.updatePeerAddress(p.deviceId, p.ip, p.port);
+    }
+  });
 
   createWindow();
   tray = createTray(() => mainWindow, engine, config);

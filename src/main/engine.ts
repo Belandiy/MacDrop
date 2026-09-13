@@ -5,6 +5,7 @@ import os from 'os';
 import { EventEmitter } from 'events';
 import { AppConfig, PairedDevice, saveConfig } from './config';
 import { Notification, shell } from 'electron';
+import { PeerDiscovery } from './discovery';
 
 export interface TransferProgress {
   filename: string;
@@ -32,6 +33,7 @@ export class SyncEngine extends EventEmitter {
   private server: http.Server | null = null;
   private currentProgress: TransferProgress | null = null;
   private history: HistoryItem[] = [];
+  private discovery?: PeerDiscovery;
 
   constructor(config: AppConfig) {
     super();
@@ -149,6 +151,116 @@ export class SyncEngine extends EventEmitter {
     return this.history.filter(h => h.peerDeviceId === deviceId).reverse();
   }
 
+  public setDiscovery(discovery: PeerDiscovery) {
+    this.discovery = discovery;
+  }
+
+  public updatePeerAddress(deviceId: string, ip: string, port?: number): boolean {
+    if (!deviceId || !ip) return false;
+    const cleanIp = ip.replace(/^::ffff:/, '').trim();
+    if (cleanIp === '127.0.0.1' || cleanIp === '::1') return false;
+
+    const peer = this.config.pairedDevices.find(d => d.id === deviceId);
+    if (peer) {
+      let changed = false;
+      if (peer.ip !== cleanIp) {
+        console.log(`Live IP Sync: device ${deviceId} (${peer.customName || peer.originalName}) changed IP from ${peer.ip} to ${cleanIp}`);
+        peer.ip = cleanIp;
+        changed = true;
+      }
+      if (port && peer.port !== port) {
+        peer.port = port;
+        changed = true;
+      }
+      peer.lastSeen = Date.now();
+      if (changed) {
+        saveConfig(this.config);
+        this.emit('status-changed', this.getStatus());
+      }
+      return changed;
+    }
+    return false;
+  }
+
+  private checkPeerPing(ip: string, port: number): Promise<boolean> {
+    return new Promise((resolve) => {
+      const req = http.get({
+        hostname: ip,
+        port,
+        path: '/api/ping',
+        headers: {
+          'x-device-id': this.config.deviceId,
+          'x-device-name': encodeURIComponent(this.config.deviceName)
+        },
+        timeout: 700
+      }, (res) => {
+        if (res.statusCode === 200) {
+          let data = '';
+          res.on('data', chunk => { data += chunk; });
+          res.on('end', () => {
+            try {
+              const json = JSON.parse(data);
+              resolve(json.status === 'ok');
+            } catch {
+              resolve(true);
+            }
+          });
+        } else {
+          resolve(false);
+        }
+      });
+
+      req.on('timeout', () => {
+        req.destroy();
+        resolve(false);
+      });
+
+      req.on('error', () => {
+        resolve(false);
+      });
+    });
+  }
+
+  public async resolvePeerIp(peer: PairedDevice): Promise<{ ip: string; port: number }> {
+    const port = peer.port || 8384;
+
+    // 1. First check if current peer.ip is reachable
+    if (peer.ip && await this.checkPeerPing(peer.ip, port)) {
+      peer.lastSeen = Date.now();
+      return { ip: peer.ip, port };
+    }
+
+    console.log(`Device ${peer.id} at ${peer.ip} is unreachable. Searching for updated IP...`);
+
+    // 2. Check if discovery recently saw a new IP for this device
+    if (this.discovery) {
+      const discovered = this.discovery.findPeer(peer.id);
+      if (discovered && discovered.ip && discovered.ip !== peer.ip) {
+        const dPort = discovered.port || port;
+        if (await this.checkPeerPing(discovered.ip, dPort)) {
+          console.log(`Device ${peer.id} found at new IP in discovery cache: ${discovered.ip}`);
+          this.updatePeerAddress(peer.id, discovered.ip, dPort);
+          return { ip: discovered.ip, port: dPort };
+        }
+      }
+
+      // 3. Actively probe the subnet for this device
+      console.log(`Probing local subnet for device ${peer.id}...`);
+      const probed = await this.discovery.probeSubnetForDevice(peer.id);
+      const match = probed.find(p => p.deviceId.toUpperCase() === peer.id.toUpperCase())
+        || this.discovery.findPeer(peer.id);
+
+      if (match && match.ip && await this.checkPeerPing(match.ip, match.port || port)) {
+        const mPort = match.port || port;
+        console.log(`Device ${peer.id} found at new IP via subnet probe: ${match.ip}`);
+        this.updatePeerAddress(peer.id, match.ip, mPort);
+        return { ip: match.ip, port: mPort };
+      }
+    }
+
+    throw new Error(`Устройство «${peer.customName || peer.originalName}» не в сети или недоступно.`);
+  }
+
   public start() {
     this.startLocalServer();
   }
@@ -253,6 +365,11 @@ export class SyncEngine extends EventEmitter {
       const url = new URL(req.url || '/', `http://${req.headers.host}`);
 
       if (url.pathname === '/api/ping') {
+        const senderId = req.headers['x-device-id'] as string;
+        if (senderId) {
+          const rawIp = req.socket.remoteAddress || '127.0.0.1';
+          this.updatePeerAddress(senderId, rawIp);
+        }
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
           status: 'ok',
@@ -316,6 +433,10 @@ export class SyncEngine extends EventEmitter {
       // Incoming file upload stream
       if (url.pathname === '/api/upload' && req.method === 'POST') {
         const senderId = req.headers['x-device-id'] as string || '';
+        if (senderId) {
+          const rawIp = req.socket.remoteAddress || '127.0.0.1';
+          this.updatePeerAddress(senderId, rawIp);
+        }
         const rawFilename = req.headers['x-filename'] as string || `file_${Date.now()}`;
         const rawRelPath = req.headers['x-relative-path'] as string || '';
         const filename = decodeURIComponent(rawFilename);
@@ -438,19 +559,14 @@ export class SyncEngine extends EventEmitter {
   }
 
   // Send single file or folder recursively across network to target device
-  public async sendItem(itemPath: string, targetDeviceId?: string, relativePrefix = ''): Promise<void> {
+  public async sendItem(
+    itemPath: string,
+    targetDeviceId?: string,
+    relativePrefix = '',
+    resolvedTarget?: { ip: string; port: number }
+  ): Promise<void> {
     if (!fs.existsSync(itemPath)) return;
     const stat = fs.statSync(itemPath);
-
-    if (stat.isDirectory()) {
-      const entries = fs.readdirSync(itemPath);
-      for (const entry of entries) {
-        const fullChild = path.join(itemPath, entry);
-        const childRel = path.join(relativePrefix || path.basename(itemPath), entry);
-        await this.sendItem(fullChild, targetDeviceId, childRel);
-      }
-      return;
-    }
 
     let peer: PairedDevice | undefined;
     if (targetDeviceId) {
@@ -459,12 +575,23 @@ export class SyncEngine extends EventEmitter {
       peer = this.config.pairedDevices[0];
     }
 
-    if (!peer || !peer.ip) {
+    if (!peer) {
       throw new Error('Нет доступных связанных устройств. Сначала выполните сопряжение.');
     }
 
-    const peerIp = peer.ip;
-    const peerPort = peer.port || 8384;
+    // Resolve active IP (with automatic re-discovery if device changed IP)
+    const { ip: peerIp, port: peerPort } = resolvedTarget || await this.resolvePeerIp(peer);
+
+    if (stat.isDirectory()) {
+      const entries = fs.readdirSync(itemPath);
+      for (const entry of entries) {
+        const fullChild = path.join(itemPath, entry);
+        const childRel = path.join(relativePrefix || path.basename(itemPath), entry);
+        await this.sendItem(fullChild, targetDeviceId, childRel, { ip: peerIp, port: peerPort });
+      }
+      return;
+    }
+
     const filename = path.basename(itemPath);
     const relPath = relativePrefix ? path.join(relativePrefix) : filename;
     const peerName = peer.customName || peer.originalName;
