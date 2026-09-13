@@ -1,6 +1,7 @@
 import http from 'http';
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 import { EventEmitter } from 'events';
 import { AppConfig, PairedDevice, saveConfig } from './config';
 import { Notification, shell } from 'electron';
@@ -39,7 +40,10 @@ export class SyncEngine extends EventEmitter {
   }
 
   private getHistoryPath(): string {
-    return path.join(path.dirname(this.config.targetFolder), '.macdrop_history.json');
+    if (this.config.targetFolder) {
+      return path.join(this.config.targetFolder, '.macdrop_history.json');
+    }
+    return path.join(os.homedir(), '.macdrop', '.macdrop_history.json');
   }
 
   private loadHistory() {
@@ -48,6 +52,27 @@ export class SyncEngine extends EventEmitter {
       if (fs.existsSync(p)) {
         const data = fs.readFileSync(p, 'utf-8');
         this.history = JSON.parse(data);
+        return;
+      }
+
+      // Check legacy paths (e.g. on Desktop or parent directory) to migrate
+      const legacyPaths = [
+        path.join(path.dirname(this.config.targetFolder), '.macdrop_history.json'),
+        path.join(os.homedir(), 'Desktop', '.macdrop_history.json'),
+        path.join(os.homedir(), '.macdrop_history.json')
+      ];
+
+      for (const leg of legacyPaths) {
+        if (fs.existsSync(leg) && leg !== p) {
+          try {
+            const data = fs.readFileSync(leg, 'utf-8');
+            this.history = JSON.parse(data);
+            this.saveHistory();
+            // Clean up old file from Desktop / parent directory
+            fs.unlinkSync(leg);
+            break;
+          } catch {}
+        }
       }
     } catch {}
   }

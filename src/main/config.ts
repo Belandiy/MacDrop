@@ -37,7 +37,7 @@ export function getDefaultFolder(): string {
     } catch {}
     return path.join(os.homedir(), 'MacDrop');
   }
-  return path.join(os.homedir(), 'Desktop', 'MacDrop');
+  return path.join(os.homedir(), '.macdrop');
 }
 
 function generateRandomKey(length = 32): string {
@@ -93,6 +93,12 @@ export function loadConfig(): AppConfig {
           lastSeen: Date.now()
         }];
       }
+
+      // Migrate Mac legacy Desktop folder to ~/.macdrop
+      if (isMac && config.targetFolder === path.join(os.homedir(), 'Desktop', 'MacDrop')) {
+        config.targetFolder = path.join(os.homedir(), '.macdrop');
+        saveConfig(config);
+      }
     } catch (e) {
       console.error('Error reading settings.json, recreating defaults', e);
     }
@@ -106,7 +112,7 @@ export function loadConfig(): AppConfig {
       fs.mkdirSync(config.targetFolder, { recursive: true });
     }
   } catch (err) {
-    config.targetFolder = path.join(os.homedir(), 'MacDrop');
+    config.targetFolder = getDefaultFolder();
     try {
       fs.mkdirSync(config.targetFolder, { recursive: true });
     } catch {}

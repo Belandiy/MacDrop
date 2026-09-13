@@ -54,7 +54,7 @@
 
 ---
 
-## Issue #3: Папки по умолчанию и расположение macdrop_history.json
+## [Issue #3: Папки по умолчанию и расположение macdrop_history.json](https://github.com/Belandiy/MacDrop/issues/3) — ✅ РЕШЕНО (Closed)
 
 ### 📌 Описание проблемы
 На macOS папка по умолчанию создавалась на рабочем столе (`~/Desktop/MacDrop`), и рядом прямо на рабочем столе появлялся служебный скрытый файл `.macdrop_history.json`.  
