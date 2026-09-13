@@ -30,6 +30,7 @@ export interface MacDropApi {
   pairDevice: (input: string) => Promise<{ success: boolean; peer?: any; error?: string }>;
   unpairDevice: (deviceId?: string) => Promise<boolean>;
   getDiscoveredPeers: () => Promise<any[]>;
+  scanNearbyPeers: () => Promise<any[]>;
   onPeersUpdate: (callback: (peers: any[]) => void) => () => void;
   onStatusUpdate: (callback: (status: any) => void) => () => void;
   onProgressUpdate: (callback: (progress: any) => void) => () => void;

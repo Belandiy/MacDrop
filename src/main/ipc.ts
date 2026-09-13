@@ -56,6 +56,10 @@ export function setupIpc(
     return discovery.getPeers();
   });
 
+  ipcMain.handle('scan-nearby-peers', async () => {
+    return discovery.probeSubnetForDevice();
+  });
+
   // Pairing by Device Code OR direct IP
   ipcMain.handle('pair-device', async (_, input: string) => {
     const clean = input.trim();
@@ -64,30 +68,39 @@ export function setupIpc(
     let targetIp = '';
     let targetPort = 8384;
 
-    // 1. Check if device is in discovered peers map
-    const peer = discovery.findPeer(clean);
-    if (peer) {
-      targetIp = peer.ip;
-      targetPort = peer.port || 8384;
-    } else if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/.test(clean)) {
-      // Direct IP:port input (e.g. 192.168.0.110 or 192.168.0.110:8384)
+    // 1. Direct IP:port input (e.g. 192.168.0.110 or 192.168.0.110:8384)
+    if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/.test(clean)) {
       const parts = clean.split(':');
       targetIp = parts[0];
       if (parts[1]) targetPort = parseInt(parts[1], 10);
     } else {
-      // Broadcast discovery might take a couple seconds, try all discovered peers
-      const allPeers = discovery.getPeers();
-      if (allPeers.length === 1) {
-        // Only one peer on LAN, connect directly
-        targetIp = allPeers[0].ip;
-        targetPort = allPeers[0].port;
+      // 2. Check if device is already in UDP discovery cache
+      let peer = discovery.findPeer(clean);
+
+      // 3. If not found in UDP cache, immediately trigger Fast Subnet Probe!
+      if (!peer) {
+        console.log(`Peer "${clean}" not in UDP cache. Scanning local subnet...`);
+        const found = await discovery.probeSubnetForDevice(clean);
+        peer = discovery.findPeer(clean);
+        if (!peer && found && found.length > 0) {
+          peer = found.find(p => {
+            const pId = p.deviceId.toUpperCase();
+            const q = clean.toUpperCase();
+            return pId === q || pId.endsWith(`-${q}`) || pId.replace(/^(MAC|PC)-/, '') === q;
+          }) || found[0];
+        }
+      }
+
+      if (peer) {
+        targetIp = peer.ip;
+        targetPort = peer.port || 8384;
       }
     }
 
     if (!targetIp) {
       return {
         success: false,
-        error: `Устройство ${clean} не найдено в сети. Убедитесь, что оба компьютера включены и подключены к сети (можно также ввести IP напрямую).`
+        error: `Устройство ${clean} не найдено в сети. Убедитесь, что оба компьютера включены и подключены к одной сети (можно также ввести IP напрямую).`
       };
     }
 

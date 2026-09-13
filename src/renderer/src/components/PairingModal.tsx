@@ -58,6 +58,12 @@ export const PairingModal: React.FC<PairingModalProps> = ({
     }
   }, [isOpen, pairedDevices.length]);
 
+  React.useEffect(() => {
+    if (isOpen) {
+      window.macdrop?.scanNearbyPeers?.().catch(() => {});
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const isMac = platform === 'darwin';

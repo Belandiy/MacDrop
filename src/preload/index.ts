@@ -19,6 +19,7 @@ export interface MacDropApi {
   pairDevice: (input: string) => Promise<{ success: boolean; peer?: any; error?: string }>;
   unpairDevice: (deviceId?: string) => Promise<boolean>;
   getDiscoveredPeers: () => Promise<any[]>;
+  scanNearbyPeers: () => Promise<any[]>;
   onPeersUpdate: (callback: (peers: any[]) => void) => () => void;
   onStatusUpdate: (callback: (status: any) => void) => () => void;
   onProgressUpdate: (callback: (progress: any) => void) => () => void;
@@ -51,6 +52,7 @@ const api: MacDropApi = {
   pairDevice: (input) => ipcRenderer.invoke('pair-device', input),
   unpairDevice: (deviceId) => ipcRenderer.invoke('unpair-device', deviceId),
   getDiscoveredPeers: () => ipcRenderer.invoke('get-discovered-peers'),
+  scanNearbyPeers: () => ipcRenderer.invoke('scan-nearby-peers'),
   onPeersUpdate: (callback) => {
     const handler = (_: any, data: any) => callback(data);
     ipcRenderer.on('peers-update', handler);
