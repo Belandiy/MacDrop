@@ -84,6 +84,13 @@ export class SyncEngine extends EventEmitter {
   private healthCheckTimer: NodeJS.Timeout | null = null;
   private isDownloadingRemote = false;
   private activeCancelHandlers: Set<() => void> = new Set();
+  private pendingPairingRequests: Map<string, {
+    res: http.ServerResponse;
+    timer: NodeJS.Timeout;
+    data: any;
+    cleanIp: string;
+  }> = new Map();
+  private pendingOutgoingPairings: Set<string> = new Set();
 
   constructor(config: AppConfig) {
     super();
@@ -535,6 +542,11 @@ export class SyncEngine extends EventEmitter {
         remotePort: this.upnpStatus?.externalPort || this.config.apiPort || 8384
       });
 
+      this.pendingOutgoingPairings.add(cleanIp);
+      const cleanupOutgoing = () => {
+        this.pendingOutgoingPairings.delete(cleanIp);
+      };
+
       const req = http.request({
         hostname: cleanIp,
         port: peerPort,
@@ -544,11 +556,12 @@ export class SyncEngine extends EventEmitter {
           'Content-Type': 'application/json',
           'Content-Length': Buffer.byteLength(payload)
         },
-        timeout: 6000
+        timeout: 35000
       }, (res) => {
         let body = '';
         res.on('data', chunk => { body += chunk; });
         res.on('end', () => {
+          cleanupOutgoing();
           if (res.statusCode === 200) {
             try {
               const data = JSON.parse(body);
@@ -592,22 +605,92 @@ export class SyncEngine extends EventEmitter {
               return;
             }
           }
-          resolve({ success: false, error: `Код ответа: HTTP ${res.statusCode}` });
+          let errMsg = `Код ответа: HTTP ${res.statusCode}`;
+          try {
+            const errData = JSON.parse(body);
+            if (errData.error) errMsg = errData.error;
+          } catch {}
+          resolve({ success: false, error: errMsg });
         });
       });
 
       req.on('error', (err) => {
+        cleanupOutgoing();
         resolve({ success: false, error: err.message });
       });
 
       req.on('timeout', () => {
+        cleanupOutgoing();
         req.destroy();
-        resolve({ success: false, error: 'Таймаут подключения' });
+        resolve({ success: false, error: 'Таймаут подключения: устройство не ответило' });
       });
 
       req.write(payload);
       req.end();
     });
+  }
+
+  public respondPairingRequest(requestId: string, approved: boolean): boolean {
+    const item = this.pendingPairingRequests.get(requestId);
+    if (!item) return false;
+
+    clearTimeout(item.timer);
+    this.pendingPairingRequests.delete(requestId);
+
+    const { res, data, cleanIp } = item;
+    if (!approved) {
+      try {
+        res.writeHead(403, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Сопряжение отклонено пользователем' }));
+      } catch {}
+      return true;
+    }
+
+    const sharedToken = data.authToken || crypto.randomBytes(24).toString('hex');
+    let existing = this.config.pairedDevices.find(d => d.id === data.deviceId);
+    if (existing) {
+      existing.ip = cleanIp;
+      existing.port = data.port || 8384;
+      if (data.wanIp) existing.remoteIp = data.wanIp;
+      if (data.remotePort) existing.remotePort = data.remotePort;
+      existing.connectionMode = isPrivateIp(cleanIp) ? 'local' : 'remote';
+      existing.originalName = data.deviceName;
+      existing.authToken = sharedToken;
+      existing.lastSeen = Date.now();
+    } else {
+      existing = {
+        id: data.deviceId,
+        originalName: data.deviceName,
+        customName: data.deviceName,
+        ip: cleanIp,
+        port: data.port || 8384,
+        remoteIp: data.wanIp,
+        remotePort: data.remotePort || data.port || 8384,
+        connectionMode: isPrivateIp(cleanIp) ? 'local' : 'remote',
+        authToken: sharedToken,
+        pairedAt: new Date().toISOString(),
+        lastSeen: Date.now()
+      };
+      this.config.pairedDevices.push(existing);
+    }
+
+    saveConfig(this.config);
+    console.log(`Device pairing approved by user from ${cleanIp}:`, existing);
+    this.emit('device-paired', existing);
+    this.emit('status-changed', this.getStatus());
+
+    try {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        success: true,
+        deviceId: this.config.deviceId,
+        deviceName: this.config.deviceName,
+        authToken: sharedToken,
+        wanIp: this.upnpStatus?.wanIp || this.config.wanIp,
+        remotePort: this.upnpStatus?.externalPort || this.config.apiPort || 8384
+      }));
+    } catch {}
+    return true;
   }
 
   private startLocalServer() {
@@ -627,6 +710,25 @@ export class SyncEngine extends EventEmitter {
       }
 
       const url = new URL(req.url || '/', `http://${req.headers.host}`);
+
+      // Basic ping/status endpoint
+      if (url.pathname === '/api/status' && req.method === 'GET') {
+        const senderId = req.headers['x-device-id'] as string || '';
+        if (senderId) {
+          const rawIp = req.socket.remoteAddress || '127.0.0.1';
+          this.updatePeerAddress(senderId, rawIp);
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          status: 'ok',
+          deviceId: this.config.deviceId,
+          deviceName: this.config.deviceName,
+          platform: process.platform,
+          wanIp: this.upnpStatus?.wanIp || this.config.wanIp,
+          remotePort: this.upnpStatus?.externalPort || this.config.apiPort || 8384
+        }));
+        return;
+      }
 
       if (url.pathname === '/api/ping') {
         const senderId = req.headers['x-device-id'] as string;
@@ -660,6 +762,7 @@ export class SyncEngine extends EventEmitter {
               let existing = this.config.pairedDevices.find(d => d.id === data.deviceId);
               const sharedToken = data.authToken || existing?.authToken || crypto.randomBytes(24).toString('hex');
 
+              // If device was already paired, update IP/port and sync info without re-prompting
               if (existing) {
                 existing.ip = cleanIp;
                 existing.port = data.port || 8384;
@@ -669,7 +772,24 @@ export class SyncEngine extends EventEmitter {
                 existing.originalName = data.deviceName;
                 existing.authToken = sharedToken;
                 existing.lastSeen = Date.now();
-              } else {
+                saveConfig(this.config);
+                this.emit('device-paired', existing);
+                this.emit('status-changed', this.getStatus());
+
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({
+                  success: true,
+                  deviceId: this.config.deviceId,
+                  deviceName: this.config.deviceName,
+                  authToken: sharedToken,
+                  wanIp: this.upnpStatus?.wanIp || this.config.wanIp,
+                  remotePort: this.upnpStatus?.externalPort || this.config.apiPort || 8384
+                }));
+                return;
+              }
+
+              // If we initiated pairing with this peer IP, auto-approve
+              if (this.pendingOutgoingPairings.has(cleanIp)) {
                 existing = {
                   id: data.deviceId,
                   originalName: data.deviceName,
@@ -684,22 +804,51 @@ export class SyncEngine extends EventEmitter {
                   lastSeen: Date.now()
                 };
                 this.config.pairedDevices.push(existing);
+                saveConfig(this.config);
+                console.log(`Device pairing auto-approved (outgoing pairing) from ${cleanIp}:`, existing);
+                this.emit('device-paired', existing);
+                this.emit('status-changed', this.getStatus());
+
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({
+                  success: true,
+                  deviceId: this.config.deviceId,
+                  deviceName: this.config.deviceName,
+                  authToken: sharedToken,
+                  wanIp: this.upnpStatus?.wanIp || this.config.wanIp,
+                  remotePort: this.upnpStatus?.externalPort || this.config.apiPort || 8384
+                }));
+                return;
               }
 
-              saveConfig(this.config);
-              console.log(`Device paired from ${cleanIp}:`, existing);
-              this.emit('device-paired', existing);
-              this.emit('status-changed', this.getStatus());
+              // Interactive Security: Ask user in UI before allowing new device pairing
+              const requestId = crypto.randomUUID();
+              console.log(`[Security] Incoming pairing request [${requestId}] from "${data.deviceName}" (${cleanIp}). Awaiting user approval...`);
 
-              res.writeHead(200, { 'Content-Type': 'application/json' });
-              res.end(JSON.stringify({
-                success: true,
-                deviceId: this.config.deviceId,
-                deviceName: this.config.deviceName,
-                authToken: sharedToken,
-                wanIp: this.upnpStatus?.wanIp || this.config.wanIp,
-                remotePort: this.upnpStatus?.externalPort || this.config.apiPort || 8384
-              }));
+              const timer = setTimeout(() => {
+                if (this.pendingPairingRequests.has(requestId)) {
+                  this.pendingPairingRequests.delete(requestId);
+                  try {
+                    res.writeHead(408, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'Время ожидания подтверждения сопряжения истекло' }));
+                  } catch {}
+                }
+              }, 30000);
+
+              this.pendingPairingRequests.set(requestId, {
+                res,
+                timer,
+                data,
+                cleanIp
+              });
+
+              this.emit('pairing-request', {
+                requestId,
+                deviceId: data.deviceId,
+                deviceName: data.deviceName,
+                ip: cleanIp,
+                port: data.port || 8384
+              });
               return;
             }
           } catch {}

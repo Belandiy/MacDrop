@@ -113,6 +113,11 @@ export function setupIpc(
     return result;
   });
 
+  // Respond to incoming pairing request (Approve / Reject)
+  ipcMain.handle('respond-pairing-request', (_, arg: { requestId: string; approved: boolean }) => {
+    return engine.respondPairingRequest(arg.requestId, arg.approved);
+  });
+
   // Update device custom name
   ipcMain.handle('update-device-name', (_, arg1: any, arg2?: string) => {
     const deviceId = typeof arg1 === 'object' ? arg1.deviceId : arg1;

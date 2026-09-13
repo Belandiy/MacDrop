@@ -1,6 +1,6 @@
 {
   "name": "macdrop",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "description": "Seamless, beautiful P2P file drop between Mac and Windows",
   "main": "dist-electron/main.js",
   "scripts": {

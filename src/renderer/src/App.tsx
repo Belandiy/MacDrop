@@ -5,6 +5,7 @@ import { DeviceDetailView, PairedDevice } from './components/DeviceDetailView';
 import { FolderSection } from './components/FolderSection';
 import { DropZone } from './components/DropZone';
 import { PairingModal } from './components/PairingModal';
+import { PairingRequestModal, PairingRequest } from './components/PairingRequestModal';
 import { SettingsModal } from './components/SettingsModal';
 import { RecentTransfers } from './components/RecentTransfers';
 
@@ -30,6 +31,14 @@ export default function App() {
   const [isPairingOpen, setIsPairingOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [discoveredPeers, setDiscoveredPeers] = useState<any[]>([]);
+  const [incomingPairingRequest, setIncomingPairingRequest] = useState<PairingRequest | null>(null);
+  const [activeTargetDeviceId, setActiveTargetDeviceId] = useState<string>(() => {
+    try {
+      return localStorage.getItem('macdrop_target_device_id') || '';
+    } catch {
+      return '';
+    }
+  });
 
   const platform = window.macdrop?.platform || 'win32';
   const devices: PairedDevice[] = config.pairedDevices || status.pairedDevices || [];
@@ -83,6 +92,36 @@ export default function App() {
     }
   }, []);
 
+  // Listen for incoming pairing requests from other devices (Interactive security modal)
+  useEffect(() => {
+    if (window.macdrop?.onPairingRequest) {
+      const unsubPairing = window.macdrop.onPairingRequest((req) => {
+        setIncomingPairingRequest(req);
+      });
+      return unsubPairing;
+    }
+  }, []);
+
+  // Ensure activeTargetDeviceId always points to a valid connected device if available
+  useEffect(() => {
+    if (devices.length > 0) {
+      if (!activeTargetDeviceId || !devices.some((d) => d.id === activeTargetDeviceId)) {
+        const fallbackId = devices[0].id;
+        setActiveTargetDeviceId(fallbackId);
+        try {
+          localStorage.setItem('macdrop_target_device_id', fallbackId);
+        } catch {}
+      }
+    }
+  }, [devices, activeTargetDeviceId]);
+
+  const handleRespondPairingRequest = async (requestId: string, approved: boolean) => {
+    if (window.macdrop?.respondPairingRequest) {
+      await window.macdrop.respondPairingRequest(requestId, approved);
+    }
+    setIncomingPairingRequest(null);
+  };
+
   const handleSelectFolder = async () => {
     if (window.macdrop) {
       const newFolder = await window.macdrop.selectFolder();
@@ -98,9 +137,13 @@ export default function App() {
     }
   };
 
-  const handleFilesDropped = async (paths: string[]) => {
+  const handleFilesDropped = async (paths: string[], targetDeviceId?: string) => {
     if (window.macdrop) {
-      const targetId = selectedDevice?.id || (devices.length > 0 ? devices[0].id : undefined);
+      const targetId =
+        targetDeviceId ||
+        selectedDevice?.id ||
+        activeTargetDeviceId ||
+        (devices.length > 0 ? devices[0].id : undefined);
       return await window.macdrop.sendDroppedFiles(paths, targetId);
     }
     return [];
@@ -216,9 +259,21 @@ export default function App() {
             <DropZone
               onFilesDropped={handleFilesDropped}
               targetFolder={config.targetFolder}
-              onChooseFiles={() => {
-                const targetId = devices.length > 0 ? devices[0].id : undefined;
-                window.macdrop?.pickAndSendFiles(targetId);
+              devices={devices}
+              selectedDeviceId={activeTargetDeviceId}
+              onSelectDevice={(id) => {
+                setActiveTargetDeviceId(id);
+                try {
+                  localStorage.setItem('macdrop_target_device_id', id);
+                } catch {}
+              }}
+              onOpenPairing={() => setIsPairingOpen(true)}
+              onChooseFiles={(targetId) => {
+                const effectiveTargetId =
+                  targetId ||
+                  activeTargetDeviceId ||
+                  (devices.length > 0 ? devices[0].id : undefined);
+                window.macdrop?.pickAndSendFiles(effectiveTargetId);
               }}
             />
 
@@ -248,6 +303,11 @@ export default function App() {
         discoveredPeers={discoveredPeers}
         onPairWithCode={handlePairWithCode}
         pairedDevices={devices}
+      />
+
+      <PairingRequestModal
+        request={incomingPairingRequest}
+        onRespond={handleRespondPairingRequest}
       />
 
       <SettingsModal

@@ -32,6 +32,8 @@ export interface MacDropApi {
   onUpdateAvailable: (callback: (version: string) => void) => () => void;
   onUpdateDownloaded: (callback: (version: string) => void) => () => void;
   cancelTransfer: () => Promise<boolean>;
+  respondPairingRequest: (requestId: string, approved: boolean) => Promise<boolean>;
+  onPairingRequest: (callback: (request: any) => void) => () => void;
 }
 
 const api: MacDropApi = {
@@ -51,6 +53,12 @@ const api: MacDropApi = {
   sendDroppedFiles: (filePaths, targetDeviceId) => ipcRenderer.invoke('send-dropped-files', { filePaths, targetDeviceId }),
   pickAndSendFiles: (targetDeviceId) => ipcRenderer.invoke('pick-and-send-files', targetDeviceId),
   cancelTransfer: () => ipcRenderer.invoke('cancel-transfer'),
+  respondPairingRequest: (requestId, approved) => ipcRenderer.invoke('respond-pairing-request', { requestId, approved }),
+  onPairingRequest: (callback) => {
+    const handler = (_: any, data: any) => callback(data);
+    ipcRenderer.on('pairing-request', handler);
+    return () => ipcRenderer.removeListener('pairing-request', handler);
+  },
   updateDeviceName: (deviceId, newName) => ipcRenderer.invoke('update-device-name', { deviceId, newName }),
   removeDevice: (deviceId) => ipcRenderer.invoke('remove-device', deviceId),
   toggleDeviceReceive: (deviceId, enabled) => ipcRenderer.invoke('toggle-device-receive', { deviceId, enabled }),
