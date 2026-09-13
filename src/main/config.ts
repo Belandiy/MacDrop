@@ -36,6 +36,16 @@ export interface AppConfig {
 const isWin = process.platform === 'win32';
 const isMac = process.platform === 'darwin';
 
+export function getServiceDir(): string {
+  const dir = path.join(os.homedir(), '.macdrop');
+  if (!fs.existsSync(dir)) {
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+    } catch {}
+  }
+  return dir;
+}
+
 export function getDefaultFolder(): string {
   if (isWin) {
     try {
@@ -45,7 +55,8 @@ export function getDefaultFolder(): string {
     } catch {}
     return path.join(os.homedir(), 'MacDrop');
   }
-  return path.join(os.homedir(), '.macdrop');
+  // macOS & Linux: ~/MacDrop (visible user folder for files)
+  return path.join(os.homedir(), 'MacDrop');
 }
 
 function generateRandomKey(length = 32): string {
@@ -98,10 +109,39 @@ export function loadConfig(): AppConfig {
         }];
       }
 
-      // Migrate Mac legacy Desktop folder to ~/.macdrop
-      if (isMac && config.targetFolder === path.join(os.homedir(), 'Desktop', 'MacDrop')) {
-        config.targetFolder = path.join(os.homedir(), '.macdrop');
-        saveConfig(config);
+      // Ensure internal service directory exists
+      getServiceDir();
+
+      // Migration for macOS: ~/.macdrop is service dir, ~/MacDrop is user file folder
+      if (isMac) {
+        const legacyServiceTarget = path.join(os.homedir(), '.macdrop');
+        const legacyDesktopTarget = path.join(os.homedir(), 'Desktop', 'MacDrop');
+        if (config.targetFolder === legacyServiceTarget || config.targetFolder === legacyDesktopTarget) {
+          config.targetFolder = path.join(os.homedir(), 'MacDrop');
+          saveConfig(config);
+
+          // Migrate any user files from ~/.macdrop to ~/MacDrop
+          try {
+            if (fs.existsSync(legacyServiceTarget)) {
+              if (!fs.existsSync(config.targetFolder)) {
+                fs.mkdirSync(config.targetFolder, { recursive: true });
+              }
+              const entries = fs.readdirSync(legacyServiceTarget);
+              for (const file of entries) {
+                // Keep service and hidden files in ~/.macdrop
+                if (file.startsWith('.') || file.endsWith('.json')) continue;
+                const oldPath = path.join(legacyServiceTarget, file);
+                const newPath = path.join(config.targetFolder, file);
+                if (!fs.existsSync(newPath) && fs.statSync(oldPath).isFile()) {
+                  fs.renameSync(oldPath, newPath);
+                  console.log(`[Config] Migrated user file to ~/MacDrop: ${file}`);
+                }
+              }
+            }
+          } catch (mErr) {
+            console.error('Migration error from legacy ~/.macdrop:', mErr);
+          }
+        }
       }
     } catch (e) {
       console.error('Error reading settings.json, recreating defaults', e);
@@ -109,6 +149,9 @@ export function loadConfig(): AppConfig {
   } else {
     saveConfig(config);
   }
+
+  // Ensure internal service directory exists
+  getServiceDir();
 
   // Ensure target folder exists
   try {
