@@ -5,12 +5,21 @@ import { SyncEngine } from './engine';
 import { AppConfig } from './config';
 
 function getIconPath(): string {
+  const isMac = process.platform === 'darwin';
+  const specificName = isMac ? 'tray-icon-mac.png' : 'tray-icon-win.png';
+  const defaultName = 'tray-icon.png';
+
   const candidates = [
-    path.join(__dirname, '../dist/tray-icon.png'),
-    path.join(__dirname, '../public/tray-icon.png'),
-    path.join(app.getAppPath(), 'dist/tray-icon.png'),
-    path.join(app.getAppPath(), 'public/tray-icon.png'),
-    path.join(process.resourcesPath, 'tray-icon.png')
+    path.join(__dirname, '../dist', specificName),
+    path.join(__dirname, '../public', specificName),
+    path.join(app.getAppPath(), 'dist', specificName),
+    path.join(app.getAppPath(), 'public', specificName),
+    path.join(process.resourcesPath, specificName),
+    path.join(__dirname, '../dist', defaultName),
+    path.join(__dirname, '../public', defaultName),
+    path.join(app.getAppPath(), 'dist', defaultName),
+    path.join(app.getAppPath(), 'public', defaultName),
+    path.join(process.resourcesPath, defaultName)
   ];
 
   for (const p of candidates) {
@@ -33,6 +42,12 @@ export function createTray(
 
   if (iconPath) {
     icon = nativeImage.createFromPath(iconPath);
+    if (process.platform === 'darwin') {
+      icon = icon.resize({ width: 18, height: 18 });
+      icon.setTemplateImage(true);
+    } else {
+      icon = icon.resize({ width: 16, height: 16 });
+    }
   } else {
     // Fallback icon
     icon = nativeImage.createEmpty();

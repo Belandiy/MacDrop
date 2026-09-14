@@ -16,6 +16,7 @@ export interface MacDropApi {
   getDeviceHistory: (deviceId: string) => Promise<any[]>;
   toggleAutostart: (enable: boolean) => Promise<boolean>;
   minimizeWindow: () => void;
+  maximizeWindow: () => void;
   closeWindow: () => void;
   pairDevice: (input: string) => Promise<{ success: boolean; peer?: any; error?: string }>;
   unpairDevice: (deviceId?: string) => Promise<boolean>;
@@ -67,6 +68,7 @@ const api: MacDropApi = {
   getDeviceHistory: (deviceId) => ipcRenderer.invoke('get-device-history', deviceId),
   toggleAutostart: (enable) => ipcRenderer.invoke('toggle-autostart', enable),
   minimizeWindow: () => ipcRenderer.send('minimize-window'),
+  maximizeWindow: () => ipcRenderer.send('maximize-window'),
   closeWindow: () => ipcRenderer.send('close-window'),
   pairDevice: (input) => ipcRenderer.invoke('pair-device', input),
   unpairDevice: (deviceId) => ipcRenderer.invoke('unpair-device', deviceId),

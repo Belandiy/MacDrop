@@ -1,7 +1,7 @@
 {
   "name": "macdrop",
-  "version": "1.3.0",
-  "description": "Seamless, beautiful P2P file drop between Mac and Windows",
+  "version": "2.0.0",
+  "description": "Cross-platform local network file transfer app (Mac & Windows)",
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "vite",

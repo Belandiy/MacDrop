@@ -5,7 +5,7 @@ import os from 'os';
 import crypto from 'crypto';
 import { EventEmitter } from 'events';
 import { AppConfig, PairedDevice, saveConfig } from './config';
-import { Notification, shell } from 'electron';
+import { Notification, shell, app } from 'electron';
 import { PeerDiscovery } from './discovery';
 import { isPrivateIp, UpnpStatus } from './upnp';
 import { getMobileWebHtml } from './mobileWeb';
@@ -817,6 +817,28 @@ export class SyncEngine extends EventEmitter {
         if (!isAuthorized) {
           res.writeHead(401, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ error: 'Unauthorized: Invalid mobile token' }));
+          return;
+        }
+
+        // Mobile Logo icon
+        if (url.pathname === '/api/mobile/logo' && req.method === 'GET') {
+          const candidates = [
+            path.join(app.getAppPath(), 'public/logo.png'),
+            path.join(__dirname, '../public/logo.png'),
+            path.join(process.resourcesPath, 'public/logo.png'),
+            path.join(process.resourcesPath, 'logo.png')
+          ];
+          for (const cand of candidates) {
+            try {
+              if (fs.existsSync(cand)) {
+                res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' });
+                fs.createReadStream(cand).pipe(res);
+                return;
+              }
+            } catch {}
+          }
+          res.writeHead(404);
+          res.end();
           return;
         }
 

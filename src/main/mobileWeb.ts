@@ -302,7 +302,7 @@ export function getMobileWebHtml(computerName: string, initialToken: string): st
   <!-- Header -->
   <header>
     <div class="brand">
-      <div class="logo-badge">M</div>
+      <img src="/api/mobile/logo?token=${initialToken}" class="logo-badge" style="object-fit: cover; padding: 0; background: none;" onerror="this.outerHTML='<div class=\'logo-badge\'>M</div>'" />
       <div>
         <h1>MacDrop</h1>
         <div style="font-size: 11px; color: #71717a;">ПК: <span id="compName">${escapeHtml(computerName)}</span></div>

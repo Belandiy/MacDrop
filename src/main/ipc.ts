@@ -234,8 +234,20 @@ export function setupIpc(
     win?.minimize();
   });
 
+  ipcMain.on('maximize-window', () => {
+    const win = getMainWindow();
+    if (win) {
+      if (win.isMaximized()) {
+        win.unmaximize();
+      } else {
+        win.maximize();
+      }
+    }
+  });
+
   ipcMain.on('close-window', () => {
     const win = getMainWindow();
     win?.hide();
   });
 }
+
