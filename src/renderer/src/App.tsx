@@ -225,14 +225,14 @@ export default function App() {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-[#1c1c1e] text-white select-none">
+    <div className="flex flex-col h-screen bg-[#090a0f] text-slate-100 select-none antialiased">
       <Header
         onOpenSettings={() => setIsSettingsOpen(true)}
         onOpenPairing={() => setIsPairingOpen(true)}
         platform={platform}
       />
 
-      <main className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+      <main className="flex-1 overflow-y-auto px-4 py-4 space-y-3.5">
         {selectedDevice ? (
           /* Device Detail Drill-Down View */
           <DeviceDetailView

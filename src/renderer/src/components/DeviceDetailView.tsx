@@ -271,7 +271,7 @@ export const DeviceDetailView: React.FC<DeviceDetailViewProps> = ({
   return (
     <div
       className={`flex flex-col h-full space-y-4 transition-colors ${
-        isDraggingOver ? 'bg-blue-500/10' : ''
+        isDraggingOver ? 'bg-indigo-500/10' : ''
       }`}
       onDragOver={(e) => { e.preventDefault(); setIsDraggingOver(true); }}
       onDragLeave={() => setIsDraggingOver(false)}
@@ -281,32 +281,32 @@ export const DeviceDetailView: React.FC<DeviceDetailViewProps> = ({
       <div className="flex items-center justify-between">
         <button
           onClick={onBack}
-          className="flex items-center gap-1.5 text-xs text-zinc-300 hover:text-white bg-[#2c2c2e] hover:bg-[#3a3a3c] px-3 py-1.5 rounded-xl border border-white/10 transition-colors"
+          className="flex items-center gap-1.5 text-xs text-slate-200 hover:text-white bg-[#171a23] hover:bg-[#1f2330] px-3 py-1.5 rounded-xl border border-white/[0.08] transition-all font-semibold active:scale-95"
         >
-          <ArrowLeft className="w-3.5 h-3.5" />
+          <ArrowLeft className="w-3.5 h-3.5 text-slate-400" />
           <span>Все устройства</span>
         </button>
 
-        <span className="text-xs text-zinc-500 font-mono">ID: {device.id}</span>
+        <span className="text-xs text-slate-500 font-mono">ID: {device.id}</span>
       </div>
 
       {/* Main Device Information Card */}
-      <div className="bg-[#2c2c2e]/90 border border-white/10 rounded-2xl p-4 shadow-lg space-y-4">
+      <div className="bg-[#111319]/90 border border-white/[0.08] rounded-2xl p-4 shadow-xl backdrop-blur-md space-y-4">
         {/* Device Header with Icon and Editable Name */}
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
             <div className={`w-12 h-12 rounded-2xl flex items-center justify-center relative ${
-              isMac ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/30' : 'bg-blue-500/10 text-blue-400 border border-blue-500/30'
+              isMac ? 'bg-indigo-500/15 text-indigo-300 border border-indigo-500/30' : 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30'
             }`}>
               {isMac ? <Laptop className="w-6 h-6" /> : <Monitor className="w-6 h-6" />}
               {device.connectionMode === 'remote' ? (
-                <span className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full border-2 border-[#2c2c2e] bg-blue-500 shadow-sm shadow-blue-500/50 flex items-center justify-center" title="Подключено удалённо">
+                <span className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full border-2 border-[#111319] bg-cyan-500 shadow-sm shadow-cyan-500/50 flex items-center justify-center" title="Подключено удалённо">
                   <Globe className="w-2.5 h-2.5 text-white" />
                 </span>
               ) : device.connectionMode === 'offline' ? (
-                <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-[#2c2c2e] bg-zinc-500 shadow-sm" title="Не в сети" />
+                <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-[#111319] bg-slate-500 shadow-sm" title="Не в сети" />
               ) : (
-                <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-[#2c2c2e] bg-emerald-500 shadow-sm shadow-emerald-500/50" title="В сети (Wi-Fi)" />
+                <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-[#111319] bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.7)]" title="В сети (Wi-Fi)" />
               )}
             </div>
 
@@ -323,13 +323,13 @@ export const DeviceDetailView: React.FC<DeviceDetailViewProps> = ({
                       if (e.key === 'Escape') setIsEditingName(false);
                     }}
                     autoFocus
-                    className="bg-[#1c1c1e] border border-blue-500/60 rounded-lg px-2.5 py-1 text-sm font-semibold text-white focus:outline-none w-48 shadow-inner"
+                    className="bg-[#171a23] border border-indigo-500/60 rounded-lg px-2.5 py-1 text-sm font-semibold text-white focus:outline-none w-48 shadow-inner"
                     placeholder="Основное название"
                   />
                   <button
                     onClick={handleSaveName}
                     title="Сохранить"
-                    className="p-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white transition-colors"
+                    className="p-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white transition-colors"
                   >
                     <Check className="w-4 h-4" />
                   </button>
@@ -339,41 +339,41 @@ export const DeviceDetailView: React.FC<DeviceDetailViewProps> = ({
                       setIsEditingName(false);
                     }}
                     title="Отмена"
-                    className="p-1 rounded-lg bg-zinc-700 hover:bg-zinc-600 text-zinc-300 transition-colors"
+                    className="p-1 rounded-lg bg-white/[0.08] hover:bg-white/[0.12] text-slate-300 transition-colors"
                   >
                     <X className="w-4 h-4" />
                   </button>
                 </div>
               ) : (
                 <div className="flex items-center gap-2 group">
-                  <h2 className="text-base font-semibold text-white">
+                  <h2 className="text-base font-bold text-white">
                     {device.customName || device.originalName}
                   </h2>
                   <button
                     onClick={() => setIsEditingName(true)}
                     title="Переименовать устройство"
-                    className="text-zinc-400 hover:text-white transition-colors p-1"
+                    className="text-slate-400 hover:text-white transition-colors p-1"
                   >
                     <Edit2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
               )}
-              <p className="text-[11px] text-zinc-400">Основное отображаемое имя</p>
+              <p className="text-[11px] text-slate-400">Основное отображаемое имя</p>
             </div>
           </div>
 
           {device.connectionMode === 'remote' ? (
-            <div className="flex items-center gap-1.5 bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2.5 py-1 rounded-full text-[11px] font-medium">
+            <div className="flex items-center gap-1.5 bg-cyan-500/15 text-cyan-300 border border-cyan-500/25 px-2.5 py-1 rounded-full text-[11px] font-semibold">
               <Globe className="w-3 h-3" />
               <span>В сети (Удалённо)</span>
             </div>
           ) : device.connectionMode === 'offline' ? (
-            <div className="flex items-center gap-1.5 bg-zinc-500/10 text-zinc-400 border border-zinc-500/20 px-2.5 py-1 rounded-full text-[11px] font-medium">
+            <div className="flex items-center gap-1.5 bg-white/[0.05] text-slate-400 border border-white/[0.08] px-2.5 py-1 rounded-full text-[11px] font-medium">
               <WifiOff className="w-3 h-3" />
               <span>Не в сети</span>
             </div>
           ) : (
-            <div className="flex items-center gap-1.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-1 rounded-full text-[11px] font-medium">
+            <div className="flex items-center gap-1.5 bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 px-2.5 py-1 rounded-full text-[11px] font-semibold">
               <CheckCircle2 className="w-3 h-3" />
               <span>В сети (Wi-Fi)</span>
             </div>
@@ -381,50 +381,50 @@ export const DeviceDetailView: React.FC<DeviceDetailViewProps> = ({
         </div>
 
         {/* Immutable Device Attributes Grid */}
-        <div className="grid grid-cols-2 gap-2.5 pt-2 border-t border-white/5">
-          <div className="bg-[#1c1c1e]/70 border border-white/5 rounded-xl p-2.5">
-            <span className="text-[10px] text-zinc-500 uppercase tracking-wider block font-semibold mb-0.5">
+        <div className="grid grid-cols-2 gap-2.5 pt-2 border-t border-white/[0.06]">
+          <div className="bg-[#171a23] border border-white/[0.06] rounded-xl p-2.5">
+            <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-bold mb-0.5">
               Неизменяемое имя
             </span>
-            <span className="text-xs text-zinc-200 font-medium truncate block" title={device.originalName}>
+            <span className="text-xs text-slate-200 font-medium truncate block" title={device.originalName}>
               {device.originalName}
             </span>
           </div>
 
-          <div className="bg-[#1c1c1e]/70 border border-white/5 rounded-xl p-2.5">
+          <div className="bg-[#171a23] border border-white/[0.06] rounded-xl p-2.5">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] text-zinc-500 uppercase tracking-wider block font-semibold mb-0.5">
+              <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-bold mb-0.5">
                 ID устройства
               </span>
               <button
                 onClick={handleCopyId}
-                className="text-zinc-400 hover:text-white transition-colors"
+                className="text-slate-400 hover:text-white transition-colors"
                 title="Скопировать ID"
               >
                 {copiedId ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
               </button>
             </div>
-            <span className="text-xs font-mono text-zinc-200 font-medium">
+            <span className="text-xs font-mono text-cyan-300 font-semibold">
               {device.id}
             </span>
           </div>
 
-          <div className="bg-[#1c1c1e]/70 border border-white/5 rounded-xl p-2.5">
-            <span className="text-[10px] text-zinc-500 uppercase tracking-wider block font-semibold mb-0.5">
+          <div className="bg-[#171a23] border border-white/[0.06] rounded-xl p-2.5">
+            <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-bold mb-0.5">
               Сетевой адрес
             </span>
-            <span className="text-xs font-mono text-zinc-300 truncate block">
+            <span className="text-xs font-mono text-slate-300 truncate block">
               {device.connectionMode === 'remote' && device.remoteIp
                 ? `${device.remoteIp}:${device.remotePort || 8384} (WAN)`
                 : `${device.ip}:${device.port || 8384} (LAN)`}
             </span>
           </div>
 
-          <div className="bg-[#1c1c1e]/70 border border-white/5 rounded-xl p-2.5">
-            <span className="text-[10px] text-zinc-500 uppercase tracking-wider block font-semibold mb-0.5">
+          <div className="bg-[#171a23] border border-white/[0.06] rounded-xl p-2.5">
+            <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-bold mb-0.5">
               Связано
             </span>
-            <span className="text-xs text-zinc-400 flex items-center gap-1">
+            <span className="text-xs text-slate-400 flex items-center gap-1 font-mono">
               <Clock className="w-3 h-3" />
               {new Date(device.pairedAt).toLocaleDateString()}
             </span>
@@ -432,9 +432,9 @@ export const DeviceDetailView: React.FC<DeviceDetailViewProps> = ({
         </div>
 
         {/* Temporary File Reception Toggle (On / Off) */}
-        <div className="bg-[#1c1c1e]/70 border border-white/5 rounded-xl p-3 flex items-center justify-between">
+        <div className="bg-[#171a23] border border-white/[0.06] rounded-xl p-3 flex items-center justify-between">
           <div>
-            <div className="text-xs font-medium text-white flex items-center gap-1.5">
+            <div className="text-xs font-semibold text-white flex items-center gap-1.5">
               {isReceiveEnabled ? (
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
               ) : (
@@ -442,20 +442,20 @@ export const DeviceDetailView: React.FC<DeviceDetailViewProps> = ({
               )}
               <span>Приём файлов от этого устройства</span>
             </div>
-            <div className="text-[11px] text-zinc-400 mt-0.5">
+            <div className="text-[11px] text-slate-400 mt-0.5">
               {isReceiveEnabled
                 ? 'Разрешено: устройство может отправлять вам файлы'
                 : 'Запрещено: приём временно заблокирован без потери связи'}
             </div>
           </div>
 
-          <div className="flex items-center bg-[#252528] p-0.5 rounded-xl border border-white/10 shrink-0 ml-3">
+          <div className="flex items-center bg-[#111319] p-0.5 rounded-xl border border-white/[0.08] shrink-0 ml-3">
             <button
               onClick={() => handleToggleReceive(true)}
               className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all ${
                 isReceiveEnabled
                   ? 'bg-emerald-600 text-white shadow-sm'
-                  : 'text-zinc-400 hover:text-white'
+                  : 'text-slate-400 hover:text-white'
               }`}
             >
               Вкл
@@ -464,8 +464,8 @@ export const DeviceDetailView: React.FC<DeviceDetailViewProps> = ({
               onClick={() => handleToggleReceive(false)}
               className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all ${
                 !isReceiveEnabled
-                  ? 'bg-red-600 text-white shadow-sm'
-                  : 'text-zinc-400 hover:text-white'
+                  ? 'bg-rose-600 text-white shadow-sm'
+                  : 'text-slate-400 hover:text-white'
               }`}
             >
               Выкл
@@ -480,18 +480,18 @@ export const DeviceDetailView: React.FC<DeviceDetailViewProps> = ({
               sendNotice.type === 'warning'
                 ? 'bg-amber-500/15 border-amber-500/30 text-amber-300'
                 : sendNotice.type === 'error'
-                ? 'bg-red-500/15 border-red-500/30 text-red-300'
+                ? 'bg-rose-500/15 border-rose-500/30 text-rose-300'
                 : 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
             }`}
           >
             {sendNotice.type === 'warning' ? (
               <Ban className="w-4 h-4 text-amber-400 shrink-0" />
             ) : sendNotice.type === 'error' ? (
-              <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+              <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
             ) : (
               <Check className="w-4 h-4 text-emerald-400 shrink-0" />
             )}
-            <span className="font-medium">{sendNotice.message}</span>
+            <span className="font-semibold">{sendNotice.message}</span>
           </div>
         )}
 
@@ -500,7 +500,7 @@ export const DeviceDetailView: React.FC<DeviceDetailViewProps> = ({
           <button
             onClick={handlePickAndSend}
             disabled={isSending}
-            className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-medium py-2 px-3 rounded-xl text-xs transition-colors shadow-sm disabled:opacity-50"
+            className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 active:scale-95 text-white font-semibold py-2 px-3 rounded-xl text-xs transition-all shadow-md shadow-indigo-600/30 disabled:opacity-50"
           >
             <Send className="w-3.5 h-3.5" />
             <span>{isSending ? 'Отправка...' : 'Отправить файл(ы)'}</span>
@@ -510,13 +510,13 @@ export const DeviceDetailView: React.FC<DeviceDetailViewProps> = ({
             <div className="flex items-center gap-1.5">
               <button
                 onClick={handleDeleteDevice}
-                className="bg-red-600 hover:bg-red-500 text-white text-xs px-2.5 py-2 rounded-xl font-medium transition-colors"
+                className="bg-rose-600 hover:bg-rose-500 text-white text-xs px-2.5 py-2 rounded-xl font-semibold transition-colors"
               >
                 Удалить связь
               </button>
               <button
                 onClick={() => setIsConfirmingDelete(false)}
-                className="bg-zinc-700 hover:bg-zinc-600 text-zinc-200 text-xs px-2 py-2 rounded-xl transition-colors"
+                className="bg-white/[0.08] hover:bg-white/[0.12] text-slate-200 text-xs px-2 py-2 rounded-xl transition-colors"
               >
                 Отмена
               </button>
@@ -524,7 +524,7 @@ export const DeviceDetailView: React.FC<DeviceDetailViewProps> = ({
           ) : (
             <button
               onClick={() => setIsConfirmingDelete(true)}
-              className="flex items-center gap-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 py-2 px-3 rounded-xl text-xs font-medium transition-colors"
+              className="flex items-center gap-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/25 py-2 px-3 rounded-xl text-xs font-semibold transition-colors"
               title="Удалить связь с устройством"
             >
               <Trash2 className="w-3.5 h-3.5" />
@@ -536,18 +536,18 @@ export const DeviceDetailView: React.FC<DeviceDetailViewProps> = ({
 
       {/* Active Transfer Progress Bar for this device */}
       {currentProgress && (
-        <div className="bg-[#2c2c2e]/90 border border-white/10 rounded-2xl p-3 shadow-lg animate-in fade-in duration-200">
+        <div className="bg-[#111319]/90 border border-white/[0.08] rounded-2xl p-3 shadow-xl animate-in fade-in duration-200">
           <div className="flex items-center justify-between text-xs mb-1.5">
-            <div className="flex items-center gap-1.5 font-medium text-white truncate max-w-[240px]">
+            <div className="flex items-center gap-1.5 font-semibold text-white truncate max-w-[240px]">
               {currentProgress.direction === 'incoming' ? (
                 <ArrowDownCircle className="w-4 h-4 text-emerald-400 shrink-0" />
               ) : (
-                <ArrowUpCircle className="w-4 h-4 text-blue-400 shrink-0" />
+                <ArrowUpCircle className="w-4 h-4 text-cyan-400 shrink-0" />
               )}
               <span className="truncate">{currentProgress.filename}</span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-blue-400 font-semibold">{percent}%</span>
+              <span className="text-cyan-400 font-bold font-mono">{percent}%</span>
               <button
                 type="button"
                 onClick={async (e) => {
@@ -557,7 +557,7 @@ export const DeviceDetailView: React.FC<DeviceDetailViewProps> = ({
                   }
                 }}
                 title="Отменить передачу"
-                className="px-1.5 py-0.5 rounded-md bg-red-500/15 hover:bg-red-500/25 active:bg-red-500/40 text-red-400 hover:text-red-300 transition-colors flex items-center gap-1 text-[10px] font-medium"
+                className="px-1.5 py-0.5 rounded-md bg-rose-500/15 hover:bg-rose-500/25 active:bg-rose-500/40 text-rose-400 hover:text-rose-300 transition-colors flex items-center gap-1 text-[10px] font-medium"
               >
                 <X className="w-3 h-3" />
                 <span>Отмена</span>
@@ -565,19 +565,19 @@ export const DeviceDetailView: React.FC<DeviceDetailViewProps> = ({
             </div>
           </div>
 
-          <div className="w-full h-2 bg-zinc-800 rounded-full overflow-hidden">
+          <div className="w-full h-2 bg-white/[0.08] rounded-full overflow-hidden">
             <div
-              className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full transition-all duration-300"
+              className="h-full bg-gradient-to-r from-indigo-500 via-indigo-600 to-cyan-400 rounded-full shadow-[0_0_12px_rgba(6,182,212,0.4)] transition-all duration-300"
               style={{ width: `${percent}%` }}
             />
           </div>
 
-          <div className="flex items-center justify-between text-[11px] text-zinc-400 mt-1.5">
+          <div className="flex items-center justify-between text-[11px] text-slate-400 mt-1.5 font-mono">
             <span>
               {formatBytes(currentProgress.bytesTransferred)} из {formatBytes(currentProgress.totalBytes)}
             </span>
-            <span className="flex items-center gap-1 text-zinc-300">
-              <RefreshCw className="w-3 h-3 animate-spin text-blue-400" />
+            <span className="flex items-center gap-1 text-slate-300">
+              <RefreshCw className="w-3 h-3 animate-spin text-cyan-400" />
               {formatSpeed(currentProgress.speedBps)}
             </span>
           </div>
@@ -585,20 +585,20 @@ export const DeviceDetailView: React.FC<DeviceDetailViewProps> = ({
       )}
 
       {/* Transfer History For This Specific Device */}
-      <div className="bg-[#2c2c2e]/90 border border-white/10 rounded-2xl p-4 shadow-lg flex-1 flex flex-col min-h-[220px]">
+      <div className="bg-[#111319]/90 border border-white/[0.08] rounded-2xl p-4 shadow-xl backdrop-blur-md flex-1 flex flex-col min-h-[220px]">
         <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-1.5 text-xs font-medium text-zinc-300">
-            <HardDrive className="w-3.5 h-3.5 text-zinc-400" />
+          <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+            <HardDrive className="w-3.5 h-3.5 text-indigo-400" />
             <span>Журнал передач с этим устройством</span>
           </div>
-          <span className="text-[10px] text-zinc-400">{history.length} файл(ов)</span>
+          <span className="text-[10px] text-slate-500 font-mono">{history.length} файл(ов)</span>
         </div>
 
         {history.length === 0 ? (
-          <div className="flex-1 flex flex-col items-center justify-center p-6 text-center text-zinc-500 space-y-2 border border-dashed border-white/10 rounded-xl">
-            <File className="w-8 h-8 text-zinc-600 stroke-[1.5]" />
-            <p className="text-xs text-zinc-400">История передач с этим устройством пуста</p>
-            <p className="text-[11px] text-zinc-500">
+          <div className="flex-1 flex flex-col items-center justify-center p-6 text-center text-slate-500 space-y-2 border border-dashed border-white/[0.08] rounded-xl">
+            <File className="w-8 h-8 text-slate-600 stroke-[1.5]" />
+            <p className="text-xs font-semibold text-slate-400">История передач с этим устройством пуста</p>
+            <p className="text-[11px] text-slate-500">
               Перетащите файлы прямо сюда или нажмите «Отправить файл(ы)»
             </p>
           </div>
@@ -608,13 +608,13 @@ export const DeviceDetailView: React.FC<DeviceDetailViewProps> = ({
               <div
                 key={item.id}
                 onClick={() => onOpenFile(item.filename)}
-                className="flex items-center justify-between p-2.5 rounded-xl bg-[#1c1c1e]/80 hover:bg-[#1c1c1e] border border-white/5 hover:border-white/15 transition-all cursor-pointer group"
+                className="flex items-center justify-between p-2.5 rounded-xl bg-[#171a23]/70 hover:bg-[#1f2330] border border-white/[0.06] hover:border-white/[0.14] transition-all cursor-pointer group"
               >
                 <div className="flex items-center gap-2.5 truncate">
                   <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
                     item.direction === 'incoming'
-                      ? 'bg-emerald-500/10 text-emerald-400'
-                      : 'bg-blue-500/10 text-blue-400'
+                      ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/25'
+                      : 'bg-indigo-500/15 text-indigo-300 border border-indigo-500/25'
                   }`}>
                     {item.direction === 'incoming' ? (
                       <ArrowDownLeft className="w-3.5 h-3.5" />
@@ -623,10 +623,10 @@ export const DeviceDetailView: React.FC<DeviceDetailViewProps> = ({
                     )}
                   </div>
                   <div className="truncate">
-                    <div className="text-xs font-medium text-white truncate group-hover:text-blue-400 transition-colors">
+                    <div className="text-xs font-semibold text-white truncate group-hover:text-indigo-300 transition-colors">
                       {item.filename}
                     </div>
-                    <div className="text-[10px] text-zinc-400 flex items-center gap-1.5">
+                    <div className="text-[10px] text-slate-400 flex items-center gap-1.5 font-mono">
                       <span>{item.direction === 'incoming' ? 'Получен' : 'Отправлен'}</span>
                       <span>•</span>
                       <span>{formatBytes(item.size)}</span>
@@ -636,7 +636,7 @@ export const DeviceDetailView: React.FC<DeviceDetailViewProps> = ({
                   </div>
                 </div>
 
-                <div className="text-zinc-600 group-hover:text-zinc-400 transition-colors pl-2">
+                <div className="text-slate-500 group-hover:text-slate-300 transition-colors pl-2">
                   <File className="w-3.5 h-3.5" />
                 </div>
               </div>

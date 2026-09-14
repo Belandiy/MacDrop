@@ -8,31 +8,47 @@ export default {
   theme: {
     extend: {
       colors: {
+        canvas: '#090a0f',
+        surface: {
+          1: '#111319',
+          2: '#171a23',
+          3: '#1f2330',
+          glass: 'rgba(23, 26, 35, 0.75)'
+        },
+        border: {
+          subtle: 'rgba(255, 255, 255, 0.06)',
+          medium: 'rgba(255, 255, 255, 0.12)',
+          glow: 'rgba(99, 102, 241, 0.3)'
+        },
         mac: {
-          bg: '#1c1c1e',
-          card: '#2c2c2e',
-          cardHover: '#3a3a3c',
-          border: 'rgba(255, 255, 255, 0.1)',
-          accent: '#007aff',
-          accentHover: '#0062cc',
-          green: '#34c759',
-          orange: '#ff9500',
-          blue: '#0a84ff',
-          textMuted: '#8e8e93'
+          bg: '#090a0f',
+          card: '#111319',
+          cardHover: '#1f2330',
+          border: 'rgba(255, 255, 255, 0.08)',
+          accent: '#6366f1',
+          accentHover: '#4f46e5',
+          green: '#10b981',
+          orange: '#f59e0b',
+          blue: '#3b82f6',
+          textMuted: '#94a3b8'
         }
       },
       fontFamily: {
         sans: [
+          '"Plus Jakarta Sans"',
           '-apple-system',
           'BlinkMacSystemFont',
-          '"Segoe UI"',
-          'Roboto',
-          'Helvetica',
-          'Arial',
+          '"SF Pro Display"',
           'sans-serif'
+        ],
+        mono: [
+          '"JetBrains Mono"',
+          'monospace'
         ]
       },
       boxShadow: {
+        'ambient': '0 25px 60px -15px rgba(0, 0, 0, 0.7)',
+        'card': '0 12px 30px -8px rgba(0, 0, 0, 0.5)',
         'glass': '0 8px 32px 0 rgba(0, 0, 0, 0.37)'
       }
     },
