@@ -8,6 +8,15 @@ import { AppConfig, PairedDevice, saveConfig } from './config';
 import { Notification, shell } from 'electron';
 import { PeerDiscovery } from './discovery';
 import { isPrivateIp, UpnpStatus } from './upnp';
+import { getMobileWebHtml } from './mobileWeb';
+
+function formatFileSize(bytes: number): string {
+  if (!bytes || bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return (bytes / Math.pow(k, i)).toFixed(1) + ' ' + sizes[i];
+}
 
 export function getSafeResolvedPath(baseFolder: string, relPath: string, filename: string): string | null {
   const sanitizedFilename = path.basename(filename).replace(/[/\\?%*:|"<>]/g, '_').trim();
@@ -91,11 +100,52 @@ export class SyncEngine extends EventEmitter {
     cleanIp: string;
   }> = new Map();
   private pendingOutgoingPairings: Set<string> = new Set();
+  private mobileSessionToken: string = crypto.randomBytes(16).toString('hex');
 
   constructor(config: AppConfig) {
     super();
     this.config = config;
     this.loadHistory();
+  }
+
+  public getMobileSessionToken(): string {
+    return this.mobileSessionToken;
+  }
+
+  public regenerateMobileSessionToken(): string {
+    this.mobileSessionToken = crypto.randomBytes(16).toString('hex');
+    return this.mobileSessionToken;
+  }
+
+  public getLocalIps(): string[] {
+    if (this.discovery) {
+      const ips = this.discovery.getLocalIps();
+      if (ips.length > 0) return ips;
+    }
+    const ips: string[] = [];
+    const ifaces = os.networkInterfaces();
+    for (const name of Object.keys(ifaces)) {
+      for (const iface of ifaces[name] || []) {
+        if (iface.family === 'IPv4' && !iface.internal && !iface.address.startsWith('169.254.')) {
+          ips.push(iface.address);
+        }
+      }
+    }
+    return ips;
+  }
+
+  public getMobileShareInfo() {
+    const ips = this.getLocalIps();
+    const port = this.config.apiPort || 8384;
+    const primaryIp = ips[0] || '127.0.0.1';
+    const url = `http://${primaryIp}:${port}/mobile?token=${this.mobileSessionToken}`;
+    return {
+      ips,
+      port,
+      token: this.mobileSessionToken,
+      url,
+      computerName: this.config.deviceName
+    };
   }
 
   private getServiceDir(): string {
@@ -717,20 +767,215 @@ export class SyncEngine extends EventEmitter {
   private startLocalServer() {
     const port = this.config.apiPort || 8384;
     this.server = http.createServer(async (req, res) => {
-      // Security: Block any requests from web browsers (CORS / Drive-by attack mitigation)
-      if (req.headers.origin) {
+      const url = new URL(req.url || '/', `http://${req.headers.host || '127.0.0.1'}`);
+
+      // Handle Web Drop for Mobile Browsers
+      const isMobileWeb = url.pathname === '/mobile' || url.pathname.startsWith('/api/mobile/');
+
+      // Security: Block non-mobile requests from web browsers (CORS / Drive-by attack mitigation)
+      if (req.headers.origin && !isMobileWeb) {
         res.writeHead(403, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'Browser cross-origin requests are forbidden' }));
         return;
       }
 
       if (req.method === 'OPTIONS') {
+        if (isMobileWeb) {
+          res.writeHead(204, {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, X-Filename, X-Mobile-Token'
+          });
+          res.end();
+          return;
+        }
         res.writeHead(405);
         res.end();
         return;
       }
 
-      const url = new URL(req.url || '/', `http://${req.headers.host}`);
+      // --- Mobile Web Endpoints ---
+      if (isMobileWeb) {
+        const queryToken = url.searchParams.get('token') || (req.headers['x-mobile-token'] as string);
+        const isAuthorized = Boolean(queryToken && queryToken === this.mobileSessionToken);
+
+        // 1. Mobile Web UI entry point
+        if (url.pathname === '/mobile' && req.method === 'GET') {
+          if (!isAuthorized) {
+            res.writeHead(401, { 'Content-Type': 'text/html; charset=utf-8' });
+            res.end(`<!DOCTYPE html><html><body style="background:#121214;color:#fff;font-family:sans-serif;padding:30px;text-align:center;"><h2>401 Доступ запрещен</h2><p style="color:#a1a1aa;">Недействительный или устаревший токен сессии MacDrop.<br>Отсканируйте QR-код в приложении заново.</p></body></html>`);
+            return;
+          }
+          res.writeHead(200, {
+            'Content-Type': 'text/html; charset=utf-8',
+            'Cache-Control': 'no-cache, no-store, must-revalidate'
+          });
+          res.end(getMobileWebHtml(this.config.deviceName, this.mobileSessionToken));
+          return;
+        }
+
+        if (!isAuthorized) {
+          res.writeHead(401, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Unauthorized: Invalid mobile token' }));
+          return;
+        }
+
+        // 2. Mobile status check
+        if (url.pathname === '/api/mobile/status' && req.method === 'GET') {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            status: 'ok',
+            computerName: this.config.deviceName,
+            deviceId: this.config.deviceId
+          }));
+          return;
+        }
+
+        // 3. Mobile file upload stream
+        if (url.pathname === '/api/mobile/upload' && req.method === 'POST') {
+          const rawFilename = (req.headers['x-filename'] as string) || url.searchParams.get('filename') || `mobile_${Date.now()}`;
+          const filename = decodeURIComponent(rawFilename);
+          const totalSize = parseInt(req.headers['content-length'] || '0', 10);
+
+          const safePath = getSafeResolvedPath(this.config.targetFolder, '', filename);
+          if (!safePath) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Недопустимое имя файла' }));
+            return;
+          }
+
+          const finalPath = getNonConflictingPath(safePath);
+          const writeStream = fs.createWriteStream(finalPath);
+
+          let bytesReceived = 0;
+          let lastReportTime = Date.now();
+          let lastBytes = 0;
+
+          req.on('data', (chunk) => {
+            bytesReceived += chunk.length;
+            writeStream.write(chunk);
+
+            const now = Date.now();
+            if (now - lastReportTime >= 200) {
+              const speed = (bytesReceived - lastBytes) / ((now - lastReportTime) / 1000);
+              this.currentProgress = {
+                filename,
+                bytesTransferred: bytesReceived,
+                totalBytes: totalSize || bytesReceived,
+                speedBps: speed,
+                direction: 'incoming',
+                peerDeviceId: 'mobile-web',
+                peerName: 'Телефон (Web Drop)'
+              };
+              this.emit('progress', this.currentProgress);
+              lastReportTime = now;
+              lastBytes = bytesReceived;
+            }
+          });
+
+          req.on('end', () => {
+            writeStream.end(() => {
+              this.currentProgress = null;
+              this.emit('progress', null);
+
+              const actualFilename = path.basename(finalPath);
+              this.history.push({
+                id: crypto.randomBytes(8).toString('hex'),
+                filename: actualFilename,
+                size: bytesReceived,
+                timestamp: Date.now(),
+                direction: 'incoming',
+                status: 'completed',
+                peerDeviceId: 'mobile-web',
+                peerName: 'Телефон (Web Drop)'
+              });
+              this.saveHistory();
+              this.emit('status-changed', this.getStatus());
+
+              if (this.config.notifications && Notification.isSupported()) {
+                try {
+                  const notification = new Notification({
+                    title: 'MacDrop: Файл с телефона!',
+                    body: `${actualFilename} (${formatFileSize(bytesReceived)}) сохранён в папку.`
+                  });
+                  notification.show();
+                } catch {}
+              }
+
+              res.writeHead(200, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ success: true, filename: actualFilename }));
+            });
+          });
+
+          req.on('error', (err) => {
+            writeStream.destroy();
+            try { fs.unlinkSync(finalPath); } catch {}
+            this.currentProgress = null;
+            this.emit('progress', null);
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: err.message }));
+          });
+          return;
+        }
+
+        // 4. List PC files for download to mobile
+        if (url.pathname === '/api/mobile/files' && req.method === 'GET') {
+          try {
+            if (!fs.existsSync(this.config.targetFolder)) {
+              res.writeHead(200, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ files: [] }));
+              return;
+            }
+
+            const entries = fs.readdirSync(this.config.targetFolder, { withFileTypes: true });
+            const files = entries
+              .filter(e => e.isFile() && !e.name.startsWith('.'))
+              .map(e => {
+                const fullPath = path.join(this.config.targetFolder, e.name);
+                const stat = fs.statSync(fullPath);
+                return {
+                  name: e.name,
+                  size: stat.size,
+                  mtime: stat.mtimeMs,
+                  time: new Date(stat.mtimeMs).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                };
+              })
+              .sort((a, b) => b.mtime - a.mtime)
+              .slice(0, 30);
+
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ files }));
+          } catch (err: any) {
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: err.message }));
+          }
+          return;
+        }
+
+        // 5. Download PC file to mobile
+        if (url.pathname.startsWith('/api/mobile/download/') && req.method === 'GET') {
+          const rawName = url.pathname.replace('/api/mobile/download/', '');
+          const filename = decodeURIComponent(rawName);
+          const safePath = getSafeResolvedPath(this.config.targetFolder, '', filename);
+
+          if (!safePath || !fs.existsSync(safePath) || !fs.statSync(safePath).isFile()) {
+            res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+            res.end('Файл не найден');
+            return;
+          }
+
+          const stat = fs.statSync(safePath);
+          res.writeHead(200, {
+            'Content-Type': 'application/octet-stream',
+            'Content-Disposition': `attachment; filename="${encodeURIComponent(filename)}"`,
+            'Content-Length': stat.size
+          });
+
+          const stream = fs.createReadStream(safePath);
+          stream.pipe(res);
+          return;
+        }
+      }
 
       // Basic ping/status endpoint
       if (url.pathname === '/api/status' && req.method === 'GET') {

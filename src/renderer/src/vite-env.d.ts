@@ -48,6 +48,8 @@ export interface MacDropApi {
   cancelTransfer?: () => Promise<boolean>;
   respondPairingRequest?: (requestId: string, approved: boolean) => Promise<boolean>;
   onPairingRequest?: (callback: (request: { requestId: string; deviceId: string; deviceName: string; ip: string; port: number }) => void) => () => void;
+  getMobileShareInfo?: () => Promise<{ ips: string[]; port: number; token: string; url: string; computerName: string }>;
+  regenerateMobileToken?: () => Promise<{ ips: string[]; port: number; token: string; url: string; computerName: string }>;
 }
 
 declare global {

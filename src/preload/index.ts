@@ -34,6 +34,8 @@ export interface MacDropApi {
   cancelTransfer: () => Promise<boolean>;
   respondPairingRequest: (requestId: string, approved: boolean) => Promise<boolean>;
   onPairingRequest: (callback: (request: any) => void) => () => void;
+  getMobileShareInfo: () => Promise<{ ips: string[]; port: number; token: string; url: string; computerName: string }>;
+  regenerateMobileToken: () => Promise<{ ips: string[]; port: number; token: string; url: string; computerName: string }>;
 }
 
 const api: MacDropApi = {
@@ -99,7 +101,9 @@ const api: MacDropApi = {
     const handler = (_: any, ver: string) => callback(ver);
     ipcRenderer.on('update-downloaded', handler);
     return () => ipcRenderer.removeListener('update-downloaded', handler);
-  }
+  },
+  getMobileShareInfo: () => ipcRenderer.invoke('get-mobile-share-info'),
+  regenerateMobileToken: () => ipcRenderer.invoke('regenerate-mobile-token')
 };
 
 contextBridge.exposeInMainWorld('macdrop', api);

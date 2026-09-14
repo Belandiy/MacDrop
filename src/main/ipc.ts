@@ -52,6 +52,15 @@ export function setupIpc(
     return engine.getStatus();
   });
 
+  ipcMain.handle('get-mobile-share-info', () => {
+    return engine.getMobileShareInfo();
+  });
+
+  ipcMain.handle('regenerate-mobile-token', () => {
+    engine.regenerateMobileSessionToken();
+    return engine.getMobileShareInfo();
+  });
+
   ipcMain.handle('get-upnp-status', () => {
     return engine.getUpnpStatus();
   });
