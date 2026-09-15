@@ -174,28 +174,14 @@ export function setupIpc(
       targetDeviceId = payload.targetDeviceId;
     }
 
-    const results = [];
-    for (const srcPath of filePaths) {
-      if (fs.existsSync(srcPath)) {
+    return await engine.sendBatch(filePaths, targetDeviceId, (srcPath, filename) => {
+      const destPath = path.join(config.targetFolder, filename);
+      if (path.resolve(srcPath) !== path.resolve(destPath)) {
         try {
-          const filename = path.basename(srcPath);
-          await engine.sendItem(srcPath, targetDeviceId);
-
-          const destPath = path.join(config.targetFolder, filename);
-          if (path.resolve(srcPath) !== path.resolve(destPath)) {
-            try {
-              fs.cpSync(srcPath, destPath, { recursive: true });
-            } catch {}
-          }
-
-          results.push({ name: filename, success: true });
-        } catch (e: any) {
-          console.error('Send error:', e);
-          results.push({ name: path.basename(srcPath), success: false, error: e.message });
-        }
+          fs.cpSync(srcPath, destPath, { recursive: true });
+        } catch {}
       }
-    }
-    return results;
+    });
   });
 
   // Pick files dialog and send to device
@@ -210,9 +196,7 @@ export function setupIpc(
     });
 
     if (!res.canceled && res.filePaths.length > 0) {
-      for (const p of res.filePaths) {
-        await engine.sendItem(p, targetDeviceId);
-      }
+      await engine.sendBatch(res.filePaths, targetDeviceId);
       return true;
     }
     return false;
@@ -227,9 +211,7 @@ export function setupIpc(
     });
 
     if (!res.canceled && res.filePaths.length > 0) {
-      for (const p of res.filePaths) {
-        await engine.sendItem(p, targetDeviceId);
-      }
+      await engine.sendBatch(res.filePaths, targetDeviceId);
       return true;
     }
     return false;

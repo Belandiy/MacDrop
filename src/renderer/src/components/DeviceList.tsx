@@ -11,9 +11,11 @@ import {
   Wifi,
   Send,
   Globe,
-  X
+  X,
+  CheckCircle2
 } from 'lucide-react';
 import { PairedDevice } from './DeviceDetailView';
+import { useSmoothProgress } from '../hooks/useSmoothProgress';
 
 interface DeviceListProps {
   devices: PairedDevice[];
@@ -85,10 +87,16 @@ export const DeviceList: React.FC<DeviceListProps> = ({
     onQuickSend?.(deviceId);
   };
 
-  const percent =
-    currentProgress && currentProgress.totalBytes > 0
-      ? Math.min(100, Math.round((currentProgress.bytesTransferred / currentProgress.totalBytes) * 100))
-      : 0;
+  const { progress, isVisible, isCompleted } = useSmoothProgress(currentProgress, 800);
+
+  const isBatch = Boolean(progress?.totalCount && progress.totalCount > 1);
+  const percent = isCompleted
+    ? 100
+    : isBatch && progress?.batchTotalBytes && progress.batchTotalBytes > 0
+    ? Math.min(100, Math.round(((progress.batchBytesTransferred || 0) / progress.batchTotalBytes) * 100))
+    : progress && progress.totalBytes > 0
+    ? Math.min(100, Math.round((progress.bytesTransferred / progress.totalBytes) * 100))
+    : 0;
 
   return (
     <div className="bg-[#111319]/90 border border-white/[0.08] rounded-2xl p-4 shadow-xl backdrop-blur-md transition-all space-y-3">
@@ -221,60 +229,95 @@ export const DeviceList: React.FC<DeviceListProps> = ({
         </div>
       )}
 
-      {/* Active Transfer Progress Bar */}
-      {currentProgress && (
-        <div className="mt-3 pt-3 border-t border-white/[0.08]">
-          <div className="flex items-center justify-between text-xs mb-1.5">
-            <div className="flex items-center gap-1.5 font-semibold text-white truncate max-w-[240px]">
-              {currentProgress.direction === 'incoming' ? (
-                <ArrowDownCircle className="w-4 h-4 text-emerald-400 shrink-0" />
-              ) : (
-                <ArrowUpCircle className="w-4 h-4 text-cyan-400 shrink-0" />
-              )}
-              <span className="truncate">{currentProgress.filename}</span>
-              {currentProgress.peerName && (
-                <span className="text-[10px] text-slate-400 truncate">
-                  ({currentProgress.direction === 'incoming' ? 'от' : 'для'} {currentProgress.peerName})
+      {/* Active Transfer Progress Bar (Smooth Transition Container) */}
+      <div
+        className={`transition-all duration-300 ease-out overflow-hidden ${
+          isVisible && progress
+            ? 'max-h-36 opacity-100 mt-3 pt-3 border-t border-white/[0.08]'
+            : 'max-h-0 opacity-0 mt-0 pt-0 border-t-0 pointer-events-none'
+        }`}
+      >
+        {progress && (
+          <div>
+            <div className="flex items-center justify-between text-xs mb-1.5">
+              <div className="flex items-center gap-1.5 font-semibold text-white truncate max-w-[240px]">
+                {isCompleted ? (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                ) : progress.direction === 'incoming' ? (
+                  <ArrowDownCircle className="w-4 h-4 text-emerald-400 shrink-0" />
+                ) : (
+                  <ArrowUpCircle className="w-4 h-4 text-cyan-400 shrink-0" />
+                )}
+                {isBatch && !isCompleted && (
+                  <span className="px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 text-[10px] font-mono font-medium shrink-0">
+                    {progress.currentIndex} из {progress.totalCount}
+                  </span>
+                )}
+                <span className="truncate">{progress.filename}</span>
+                {progress.peerName && (
+                  <span className="text-[10px] text-slate-400 truncate">
+                    ({progress.direction === 'incoming' ? 'от' : 'для'} {progress.peerName})
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <span className={`font-bold font-mono ${isCompleted ? 'text-emerald-400' : 'text-cyan-400'}`}>
+                  {percent}%
                 </span>
-              )}
+                {!isCompleted && (
+                  <button
+                    type="button"
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      if (window.macdrop?.cancelTransfer) {
+                        await window.macdrop.cancelTransfer();
+                      }
+                    }}
+                    title="Отменить передачу"
+                    className="px-1.5 py-0.5 rounded-md bg-rose-500/15 hover:bg-rose-500/25 active:bg-rose-500/40 text-rose-400 hover:text-rose-300 transition-colors flex items-center gap-1 text-[10px] font-medium"
+                  >
+                    <X className="w-3 h-3" />
+                    <span>Отмена</span>
+                  </button>
+                )}
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="text-cyan-400 font-bold font-mono">{percent}%</span>
-              <button
-                type="button"
-                onClick={async (e) => {
-                  e.stopPropagation();
-                  if (window.macdrop?.cancelTransfer) {
-                    await window.macdrop.cancelTransfer();
-                  }
-                }}
-                title="Отменить передачу"
-                className="px-1.5 py-0.5 rounded-md bg-rose-500/15 hover:bg-rose-500/25 active:bg-rose-500/40 text-rose-400 hover:text-rose-300 transition-colors flex items-center gap-1 text-[10px] font-medium"
-              >
-                <X className="w-3 h-3" />
-                <span>Отмена</span>
-              </button>
+
+            <div className="w-full h-2 bg-white/[0.08] rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all duration-300 ${
+                  isCompleted
+                    ? 'bg-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.5)]'
+                    : 'bg-gradient-to-r from-indigo-500 via-indigo-600 to-cyan-400 shadow-[0_0_12px_rgba(6,182,212,0.4)]'
+                }`}
+                style={{ width: `${percent}%` }}
+              />
+            </div>
+
+            <div className="flex items-center justify-between text-[11px] text-slate-400 mt-1.5 font-mono">
+              <span>
+                {isCompleted
+                  ? isBatch
+                    ? `Все файлы переданы (${progress.totalCount} шт.)`
+                    : 'Передача завершена'
+                  : isBatch && progress.batchTotalBytes
+                  ? `${formatBytes(progress.batchBytesTransferred || 0)} из ${formatBytes(progress.batchTotalBytes)}`
+                  : `${formatBytes(progress.bytesTransferred)} из ${formatBytes(progress.totalBytes)}`}
+              </span>
+              <span className="flex items-center gap-1 text-slate-300">
+                {isCompleted ? (
+                  <span className="text-emerald-400 text-[10px]">✓ Готово</span>
+                ) : (
+                  <>
+                    <RefreshCw className="w-3 h-3 animate-spin text-cyan-400" />
+                    {formatSpeed(progress.speedBps)}
+                  </>
+                )}
+              </span>
             </div>
           </div>
-
-          <div className="w-full h-2 bg-white/[0.08] rounded-full overflow-hidden">
-            <div
-              className="h-full bg-gradient-to-r from-indigo-500 via-indigo-600 to-cyan-400 rounded-full shadow-[0_0_12px_rgba(6,182,212,0.4)] transition-all duration-300"
-              style={{ width: `${percent}%` }}
-            />
-          </div>
-
-          <div className="flex items-center justify-between text-[11px] text-slate-400 mt-1.5 font-mono">
-            <span>
-              {formatBytes(currentProgress.bytesTransferred)} из {formatBytes(currentProgress.totalBytes)}
-            </span>
-            <span className="flex items-center gap-1 text-slate-300">
-              <RefreshCw className="w-3 h-3 animate-spin text-cyan-400" />
-              {formatSpeed(currentProgress.speedBps)}
-            </span>
-          </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 };

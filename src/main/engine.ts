@@ -51,6 +51,14 @@ export function getNonConflictingPath(targetPath: string): string {
   return path.join(dir, `${base} (${counter})${ext}`);
 }
 
+export interface BatchContext {
+  currentIndex: number;
+  totalCount: number;
+  batchCompletedBytes: number;
+  batchTotalBytes: number;
+  isLastItem: boolean;
+}
+
 export interface TransferProgress {
   filename: string;
   bytesTransferred: number;
@@ -59,6 +67,10 @@ export interface TransferProgress {
   direction: 'incoming' | 'outgoing';
   peerDeviceId?: string;
   peerName?: string;
+  currentIndex?: number;
+  totalCount?: number;
+  batchBytesTransferred?: number;
+  batchTotalBytes?: number;
 }
 
 export interface HistoryItem {
@@ -102,6 +114,8 @@ export class SyncEngine extends EventEmitter {
   }> = new Map();
   private pendingOutgoingPairings: Set<string> = new Set();
   private mobileSessionToken: string = crypto.randomBytes(16).toString('hex');
+  private isBatchCancelled = false;
+  private batchReceiverTimeout: NodeJS.Timeout | null = null;
 
   constructor(config: AppConfig) {
     super();
@@ -311,6 +325,12 @@ export class SyncEngine extends EventEmitter {
     if (this.pendingTransfers.size > 0) {
       this.pendingTransfers.clear();
       cancelledAny = true;
+    }
+
+    this.isBatchCancelled = true;
+    if (this.batchReceiverTimeout) {
+      clearTimeout(this.batchReceiverTimeout);
+      this.batchReceiverTimeout = null;
     }
 
     if (this.currentProgress) {
@@ -1160,6 +1180,20 @@ export class SyncEngine extends EventEmitter {
         const relPath = rawRelPath ? decodeURIComponent(rawRelPath) : filename;
         const totalSize = parseInt(req.headers['content-length'] || '0', 10);
 
+        const batchIndexHeader = req.headers['x-batch-index'];
+        const batchTotalHeader = req.headers['x-batch-total'];
+        const batchIndex = batchIndexHeader ? parseInt(batchIndexHeader as string, 10) : undefined;
+        const batchTotal = batchTotalHeader ? parseInt(batchTotalHeader as string, 10) : undefined;
+        const batchTotalBytes = req.headers['x-batch-total-bytes'] ? parseInt(req.headers['x-batch-total-bytes'] as string, 10) : undefined;
+        const batchBytesOffset = req.headers['x-batch-bytes-offset'] ? parseInt(req.headers['x-batch-bytes-offset'] as string, 10) : 0;
+        const isBatch = typeof batchIndex === 'number' && typeof batchTotal === 'number' && batchTotal > 1;
+        const isLastInBatch = isBatch ? batchIndex >= batchTotal : true;
+
+        if (this.batchReceiverTimeout) {
+          clearTimeout(this.batchReceiverTimeout);
+          this.batchReceiverTimeout = null;
+        }
+
         // Security: Block unauthorized / unpaired clients from uploading files
         const peer = this.config.pairedDevices.find(d => d.id === senderId);
         if (!peer) {
@@ -1225,6 +1259,10 @@ export class SyncEngine extends EventEmitter {
           try {
             if (fs.existsSync(targetPath)) fs.unlinkSync(targetPath);
           } catch {}
+          if (this.batchReceiverTimeout) {
+            clearTimeout(this.batchReceiverTimeout);
+            this.batchReceiverTimeout = null;
+          }
           this.currentProgress = null;
           this.emit('progress', null);
         };
@@ -1241,7 +1279,11 @@ export class SyncEngine extends EventEmitter {
           speedBps: 0,
           direction: 'incoming',
           peerDeviceId: senderId,
-          peerName
+          peerName,
+          currentIndex: batchIndex,
+          totalCount: batchTotal,
+          batchBytesTransferred: isBatch ? batchBytesOffset : undefined,
+          batchTotalBytes: isBatch ? batchTotalBytes : undefined
         };
         this.emit('progress', this.currentProgress);
 
@@ -1252,6 +1294,9 @@ export class SyncEngine extends EventEmitter {
 
           if (this.currentProgress) {
             this.currentProgress.bytesTransferred = writtenBytes;
+            if (isBatch) {
+              this.currentProgress.batchBytesTransferred = batchBytesOffset + writtenBytes;
+            }
             this.currentProgress.speedBps = speed;
             this.emit('progress', this.currentProgress);
           }
@@ -1261,8 +1306,23 @@ export class SyncEngine extends EventEmitter {
 
         writeStream.on('finish', () => {
           cleanupCancel();
-          this.currentProgress = null;
-          this.emit('progress', null);
+          if (isLastInBatch) {
+            this.currentProgress = null;
+            this.emit('progress', null);
+          } else {
+            if (this.currentProgress) {
+              this.currentProgress.bytesTransferred = totalSize;
+              if (isBatch) {
+                this.currentProgress.batchBytesTransferred = batchBytesOffset + totalSize;
+              }
+              this.emit('progress', this.currentProgress);
+            }
+            this.batchReceiverTimeout = setTimeout(() => {
+              this.currentProgress = null;
+              this.emit('progress', null);
+              this.batchReceiverTimeout = null;
+            }, 3000);
+          }
 
           this.history.push({
             id: crypto.randomBytes(8).toString('hex'),
@@ -1279,14 +1339,27 @@ export class SyncEngine extends EventEmitter {
 
           if (this.config.notifications && Notification.isSupported()) {
             try {
-              const notification = new Notification({
-                title: `MacDrop: Файл от ${peerName}!`,
-                body: `${actualFilename} сохранен в ${path.basename(this.config.targetFolder)}`
-              });
-              notification.on('click', () => {
-                shell.showItemInFolder(targetPath);
-              });
-              notification.show();
+              if (isBatch) {
+                if (isLastInBatch) {
+                  const notification = new Notification({
+                    title: `MacDrop: Файлы от ${peerName}!`,
+                    body: `Получено ${batchTotal} файлов в ${path.basename(this.config.targetFolder)}`
+                  });
+                  notification.on('click', () => {
+                    shell.showItemInFolder(targetPath);
+                  });
+                  notification.show();
+                }
+              } else {
+                const notification = new Notification({
+                  title: `MacDrop: Файл от ${peerName}!`,
+                  body: `${actualFilename} сохранен в ${path.basename(this.config.targetFolder)}`
+                });
+                notification.on('click', () => {
+                  shell.showItemInFolder(targetPath);
+                });
+                notification.show();
+              }
             } catch {}
           }
 
@@ -1297,6 +1370,10 @@ export class SyncEngine extends EventEmitter {
         writeStream.on('error', (err) => {
           cleanupCancel();
           console.error('File write stream error:', err);
+          if (this.batchReceiverTimeout) {
+            clearTimeout(this.batchReceiverTimeout);
+            this.batchReceiverTimeout = null;
+          }
           this.currentProgress = null;
           this.emit('progress', null);
           res.writeHead(500, { 'Content-Type': 'application/json' });
@@ -1476,7 +1553,8 @@ export class SyncEngine extends EventEmitter {
     targetDeviceId?: string,
     relativePrefix = '',
     resolvedTarget?: { ip: string; port: number },
-    overrideFilename?: string
+    overrideFilename?: string,
+    batchContext?: BatchContext
   ): Promise<void> {
     if (!fs.existsSync(itemPath)) return;
     const stat = fs.statSync(itemPath);
@@ -1504,7 +1582,11 @@ export class SyncEngine extends EventEmitter {
         speedBps: 0,
         direction: 'outgoing',
         peerDeviceId: peer.id,
-        peerName
+        peerName,
+        currentIndex: batchContext?.currentIndex,
+        totalCount: batchContext?.totalCount,
+        batchBytesTransferred: batchContext?.batchCompletedBytes,
+        batchTotalBytes: batchContext?.batchTotalBytes
       };
       this.emit('progress', this.currentProgress);
 
@@ -1537,7 +1619,8 @@ export class SyncEngine extends EventEmitter {
           targetDeviceId,
           relativePrefix,
           resolvedTarget,
-          zipResult.zipFilename
+          zipResult.zipFilename,
+          batchContext
         );
       } finally {
         await zipResult.cleanup();
@@ -1575,14 +1658,30 @@ export class SyncEngine extends EventEmitter {
           'x-relative-path': encodeURIComponent(relPath),
           'x-device-id': this.config.deviceId,
           'x-device-name': encodeURIComponent(this.config.deviceName),
-          'x-auth-token': peer?.authToken || ''
+          'x-auth-token': peer?.authToken || '',
+          ...(batchContext ? {
+            'x-batch-index': String(batchContext.currentIndex),
+            'x-batch-total': String(batchContext.totalCount),
+            'x-batch-total-bytes': String(batchContext.batchTotalBytes),
+            'x-batch-bytes-offset': String(batchContext.batchCompletedBytes)
+          } : {})
         },
         timeout: 60000
       }, (res) => {
         cleanup();
         if (res.statusCode === 200) {
-          this.currentProgress = null;
-          this.emit('progress', null);
+          if (!batchContext || batchContext.isLastItem) {
+            this.currentProgress = null;
+            this.emit('progress', null);
+          } else {
+            if (this.currentProgress) {
+              this.currentProgress.bytesTransferred = stat.size;
+              if (batchContext) {
+                this.currentProgress.batchBytesTransferred = batchContext.batchCompletedBytes + stat.size;
+              }
+              this.emit('progress', this.currentProgress);
+            }
+          }
           this.history.push({
             id: crypto.randomBytes(8).toString('hex'),
             filename,
@@ -1672,7 +1771,11 @@ export class SyncEngine extends EventEmitter {
         speedBps: 0,
         direction: 'outgoing',
         peerDeviceId: peer?.id,
-        peerName
+        peerName,
+        currentIndex: batchContext?.currentIndex,
+        totalCount: batchContext?.totalCount,
+        batchBytesTransferred: batchContext ? batchContext.batchCompletedBytes : undefined,
+        batchTotalBytes: batchContext ? batchContext.batchTotalBytes : undefined
       };
       this.emit('progress', this.currentProgress);
 
@@ -1682,6 +1785,9 @@ export class SyncEngine extends EventEmitter {
         const speed = elapsed > 0 ? sentBytes / elapsed : 0;
         if (this.currentProgress) {
           this.currentProgress.bytesTransferred = sentBytes;
+          if (batchContext) {
+            this.currentProgress.batchBytesTransferred = batchContext.batchCompletedBytes + sentBytes;
+          }
           this.currentProgress.speedBps = speed;
           this.emit('progress', this.currentProgress);
         }
@@ -1689,6 +1795,102 @@ export class SyncEngine extends EventEmitter {
 
       fileStream.pipe(req);
     });
+  }
+
+  // Calculate recursive size of directory
+  private getFolderSize(dirPath: string): number {
+    let total = 0;
+    try {
+      const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+      for (const entry of entries) {
+        const full = path.join(dirPath, entry.name);
+        if (entry.isDirectory()) {
+          total += this.getFolderSize(full);
+        } else if (entry.isFile()) {
+          try {
+            total += fs.statSync(full).size;
+          } catch {}
+        }
+      }
+    } catch {}
+    return total;
+  }
+
+  // Send batch of files or folders with aggregate progress tracking
+  public async sendBatch(
+    itemPaths: string[],
+    targetDeviceId?: string,
+    onFileSuccess?: (itemPath: string, filename: string) => void
+  ): Promise<{ name: string; success: boolean; error?: string }[]> {
+    this.isBatchCancelled = false;
+    const results: { name: string; success: boolean; error?: string }[] = [];
+
+    const validPaths = itemPaths.filter(p => fs.existsSync(p));
+    if (validPaths.length === 0) return results;
+
+    const totalCount = validPaths.length;
+    let batchTotalBytes = 0;
+    const itemSizes: number[] = [];
+
+    for (const p of validPaths) {
+      try {
+        const stat = fs.statSync(p);
+        if (stat.isDirectory()) {
+          const dirSize = this.getFolderSize(p);
+          itemSizes.push(dirSize);
+          batchTotalBytes += dirSize;
+        } else {
+          itemSizes.push(stat.size);
+          batchTotalBytes += stat.size;
+        }
+      } catch {
+        itemSizes.push(0);
+      }
+    }
+
+    let batchCompletedBytes = 0;
+
+    for (let i = 0; i < validPaths.length; i++) {
+      if (this.isBatchCancelled) {
+        break;
+      }
+
+      const p = validPaths[i];
+      const filename = path.basename(p);
+      const isLastItem = (i === validPaths.length - 1);
+      const currentItemSize = itemSizes[i] || 0;
+
+      const batchContext: BatchContext = {
+        currentIndex: i + 1,
+        totalCount,
+        batchCompletedBytes,
+        batchTotalBytes,
+        isLastItem
+      };
+
+      try {
+        await this.sendItem(p, targetDeviceId, '', undefined, undefined, batchContext);
+        batchCompletedBytes += currentItemSize;
+        if (onFileSuccess) {
+          try { onFileSuccess(p, filename); } catch {}
+        }
+        results.push({ name: filename, success: true });
+      } catch (err: any) {
+        batchCompletedBytes += currentItemSize;
+        results.push({ name: filename, success: false, error: err?.message || 'Ошибка передачи' });
+        if (isLastItem || this.isBatchCancelled) {
+          this.currentProgress = null;
+          this.emit('progress', null);
+        }
+      }
+    }
+
+    if (this.currentProgress) {
+      this.currentProgress = null;
+      this.emit('progress', null);
+    }
+
+    return results;
   }
 
   private async enqueuePendingTransfer(
