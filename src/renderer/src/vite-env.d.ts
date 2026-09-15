@@ -24,6 +24,7 @@ export interface MacDropApi {
   getPathForFile: (file: any) => string;
   sendDroppedFiles: (filePaths: string[], targetDeviceId?: string) => Promise<any>;
   pickAndSendFiles: (targetDeviceId?: string) => Promise<boolean>;
+  pickAndSendFolder?: (targetDeviceId?: string) => Promise<boolean>;
   updateDeviceName: (deviceId: string, newName: string) => Promise<boolean>;
   removeDevice: (deviceId: string) => Promise<boolean>;
   toggleDeviceReceive: (deviceId: string, enabled: boolean) => Promise<boolean>;

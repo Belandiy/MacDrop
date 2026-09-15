@@ -4,15 +4,18 @@ import {
   Monitor,
   Plus,
   ChevronRight,
+  ChevronDown,
   ArrowDownCircle,
   ArrowUpCircle,
   RefreshCw,
   Wifi,
   Send,
   Globe,
-  X
+  X,
+  CheckCircle2
 } from 'lucide-react';
 import { PairedDevice } from './DeviceDetailView';
+import { useSmoothProgress } from '../hooks/useSmoothProgress';
 
 interface DeviceListProps {
   devices: PairedDevice[];
@@ -49,10 +52,51 @@ export const DeviceList: React.FC<DeviceListProps> = ({
   onQuickSend,
   currentProgress
 }) => {
-  const percent =
-    currentProgress && currentProgress.totalBytes > 0
-      ? Math.min(100, Math.round((currentProgress.bytesTransferred / currentProgress.totalBytes) * 100))
-      : 0;
+  const [isExpanded, setIsExpanded] = React.useState(false);
+
+  // Sort devices by last active interaction / lastSeen / pairedAt
+  const sortedDevices = React.useMemo(() => {
+    return [...devices].sort((a, b) => {
+      const getLastActivity = (dev: PairedDevice) => {
+        try {
+          const stored = localStorage.getItem(`macdrop_last_active_${dev.id}`);
+          if (stored) return parseInt(stored, 10);
+        } catch {}
+        return (dev.lastSeen || 0) || (new Date(dev.pairedAt).getTime() || 0);
+      };
+      return getLastActivity(b) - getLastActivity(a);
+    });
+  }, [devices]);
+
+  const displayedDevices = isExpanded ? sortedDevices : sortedDevices.slice(0, 3);
+  const hasMoreDevices = devices.length > 3;
+  const hiddenCount = devices.length - 3;
+
+  const handleDeviceClick = (device: PairedDevice) => {
+    try {
+      localStorage.setItem(`macdrop_last_active_${device.id}`, String(Date.now()));
+    } catch {}
+    onSelectDevice(device);
+  };
+
+  const handleQuickSendClick = (e: React.MouseEvent, deviceId: string) => {
+    e.stopPropagation();
+    try {
+      localStorage.setItem(`macdrop_last_active_${deviceId}`, String(Date.now()));
+    } catch {}
+    onQuickSend?.(deviceId);
+  };
+
+  const { progress, isVisible, isCompleted } = useSmoothProgress(currentProgress, 800);
+
+  const isBatch = Boolean(progress?.totalCount && progress.totalCount > 1);
+  const percent = isCompleted
+    ? 100
+    : isBatch && progress?.batchTotalBytes && progress.batchTotalBytes > 0
+    ? Math.min(100, Math.round(((progress.batchBytesTransferred || 0) / progress.batchTotalBytes) * 100))
+    : progress && progress.totalBytes > 0
+    ? Math.min(100, Math.round((progress.bytesTransferred / progress.totalBytes) * 100))
+    : 0;
 
   return (
     <div className="bg-[#111319]/90 border border-white/[0.08] rounded-2xl p-4 shadow-xl backdrop-blur-md transition-all space-y-3">
@@ -61,7 +105,9 @@ export const DeviceList: React.FC<DeviceListProps> = ({
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-indigo-400 shadow-[0_0_8px_rgba(99,102,241,0.6)]" />
           <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-            Подключенные устройства ({devices.length})
+            {hasMoreDevices && !isExpanded
+              ? `Подключенные устройства (3 из ${devices.length})`
+              : `Подключенные устройства (${devices.length})`}
           </h3>
         </div>
 
@@ -89,12 +135,12 @@ export const DeviceList: React.FC<DeviceListProps> = ({
         </div>
       ) : (
         <div className="flex flex-col gap-2">
-          {devices.map((device) => {
+          {displayedDevices.map((device) => {
             const isMac = device.id.startsWith('MAC') || device.originalName.toLowerCase().includes('mac');
             return (
               <div
                 key={device.id}
-                onClick={() => onSelectDevice(device)}
+                onClick={() => handleDeviceClick(device)}
                 className="flex items-center justify-between p-2.5 rounded-xl bg-[#171a23]/70 hover:bg-[#1f2330] border border-white/[0.06] hover:border-white/[0.14] transition-all cursor-pointer group"
               >
                 <div className="flex items-center gap-3 truncate">
@@ -146,10 +192,7 @@ export const DeviceList: React.FC<DeviceListProps> = ({
                 <div className="flex items-center gap-2 pl-2 shrink-0">
                   {onQuickSend && (
                     <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onQuickSend(device.id);
-                      }}
+                      onClick={(e) => handleQuickSendClick(e, device.id)}
                       title="Отправить файл"
                       className="p-1.5 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] text-slate-400 hover:text-white transition-colors"
                     >
@@ -164,63 +207,117 @@ export const DeviceList: React.FC<DeviceListProps> = ({
               </div>
             );
           })}
+
+          {hasMoreDevices && (
+            <button
+              type="button"
+              onClick={() => setIsExpanded((prev) => !prev)}
+              className="w-full py-2 px-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.07] active:scale-[0.99] border border-white/[0.06] hover:border-white/[0.12] text-xs font-semibold text-slate-300 hover:text-white transition-all flex items-center justify-center gap-1.5 shadow-sm group mt-0.5"
+            >
+              <span>
+                {isExpanded
+                  ? 'Свернуть до недавних'
+                  : `Показать все устройства (ещё ${hiddenCount})`}
+              </span>
+              <ChevronDown
+                className={`w-3.5 h-3.5 text-slate-400 group-hover:text-indigo-300 transition-transform duration-200 ${
+                  isExpanded ? 'rotate-180 text-indigo-300' : ''
+                }`}
+              />
+            </button>
+          )}
         </div>
       )}
 
-      {/* Active Transfer Progress Bar */}
-      {currentProgress && (
-        <div className="mt-3 pt-3 border-t border-white/[0.08]">
-          <div className="flex items-center justify-between text-xs mb-1.5">
-            <div className="flex items-center gap-1.5 font-semibold text-white truncate max-w-[240px]">
-              {currentProgress.direction === 'incoming' ? (
-                <ArrowDownCircle className="w-4 h-4 text-emerald-400 shrink-0" />
-              ) : (
-                <ArrowUpCircle className="w-4 h-4 text-cyan-400 shrink-0" />
-              )}
-              <span className="truncate">{currentProgress.filename}</span>
-              {currentProgress.peerName && (
-                <span className="text-[10px] text-slate-400 truncate">
-                  ({currentProgress.direction === 'incoming' ? 'от' : 'для'} {currentProgress.peerName})
+      {/* Active Transfer Progress Bar (Smooth Transition Container) */}
+      <div
+        className={`transition-all duration-300 ease-out overflow-hidden ${
+          isVisible && progress
+            ? 'max-h-36 opacity-100 mt-3 pt-3 border-t border-white/[0.08]'
+            : 'max-h-0 opacity-0 mt-0 pt-0 border-t-0 pointer-events-none'
+        }`}
+      >
+        {progress && (
+          <div>
+            <div className="flex items-center justify-between text-xs mb-1.5">
+              <div className="flex items-center gap-1.5 font-semibold text-white truncate max-w-[240px]">
+                {isCompleted ? (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                ) : progress.direction === 'incoming' ? (
+                  <ArrowDownCircle className="w-4 h-4 text-emerald-400 shrink-0" />
+                ) : (
+                  <ArrowUpCircle className="w-4 h-4 text-cyan-400 shrink-0" />
+                )}
+                {isBatch && !isCompleted && (
+                  <span className="px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 text-[10px] font-mono font-medium shrink-0">
+                    {progress.currentIndex} из {progress.totalCount}
+                  </span>
+                )}
+                <span className="truncate">{progress.filename}</span>
+                {progress.peerName && (
+                  <span className="text-[10px] text-slate-400 truncate">
+                    ({progress.direction === 'incoming' ? 'от' : 'для'} {progress.peerName})
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <span className={`font-bold font-mono ${isCompleted ? 'text-emerald-400' : 'text-cyan-400'}`}>
+                  {percent}%
                 </span>
-              )}
+                {!isCompleted && (
+                  <button
+                    type="button"
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      if (window.macdrop?.cancelTransfer) {
+                        await window.macdrop.cancelTransfer();
+                      }
+                    }}
+                    title="Отменить передачу"
+                    className="px-1.5 py-0.5 rounded-md bg-rose-500/15 hover:bg-rose-500/25 active:bg-rose-500/40 text-rose-400 hover:text-rose-300 transition-colors flex items-center gap-1 text-[10px] font-medium"
+                  >
+                    <X className="w-3 h-3" />
+                    <span>Отмена</span>
+                  </button>
+                )}
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="text-cyan-400 font-bold font-mono">{percent}%</span>
-              <button
-                type="button"
-                onClick={async (e) => {
-                  e.stopPropagation();
-                  if (window.macdrop?.cancelTransfer) {
-                    await window.macdrop.cancelTransfer();
-                  }
-                }}
-                title="Отменить передачу"
-                className="px-1.5 py-0.5 rounded-md bg-rose-500/15 hover:bg-rose-500/25 active:bg-rose-500/40 text-rose-400 hover:text-rose-300 transition-colors flex items-center gap-1 text-[10px] font-medium"
-              >
-                <X className="w-3 h-3" />
-                <span>Отмена</span>
-              </button>
+
+            <div className="w-full h-2 bg-white/[0.08] rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all duration-300 ${
+                  isCompleted
+                    ? 'bg-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.5)]'
+                    : 'bg-gradient-to-r from-indigo-500 via-indigo-600 to-cyan-400 shadow-[0_0_12px_rgba(6,182,212,0.4)]'
+                }`}
+                style={{ width: `${percent}%` }}
+              />
+            </div>
+
+            <div className="flex items-center justify-between text-[11px] text-slate-400 mt-1.5 font-mono">
+              <span>
+                {isCompleted
+                  ? isBatch
+                    ? `Все файлы переданы (${progress.totalCount} шт.)`
+                    : 'Передача завершена'
+                  : isBatch && progress.batchTotalBytes
+                  ? `${formatBytes(progress.batchBytesTransferred || 0)} из ${formatBytes(progress.batchTotalBytes)}`
+                  : `${formatBytes(progress.bytesTransferred)} из ${formatBytes(progress.totalBytes)}`}
+              </span>
+              <span className="flex items-center gap-1 text-slate-300">
+                {isCompleted ? (
+                  <span className="text-emerald-400 text-[10px]">✓ Готово</span>
+                ) : (
+                  <>
+                    <RefreshCw className="w-3 h-3 animate-spin text-cyan-400" />
+                    {formatSpeed(progress.speedBps)}
+                  </>
+                )}
+              </span>
             </div>
           </div>
-
-          <div className="w-full h-2 bg-white/[0.08] rounded-full overflow-hidden">
-            <div
-              className="h-full bg-gradient-to-r from-indigo-500 via-indigo-600 to-cyan-400 rounded-full shadow-[0_0_12px_rgba(6,182,212,0.4)] transition-all duration-300"
-              style={{ width: `${percent}%` }}
-            />
-          </div>
-
-          <div className="flex items-center justify-between text-[11px] text-slate-400 mt-1.5 font-mono">
-            <span>
-              {formatBytes(currentProgress.bytesTransferred)} из {formatBytes(currentProgress.totalBytes)}
-            </span>
-            <span className="flex items-center gap-1 text-slate-300">
-              <RefreshCw className="w-3 h-3 animate-spin text-cyan-400" />
-              {formatSpeed(currentProgress.speedBps)}
-            </span>
-          </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 };

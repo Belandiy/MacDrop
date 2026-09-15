@@ -174,42 +174,44 @@ export function setupIpc(
       targetDeviceId = payload.targetDeviceId;
     }
 
-    const results = [];
-    for (const srcPath of filePaths) {
-      if (fs.existsSync(srcPath)) {
+    return await engine.sendBatch(filePaths, targetDeviceId, (srcPath, filename) => {
+      const destPath = path.join(config.targetFolder, filename);
+      if (path.resolve(srcPath) !== path.resolve(destPath)) {
         try {
-          const filename = path.basename(srcPath);
-          await engine.sendItem(srcPath, targetDeviceId);
-
-          const destPath = path.join(config.targetFolder, filename);
-          if (path.resolve(srcPath) !== path.resolve(destPath)) {
-            try {
-              fs.cpSync(srcPath, destPath, { recursive: true });
-            } catch {}
-          }
-
-          results.push({ name: filename, success: true });
-        } catch (e: any) {
-          console.error('Send error:', e);
-          results.push({ name: path.basename(srcPath), success: false, error: e.message });
-        }
+          fs.cpSync(srcPath, destPath, { recursive: true });
+        } catch {}
       }
-    }
-    return results;
+    });
   });
 
   // Pick files dialog and send to device
   ipcMain.handle('pick-and-send-files', async (_, targetDeviceId?: string) => {
     const win = getMainWindow();
+    const isMac = process.platform === 'darwin';
     const res = await dialog.showOpenDialog(win!, {
       title: 'Выберите файлы для отправки',
-      properties: ['openFile', 'openDirectory', 'multiSelections']
+      properties: isMac
+        ? ['openFile', 'openDirectory', 'multiSelections']
+        : ['openFile', 'multiSelections']
     });
 
     if (!res.canceled && res.filePaths.length > 0) {
-      for (const p of res.filePaths) {
-        await engine.sendItem(p, targetDeviceId);
-      }
+      await engine.sendBatch(res.filePaths, targetDeviceId);
+      return true;
+    }
+    return false;
+  });
+
+  // Pick folder dialog and send to device (auto-zipped into .zip)
+  ipcMain.handle('pick-and-send-folder', async (_, targetDeviceId?: string) => {
+    const win = getMainWindow();
+    const res = await dialog.showOpenDialog(win!, {
+      title: 'Выберите папку для отправки',
+      properties: ['openDirectory']
+    });
+
+    if (!res.canceled && res.filePaths.length > 0) {
+      await engine.sendBatch(res.filePaths, targetDeviceId);
       return true;
     }
     return false;
