@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { UploadCloud, FileCheck, Copy, Ban, AlertCircle, Laptop, Monitor, Radio, FileUp } from 'lucide-react';
+import { UploadCloud, FileCheck, Ban, AlertCircle, Laptop, Monitor, Radio, FileUp } from 'lucide-react';
 import { PairedDevice } from './DeviceDetailView';
 
 interface DropZoneProps {
   onFilesDropped: (filePaths: string[], targetDeviceId?: string) => Promise<any> | void;
-  targetFolder: string;
+  targetFolder?: string;
   onChooseFiles?: (targetDeviceId?: string) => void;
   devices?: PairedDevice[];
   selectedDeviceId?: string | null;
@@ -290,11 +290,6 @@ export const DropZone: React.FC<DropZoneProps> = ({
             <span>{targetName ? `Выбрать для ${targetName}` : 'Выбрать в Finder'}</span>
           </button>
         )}
-
-        <div className="text-[11px] text-slate-400 bg-white/5 px-2.5 py-1 rounded-full mt-1 border border-white/5 flex items-center gap-1">
-          <Copy className="w-3 h-3 text-slate-400" />
-          <span>или сохраняйте их в <strong className="text-slate-300 font-mono">{targetFolder.split(/[\\/]/).filter(Boolean).pop()}</strong></span>
-        </div>
       </div>
     </div>
   );
