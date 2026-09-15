@@ -4,6 +4,7 @@ import {
   Monitor,
   Plus,
   ChevronRight,
+  ChevronDown,
   ArrowDownCircle,
   ArrowUpCircle,
   RefreshCw,
@@ -49,6 +50,41 @@ export const DeviceList: React.FC<DeviceListProps> = ({
   onQuickSend,
   currentProgress
 }) => {
+  const [isExpanded, setIsExpanded] = React.useState(false);
+
+  // Sort devices by last active interaction / lastSeen / pairedAt
+  const sortedDevices = React.useMemo(() => {
+    return [...devices].sort((a, b) => {
+      const getLastActivity = (dev: PairedDevice) => {
+        try {
+          const stored = localStorage.getItem(`macdrop_last_active_${dev.id}`);
+          if (stored) return parseInt(stored, 10);
+        } catch {}
+        return (dev.lastSeen || 0) || (new Date(dev.pairedAt).getTime() || 0);
+      };
+      return getLastActivity(b) - getLastActivity(a);
+    });
+  }, [devices]);
+
+  const displayedDevices = isExpanded ? sortedDevices : sortedDevices.slice(0, 3);
+  const hasMoreDevices = devices.length > 3;
+  const hiddenCount = devices.length - 3;
+
+  const handleDeviceClick = (device: PairedDevice) => {
+    try {
+      localStorage.setItem(`macdrop_last_active_${device.id}`, String(Date.now()));
+    } catch {}
+    onSelectDevice(device);
+  };
+
+  const handleQuickSendClick = (e: React.MouseEvent, deviceId: string) => {
+    e.stopPropagation();
+    try {
+      localStorage.setItem(`macdrop_last_active_${deviceId}`, String(Date.now()));
+    } catch {}
+    onQuickSend?.(deviceId);
+  };
+
   const percent =
     currentProgress && currentProgress.totalBytes > 0
       ? Math.min(100, Math.round((currentProgress.bytesTransferred / currentProgress.totalBytes) * 100))
@@ -61,7 +97,9 @@ export const DeviceList: React.FC<DeviceListProps> = ({
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-indigo-400 shadow-[0_0_8px_rgba(99,102,241,0.6)]" />
           <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-            Подключенные устройства ({devices.length})
+            {hasMoreDevices && !isExpanded
+              ? `Подключенные устройства (3 из ${devices.length})`
+              : `Подключенные устройства (${devices.length})`}
           </h3>
         </div>
 
@@ -89,12 +127,12 @@ export const DeviceList: React.FC<DeviceListProps> = ({
         </div>
       ) : (
         <div className="flex flex-col gap-2">
-          {devices.map((device) => {
+          {displayedDevices.map((device) => {
             const isMac = device.id.startsWith('MAC') || device.originalName.toLowerCase().includes('mac');
             return (
               <div
                 key={device.id}
-                onClick={() => onSelectDevice(device)}
+                onClick={() => handleDeviceClick(device)}
                 className="flex items-center justify-between p-2.5 rounded-xl bg-[#171a23]/70 hover:bg-[#1f2330] border border-white/[0.06] hover:border-white/[0.14] transition-all cursor-pointer group"
               >
                 <div className="flex items-center gap-3 truncate">
@@ -146,10 +184,7 @@ export const DeviceList: React.FC<DeviceListProps> = ({
                 <div className="flex items-center gap-2 pl-2 shrink-0">
                   {onQuickSend && (
                     <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onQuickSend(device.id);
-                      }}
+                      onClick={(e) => handleQuickSendClick(e, device.id)}
                       title="Отправить файл"
                       className="p-1.5 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] text-slate-400 hover:text-white transition-colors"
                     >
@@ -164,6 +199,25 @@ export const DeviceList: React.FC<DeviceListProps> = ({
               </div>
             );
           })}
+
+          {hasMoreDevices && (
+            <button
+              type="button"
+              onClick={() => setIsExpanded((prev) => !prev)}
+              className="w-full py-2 px-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.07] active:scale-[0.99] border border-white/[0.06] hover:border-white/[0.12] text-xs font-semibold text-slate-300 hover:text-white transition-all flex items-center justify-center gap-1.5 shadow-sm group mt-0.5"
+            >
+              <span>
+                {isExpanded
+                  ? 'Свернуть до недавних'
+                  : `Показать все устройства (ещё ${hiddenCount})`}
+              </span>
+              <ChevronDown
+                className={`w-3.5 h-3.5 text-slate-400 group-hover:text-indigo-300 transition-transform duration-200 ${
+                  isExpanded ? 'rotate-180 text-indigo-300' : ''
+                }`}
+              />
+            </button>
+          )}
         </div>
       )}
 
