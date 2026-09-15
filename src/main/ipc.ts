@@ -201,9 +201,12 @@ export function setupIpc(
   // Pick files dialog and send to device
   ipcMain.handle('pick-and-send-files', async (_, targetDeviceId?: string) => {
     const win = getMainWindow();
+    const isMac = process.platform === 'darwin';
     const res = await dialog.showOpenDialog(win!, {
       title: 'Выберите файлы для отправки',
-      properties: ['openFile', 'multiSelections']
+      properties: isMac
+        ? ['openFile', 'openDirectory', 'multiSelections']
+        : ['openFile', 'multiSelections']
     });
 
     if (!res.canceled && res.filePaths.length > 0) {
