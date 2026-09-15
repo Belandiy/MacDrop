@@ -10,6 +10,7 @@ export interface MacDropApi {
   getPathForFile: (file: any) => string;
   sendDroppedFiles: (filePaths: string[], targetDeviceId?: string) => Promise<any>;
   pickAndSendFiles: (targetDeviceId?: string) => Promise<boolean>;
+  pickAndSendFolder: (targetDeviceId?: string) => Promise<boolean>;
   updateDeviceName: (deviceId: string, newName: string) => Promise<boolean>;
   removeDevice: (deviceId: string) => Promise<boolean>;
   toggleDeviceReceive: (deviceId: string, enabled: boolean) => Promise<boolean>;
@@ -55,6 +56,7 @@ const api: MacDropApi = {
   },
   sendDroppedFiles: (filePaths, targetDeviceId) => ipcRenderer.invoke('send-dropped-files', { filePaths, targetDeviceId }),
   pickAndSendFiles: (targetDeviceId) => ipcRenderer.invoke('pick-and-send-files', targetDeviceId),
+  pickAndSendFolder: (targetDeviceId) => ipcRenderer.invoke('pick-and-send-folder', targetDeviceId),
   cancelTransfer: () => ipcRenderer.invoke('cancel-transfer'),
   respondPairingRequest: (requestId, approved) => ipcRenderer.invoke('respond-pairing-request', { requestId, approved }),
   onPairingRequest: (callback) => {

@@ -275,6 +275,13 @@ export default function App() {
                   (devices.length > 0 ? devices[0].id : undefined);
                 window.macdrop?.pickAndSendFiles(effectiveTargetId);
               }}
+              onChooseFolder={(targetId) => {
+                const effectiveTargetId =
+                  targetId ||
+                  activeTargetDeviceId ||
+                  (devices.length > 0 ? devices[0].id : undefined);
+                window.macdrop?.pickAndSendFolder?.(effectiveTargetId);
+              }}
             />
 
             {/* Target Folder Selector */}

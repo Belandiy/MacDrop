@@ -21,7 +21,8 @@ import {
   WifiOff,
   ArrowDownCircle,
   ArrowUpCircle,
-  RefreshCw
+  RefreshCw,
+  Folder
 } from 'lucide-react';
 
 export interface PairedDevice {
@@ -178,6 +179,33 @@ export const DeviceDetailView: React.FC<DeviceDetailViewProps> = ({
           setSendNotice({
             type: 'error',
             message: msg || 'Ошибка отправки файла'
+          });
+        }
+        setTimeout(() => setSendNotice(null), 4500);
+      } finally {
+        setIsSending(false);
+      }
+    }
+  };
+
+  const handlePickFolderAndSend = async () => {
+    if (window.macdrop?.pickAndSendFolder) {
+      setIsSending(true);
+      setSendNotice(null);
+      try {
+        await window.macdrop.pickAndSendFolder(device.id);
+        await loadHistory();
+      } catch (err: any) {
+        const msg = err?.message || '';
+        if (msg.includes('отключил приём') || msg.includes('выключен приём') || msg.includes('403')) {
+          setSendNotice({
+            type: 'warning',
+            message: 'У этого устройства выключен приём файлов'
+          });
+        } else {
+          setSendNotice({
+            type: 'error',
+            message: msg || 'Ошибка отправки папки'
           });
         }
         setTimeout(() => setSendNotice(null), 4500);
@@ -495,15 +523,26 @@ export const DeviceDetailView: React.FC<DeviceDetailViewProps> = ({
           </div>
         )}
 
-        {/* Action Buttons: Send File & Delete Link */}
+        {/* Action Buttons: Send File, Send Folder & Delete Link */}
         <div className="flex items-center gap-2 pt-2">
           <button
             onClick={handlePickAndSend}
             disabled={isSending}
-            className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 active:scale-95 text-white font-semibold py-2 px-3 rounded-xl text-xs transition-all shadow-md shadow-indigo-600/30 disabled:opacity-50"
+            className="flex-1 flex items-center justify-center gap-1.5 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 active:scale-95 text-white font-semibold py-2 px-2.5 rounded-xl text-xs transition-all shadow-md shadow-indigo-600/30 disabled:opacity-50"
+            title="Выбрать и отправить файлы или готовые архивы"
           >
             <Send className="w-3.5 h-3.5" />
-            <span>{isSending ? 'Отправка...' : 'Отправить файл(ы)'}</span>
+            <span>{isSending ? 'Отправка...' : 'Файлы'}</span>
+          </button>
+
+          <button
+            onClick={handlePickFolderAndSend}
+            disabled={isSending}
+            className="flex-1 flex items-center justify-center gap-1.5 bg-white/10 hover:bg-white/15 active:scale-95 text-indigo-200 hover:text-white border border-indigo-400/30 font-semibold py-2 px-2.5 rounded-xl text-xs transition-all disabled:opacity-50"
+            title="Выбрать папку (автоматически упакуется в .zip и отправится)"
+          >
+            <Folder className="w-3.5 h-3.5 text-indigo-300" />
+            <span>Папку (.zip)</span>
           </button>
 
           {isConfirmingDelete ? (

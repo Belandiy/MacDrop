@@ -203,7 +203,24 @@ export function setupIpc(
     const win = getMainWindow();
     const res = await dialog.showOpenDialog(win!, {
       title: 'Выберите файлы для отправки',
-      properties: ['openFile', 'openDirectory', 'multiSelections']
+      properties: ['openFile', 'multiSelections']
+    });
+
+    if (!res.canceled && res.filePaths.length > 0) {
+      for (const p of res.filePaths) {
+        await engine.sendItem(p, targetDeviceId);
+      }
+      return true;
+    }
+    return false;
+  });
+
+  // Pick folder dialog and send to device (auto-zipped into .zip)
+  ipcMain.handle('pick-and-send-folder', async (_, targetDeviceId?: string) => {
+    const win = getMainWindow();
+    const res = await dialog.showOpenDialog(win!, {
+      title: 'Выберите папку для отправки',
+      properties: ['openDirectory']
     });
 
     if (!res.canceled && res.filePaths.length > 0) {

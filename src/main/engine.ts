@@ -9,6 +9,7 @@ import { Notification, shell, app } from 'electron';
 import { PeerDiscovery } from './discovery';
 import { isPrivateIp, UpnpStatus } from './upnp';
 import { getMobileWebHtml } from './mobileWeb';
+import { createZipFromFolder, isArchiveFile, FolderZipResult } from './archiver';
 
 function formatFileSize(bytes: number): string {
   if (!bytes || bytes === 0) return '0 B';
@@ -1474,7 +1475,8 @@ export class SyncEngine extends EventEmitter {
     itemPath: string,
     targetDeviceId?: string,
     relativePrefix = '',
-    resolvedTarget?: { ip: string; port: number }
+    resolvedTarget?: { ip: string; port: number },
+    overrideFilename?: string
   ): Promise<void> {
     if (!fs.existsSync(itemPath)) return;
     const stat = fs.statSync(itemPath);
@@ -1490,29 +1492,72 @@ export class SyncEngine extends EventEmitter {
       throw new Error('Нет доступных связанных устройств. Сначала выполните сопряжение.');
     }
 
-    // Resolve active IP (with automatic re-discovery if device changed IP)
-    const { ip: peerIp, port: peerPort } = resolvedTarget || await this.resolvePeerIp(peer);
-
-    if (peerIp === 'REVERSE_PULL') {
-      const transferIds = await this.enqueuePendingTransfer(itemPath, peer.id, relativePrefix);
-      const totalBytes = transferIds.reduce((sum, id) => sum + (this.pendingTransfers.get(id)?.size || 0), 0);
-      await this.waitForPendingTransfers(transferIds, peer, path.basename(itemPath), totalBytes);
-      return;
-    }
-
+    // If item is a directory, compress it to a zip archive first and send the archive
     if (stat.isDirectory()) {
-      const entries = fs.readdirSync(itemPath);
-      for (const entry of entries) {
-        const fullChild = path.join(itemPath, entry);
-        const childRel = path.join(relativePrefix || path.basename(itemPath), entry);
-        await this.sendItem(fullChild, targetDeviceId, childRel, { ip: peerIp, port: peerPort });
+      const folderName = path.basename(itemPath);
+      const peerName = peer.customName || peer.originalName;
+
+      this.currentProgress = {
+        filename: `Сжатие папки ${folderName}...`,
+        bytesTransferred: 0,
+        totalBytes: 0,
+        speedBps: 0,
+        direction: 'outgoing',
+        peerDeviceId: peer.id,
+        peerName
+      };
+      this.emit('progress', this.currentProgress);
+
+      const abortController = new AbortController();
+      const cancelArchive = () => {
+        try {
+          abortController.abort();
+        } catch {}
+      };
+      this.activeCancelHandlers.add(cancelArchive);
+
+      let zipResult: FolderZipResult | null = null;
+      try {
+        zipResult = await createZipFromFolder(itemPath, {
+          signal: abortController.signal,
+          onProgress: (prog) => {
+            if (this.currentProgress) {
+              this.currentProgress.filename = `Сжатие ${folderName} (${formatFileSize(prog.processedBytes)})...`;
+              this.emit('progress', this.currentProgress);
+            }
+          }
+        });
+      } finally {
+        this.activeCancelHandlers.delete(cancelArchive);
+      }
+
+      try {
+        await this.sendItem(
+          zipResult.zipPath,
+          targetDeviceId,
+          relativePrefix,
+          resolvedTarget,
+          zipResult.zipFilename
+        );
+      } finally {
+        await zipResult.cleanup();
       }
       return;
     }
 
-    const filename = path.basename(itemPath);
-    const relPath = relativePrefix ? path.join(relativePrefix) : filename;
+    // Resolve active IP (with automatic re-discovery if device changed IP)
+    const { ip: peerIp, port: peerPort } = resolvedTarget || await this.resolvePeerIp(peer);
+
+    const filename = overrideFilename || path.basename(itemPath);
+    const relPath = relativePrefix ? path.join(relativePrefix, filename) : filename;
     const peerName = peer.customName || peer.originalName;
+
+    if (peerIp === 'REVERSE_PULL') {
+      const transferIds = await this.enqueuePendingTransfer(itemPath, peer.id, relativePrefix, filename);
+      const totalBytes = transferIds.reduce((sum, id) => sum + (this.pendingTransfers.get(id)?.size || 0), 0);
+      await this.waitForPendingTransfers(transferIds, peer, filename, totalBytes);
+      return;
+    }
 
     return new Promise((resolve, reject) => {
       let isCancelled = false;
@@ -1649,7 +1694,8 @@ export class SyncEngine extends EventEmitter {
   private async enqueuePendingTransfer(
     itemPath: string,
     targetDeviceId: string,
-    relativePrefix = ''
+    relativePrefix = '',
+    overrideFilename?: string
   ): Promise<string[]> {
     if (!fs.existsSync(itemPath)) return [];
     const stat = fs.statSync(itemPath);
@@ -1666,8 +1712,8 @@ export class SyncEngine extends EventEmitter {
       return ids;
     }
 
-    const filename = path.basename(itemPath);
-    const relPath = relativePrefix ? path.join(relativePrefix) : filename;
+    const filename = overrideFilename || path.basename(itemPath);
+    const relPath = relativePrefix ? path.join(relativePrefix, filename) : filename;
     const transferId = Math.random().toString(36).substring(2) + Date.now().toString(36);
 
     this.pendingTransfers.set(transferId, {
