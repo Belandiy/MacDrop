@@ -1,5 +1,5 @@
 import { autoUpdater } from 'electron-updater';
-import { BrowserWindow, ipcMain, app } from 'electron';
+import { BrowserWindow, ipcMain, app, shell } from 'electron';
 
 export function setupAutoUpdater(getMainWindow: () => BrowserWindow | null) {
   // In development, autoUpdater will log but not crash
@@ -48,9 +48,34 @@ export function setupAutoUpdater(getMainWindow: () => BrowserWindow | null) {
     }
   });
 
-  ipcMain.handle('install-update', () => {
+  ipcMain.handle('install-update', async () => {
     console.log('Quit and install update now...');
-    autoUpdater.quitAndInstall(false, true);
+
+    if (process.platform === 'darwin') {
+      try {
+        // macOS unsigned apps cannot use autoUpdater.quitAndInstall() via zip/Squirrel reliably.
+        // Instead, we open the latest release page so the user can download the DMG.
+        console.log('macOS: Opening releases page for manual DMG download');
+        await shell.openExternal('https://github.com/Belandiy/MacDrop/releases/latest');
+        return;
+      } catch (e) {
+        console.error('Failed to open release page on macOS', e);
+      }
+    }
+
+    // Set quitting flag so windows actually close instead of minimizing to tray
+    (app as any).isQuitting = true;
+
+    // Close all windows immediately
+    BrowserWindow.getAllWindows().forEach((win) => {
+      win.removeAllListeners('close');
+      win.close();
+    });
+
+    // On Windows, giving it a tiny delay ensures file locks are released
+    setTimeout(() => {
+      autoUpdater.quitAndInstall(false, true);
+    }, 300);
   });
 
   // Automatically check for updates 3.5 seconds after launch
