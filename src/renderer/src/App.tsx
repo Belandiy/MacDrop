@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Header } from './components/Header';
 import { DeviceList } from './components/DeviceList';
 import { DeviceDetailView, PairedDevice } from './components/DeviceDetailView';
@@ -122,20 +122,24 @@ export default function App() {
     setIncomingPairingRequest(null);
   };
 
-  const handleSelectFolder = async () => {
+  // ⚡ Bolt Performance Optimization:
+  // Memoized handlers using useCallback to prevent new function references on every render.
+  // This prevents child components (like FolderSection, Header, etc.) from re-rendering
+  // unnecessarily when the parent App's state (e.g., current progress) updates frequently.
+  const handleSelectFolder = useCallback(async () => {
     if (window.macdrop) {
       const newFolder = await window.macdrop.selectFolder();
       if (newFolder) {
         setConfig((prev: any) => ({ ...prev, targetFolder: newFolder }));
       }
     }
-  };
+  }, []);
 
-  const handleOpenFolder = async () => {
+  const handleOpenFolder = useCallback(async () => {
     if (window.macdrop) {
       await window.macdrop.openFolder();
     }
-  };
+  }, []);
 
   const handleFilesDropped = async (paths: string[], targetDeviceId?: string) => {
     if (window.macdrop) {
@@ -224,11 +228,17 @@ export default function App() {
     }
   };
 
+  // ⚡ Bolt Performance Optimization:
+  // Extracted inline functions to memoized handlers to prevent Header from re-rendering
+  // on every progress tick, as Header is wrapped in React.memo.
+  const handleOpenSettings = useCallback(() => setIsSettingsOpen(true), []);
+  const handleOpenPairing = useCallback(() => setIsPairingOpen(true), []);
+
   return (
     <div className="flex flex-col h-screen bg-[#090a0f] text-slate-100 select-none antialiased">
       <Header
-        onOpenSettings={() => setIsSettingsOpen(true)}
-        onOpenPairing={() => setIsPairingOpen(true)}
+        onOpenSettings={handleOpenSettings}
+        onOpenPairing={handleOpenPairing}
         platform={platform}
       />
 

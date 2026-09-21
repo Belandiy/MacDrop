@@ -1,0 +1,3 @@
+## 2024-05-20 - Unnecessary App Re-renders Due to Progress Updates
+**Learning:** In MacDrop's `App.tsx`, frequent updates to file transfer progress (`currentProgress`) via IPC listeners trigger rapid re-renders of the entire component tree. Many child components do not depend on `currentProgress` but re-rendered anyway because callback props were recreated on every render.
+**Action:** Always wrap heavy child components (`Header`, `FolderSection`, `RecentTransfers`) in `React.memo` and memoize their callback props with `useCallback` when they are rendered inside a parent (`App.tsx`) that receives high-frequency tick updates from a system/backend.
