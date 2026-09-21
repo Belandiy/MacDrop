@@ -107,7 +107,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSettings, onOpenPairing, p
           {updateDownloaded && (
             <button
               onClick={handleInstallUpdate}
-              title="Нажмите для перезапуска и обновления"
+              title="Скачать новую версию"
               className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 hover:bg-emerald-500/30 transition-all animate-pulse shadow-sm"
             >
               <ArrowUpCircle className="w-3 h-3" />
@@ -117,10 +117,10 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSettings, onOpenPairing, p
 
           {updateAvailable && !updateDownloaded && (
             <span
-              title="Загрузка обновления в фоне..."
+              title="Доступно обновление"
               className="flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-lg bg-indigo-500/15 text-indigo-300 border border-indigo-500/25"
             >
-              <ArrowUpCircle className="w-3.5 h-3.5 animate-spin" />
+              <ArrowUpCircle className="w-3.5 h-3.5 animate-pulse" />
             </span>
           )}
 
