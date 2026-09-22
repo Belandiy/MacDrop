@@ -387,10 +387,6 @@ export function getMobileWebHtml(computerName: string, initialToken: string): st
     const urlParams = new URLSearchParams(window.location.search);
     const sessionToken = urlParams.get('token') || '${initialToken}';
 
-    function escapeHtml(str) {
-      return (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-    }
-
     function formatBytes(bytes) {
       if (!bytes || bytes === 0) return '0 B';
       const k = 1024;
@@ -458,15 +454,35 @@ export function getMobileWebHtml(computerName: string, initialToken: string): st
       const div = document.createElement('div');
       div.className = 'file-item';
       div.id = item.id;
-      div.innerHTML = \`
-        <div class="file-info">
-          <div class="file-name" title="\${escapeHtml(item.name)}">\${escapeHtml(item.name)}</div>
-          <div class="file-meta" id="meta_\${item.id}">\${formatBytes(item.size)}</div>
-        </div>
-        <div class="progress-bar-bg">
-          <div class="progress-bar-fill" id="bar_\${item.id}"></div>
-        </div>
-      \`;
+
+      const fileInfo = document.createElement('div');
+      fileInfo.className = 'file-info';
+
+      const fileName = document.createElement('div');
+      fileName.className = 'file-name';
+      fileName.title = item.name;
+      fileName.textContent = item.name;
+
+      const fileMeta = document.createElement('div');
+      fileMeta.className = 'file-meta';
+      fileMeta.id = 'meta_' + item.id;
+      fileMeta.textContent = formatBytes(item.size);
+
+      fileInfo.appendChild(fileName);
+      fileInfo.appendChild(fileMeta);
+
+      const progressBg = document.createElement('div');
+      progressBg.className = 'progress-bar-bg';
+
+      const progressFill = document.createElement('div');
+      progressFill.className = 'progress-bar-fill';
+      progressFill.id = 'bar_' + item.id;
+
+      progressBg.appendChild(progressFill);
+
+      div.appendChild(fileInfo);
+      div.appendChild(progressBg);
+
       list.prepend(div);
     }
 
@@ -498,7 +514,11 @@ export function getMobileWebHtml(computerName: string, initialToken: string): st
           bar.style.background = '#34d399';
         }
         if (meta) {
-          meta.innerHTML = '<span class="file-status-success">✓ Отправлено</span>';
+          meta.innerHTML = '';
+          const statusSpan = document.createElement('span');
+          statusSpan.className = 'file-status-success';
+          statusSpan.textContent = '✓ Отправлено';
+          meta.appendChild(statusSpan);
         }
 
         // Haptic feedback on Android
@@ -509,7 +529,11 @@ export function getMobileWebHtml(computerName: string, initialToken: string): st
         next.status = 'error';
         if (bar) bar.style.background = '#f87171';
         if (meta) {
-          meta.innerHTML = '<span class="file-status-error">✕ Ошибка</span>';
+          meta.innerHTML = '';
+          const statusSpan = document.createElement('span');
+          statusSpan.className = 'file-status-error';
+          statusSpan.textContent = '✕ Ошибка';
+          meta.appendChild(statusSpan);
         }
       } finally {
         isUploading = false;
@@ -573,19 +597,35 @@ export function getMobileWebHtml(computerName: string, initialToken: string): st
         data.files.forEach(f => {
           const div = document.createElement('div');
           div.className = 'file-item';
+
+          const fileInfo = document.createElement('div');
+          fileInfo.className = 'file-info';
+
+          const fileDetails = document.createElement('div');
+
+          const fileName = document.createElement('div');
+          fileName.className = 'file-name';
+          fileName.title = f.name;
+          fileName.textContent = f.name;
+
+          const fileMeta = document.createElement('div');
+          fileMeta.className = 'file-meta';
+          fileMeta.textContent = formatBytes(f.size) + ' • ' + f.time;
+
+          fileDetails.appendChild(fileName);
+          fileDetails.appendChild(fileMeta);
+
           const downloadUrl = '/api/mobile/download/' + encodeURIComponent(f.name) + '?token=' + encodeURIComponent(sessionToken);
-          div.innerHTML = \`
-            <div class="file-info">
-              <div>
-                <div class="file-name" title="\${escapeHtml(f.name)}">\${escapeHtml(f.name)}</div>
-                <div class="file-meta">\${formatBytes(f.size)} • \${f.time}</div>
-              </div>
-              <a href="\${downloadUrl}" download="\${escapeHtml(f.name)}" class="download-btn">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                <span>Скачать</span>
-              </a>
-            </div>
-          \`;
+          const downloadBtn = document.createElement('a');
+          downloadBtn.href = downloadUrl;
+          downloadBtn.download = f.name;
+          downloadBtn.className = 'download-btn';
+          downloadBtn.innerHTML = \`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span>Скачать</span>\`;
+
+          fileInfo.appendChild(fileDetails);
+          fileInfo.appendChild(downloadBtn);
+          div.appendChild(fileInfo);
+
           container.appendChild(div);
         });
       } catch (err) {
