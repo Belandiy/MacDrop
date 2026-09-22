@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Send, Settings, QrCode, Monitor, Laptop, Minus, X, ArrowUpCircle, Plus } from 'lucide-react';
+import { Settings, QrCode, Monitor, Minus, X, ArrowUpCircle, Plus } from 'lucide-react';
 import logoImg from '../assets/logo.png';
 import packageJson from '../../../../package.json';
 
