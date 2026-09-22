@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Bell, Power, Unlink, HardDrive, Globe, CheckCircle2, AlertCircle } from 'lucide-react';
+import { X, Bell, Power, Unlink, HardDrive, Globe, CheckCircle2 } from 'lucide-react';
 
 export interface PairedDevice {
   id: string;
