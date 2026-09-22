@@ -68,3 +68,4 @@ $RECYCLE.BIN/
 *.crash
 
 GEMINI.md
+coverage/
