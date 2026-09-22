@@ -8,7 +8,8 @@
     "build": "tsc && vite build && electron-builder",
     "build:win": "tsc && vite build && electron-builder --win",
     "build:mac": "tsc && vite build && electron-builder --mac",
-    "start": "electron ."
+    "start": "electron .",
+    "test": "NODE_OPTIONS='--require ./test-wrapper.js' npx tsx --test src/main/tests/*.test.ts"
   },
   "keywords": [
     "file-transfer",
