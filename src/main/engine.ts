@@ -523,7 +523,7 @@ export class SyncEngine extends EventEmitter {
   private startHealthCheck() {
     if (this.healthCheckTimer) clearInterval(this.healthCheckTimer);
     this.healthCheckTimer = setInterval(async () => {
-      for (const peer of this.config.pairedDevices) {
+      await Promise.all(this.config.pairedDevices.map(async (peer) => {
         const localPort = peer.port || 8384;
         const isLocal = peer.ip && await this.checkPeerPing(peer.ip, localPort);
         if (isLocal) {
@@ -532,7 +532,7 @@ export class SyncEngine extends EventEmitter {
             peer.lastSeen = Date.now();
             this.emit('status-changed', this.getStatus());
           }
-          continue;
+          return;
         }
 
         const remoteHost = peer.remoteIp || this.config.customRemoteHost;
@@ -544,7 +544,7 @@ export class SyncEngine extends EventEmitter {
             peer.lastSeen = Date.now();
             this.emit('status-changed', this.getStatus());
           }
-          continue;
+          return;
         }
 
         // If not responding to direct ping, check if seen in last 40 seconds (from reverse poll)
@@ -559,7 +559,7 @@ export class SyncEngine extends EventEmitter {
             this.emit('status-changed', this.getStatus());
           }
         }
-      }
+      }));
     }, 12000);
   }
 
