@@ -12,7 +12,8 @@ import {
   Send,
   Globe,
   X,
-  CheckCircle2
+  CheckCircle2,
+  Smartphone
 } from 'lucide-react';
 import { PairedDevice } from './DeviceDetailView';
 import { useSmoothProgress, ProgressData } from '../hooks/useSmoothProgress';
@@ -44,6 +45,7 @@ interface DeviceListItemProps {
 }
 
 const DeviceListItem: React.FC<DeviceListItemProps> = ({ device, onClick, onQuickSend }) => {
+  const isMobile = device.id === 'mobile-web';
   const isMac = device.id.startsWith('MAC') || device.originalName.toLowerCase().includes('mac');
 
   return (
@@ -59,7 +61,7 @@ const DeviceListItem: React.FC<DeviceListItemProps> = ({ device, onClick, onQuic
               ? 'bg-indigo-500/15 text-indigo-300 border border-indigo-500/30'
               : 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30'
           }`}>
-            {isMac ? <Laptop className="w-4.5 h-4.5" /> : <Monitor className="w-4.5 h-4.5" />}
+            {isMobile ? <Smartphone className="w-4.5 h-4.5" /> : isMac ? <Laptop className="w-4.5 h-4.5" /> : <Monitor className="w-4.5 h-4.5" />}
           </div>
           {device.connectionMode === 'remote' ? (
             <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-[#171a23] bg-cyan-500 shadow-sm shadow-cyan-500/50 flex items-center justify-center" title="В сети (Удалённо через Интернет)">

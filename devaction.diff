@@ -1,0 +1,25 @@
+<<<<<<< SEARCH
+      ) : (
+        <button
+          onClick={() => setIsConfirmingDelete(true)}
+          className="flex items-center gap-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/25 py-2 px-3 rounded-xl text-xs font-semibold transition-colors"
+          title="Удалить связь с устройством"
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+          <span>Разорвать связь</span>
+        </button>
+      )}
+    </div>
+=======
+      ) : (
+        <button
+          onClick={() => setIsConfirmingDelete(true)}
+          className="flex items-center gap-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/25 py-2 px-3 rounded-xl text-xs font-semibold transition-colors"
+          title="Удалить связь с устройством"
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+          <span>Разорвать связь</span>
+        </button>
+      ))}
+    </div>
+>>>>>>> REPLACE

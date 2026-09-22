@@ -1,0 +1,13 @@
+<<<<<<< SEARCH
+        <DeviceReceiveToggle
+          isReceiveEnabled={isReceiveEnabled}
+          handleToggleReceive={handleToggleReceive}
+        />
+=======
+        {!isMobileDevice && (
+          <DeviceReceiveToggle
+            isReceiveEnabled={isReceiveEnabled}
+            handleToggleReceive={handleToggleReceive}
+          />
+        )}
+>>>>>>> REPLACE
