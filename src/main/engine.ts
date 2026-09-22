@@ -1899,12 +1899,16 @@ export class SyncEngine extends EventEmitter {
     relativePrefix = '',
     overrideFilename?: string
   ): Promise<string[]> {
-    if (!fs.existsSync(itemPath)) return [];
-    const stat = fs.statSync(itemPath);
+    let stat;
+    try {
+      stat = await fs.promises.stat(itemPath);
+    } catch {
+      return [];
+    }
 
     if (stat.isDirectory()) {
       const ids: string[] = [];
-      const entries = fs.readdirSync(itemPath);
+      const entries = await fs.promises.readdir(itemPath);
       for (const entry of entries) {
         const fullChild = path.join(itemPath, entry);
         const childRel = path.join(relativePrefix || path.basename(itemPath), entry);
