@@ -7,6 +7,7 @@ interface DeviceActionButtonsProps {
   isConfirmingDelete: boolean;
   setIsConfirmingDelete: (isConfirming: boolean) => void;
   handleDeleteDevice: () => void;
+  hideDelete?: boolean;
 }
 
 export const DeviceActionButtons: React.FC<DeviceActionButtonsProps> = ({
@@ -14,7 +15,8 @@ export const DeviceActionButtons: React.FC<DeviceActionButtonsProps> = ({
   handlePickAndSend,
   isConfirmingDelete,
   setIsConfirmingDelete,
-  handleDeleteDevice
+  handleDeleteDevice,
+  hideDelete
 }) => {
   return (
     <div className="flex items-center gap-2 pt-2">
@@ -27,7 +29,7 @@ export const DeviceActionButtons: React.FC<DeviceActionButtonsProps> = ({
         <span>{isSending ? 'Отправка...' : 'Отправить файл(ы)'}</span>
       </button>
 
-      {isConfirmingDelete ? (
+      {!hideDelete && (isConfirmingDelete ? (
         <div className="flex items-center gap-1.5">
           <button
             onClick={handleDeleteDevice}
@@ -51,7 +53,7 @@ export const DeviceActionButtons: React.FC<DeviceActionButtonsProps> = ({
           <Trash2 className="w-3.5 h-3.5" />
           <span>Разорвать связь</span>
         </button>
-      )}
+      ))}
     </div>
   );
 };

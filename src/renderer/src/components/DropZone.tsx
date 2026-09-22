@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { UploadCloud, FileCheck, Ban, AlertCircle, Laptop, Monitor, Radio, FileUp, ChevronDown, Check } from 'lucide-react';
+import { UploadCloud, FileCheck, Ban, AlertCircle, Laptop, Monitor, Radio, FileUp, ChevronDown, Check, Smartphone } from 'lucide-react';
 import { PairedDevice } from './DeviceDetailView';
 
 interface DropZoneProps {
@@ -63,7 +63,9 @@ const DeviceSelector: React.FC<DeviceSelectorProps> = ({
         >
           {targetDevice && (
             <>
-              {targetDevice.id.toUpperCase().startsWith('MAC') ||
+              {targetDevice.id === 'mobile-web' ? (
+                <Smartphone className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+              ) : targetDevice.id.toUpperCase().startsWith('MAC') ||
               (targetDevice.originalName || '').toLowerCase().includes('mac') ? (
                 <Laptop className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
               ) : (
@@ -105,6 +107,7 @@ const DeviceSelector: React.FC<DeviceSelectorProps> = ({
               {devices.map((d) => {
                 const isSelected = d.id === targetDevice?.id;
                 const isRemote = d.connectionMode === 'remote';
+                const isMobile = d.id === 'mobile-web';
                 const isMac =
                   d.id.toUpperCase().startsWith('MAC') ||
                   (d.originalName || '').toLowerCase().includes('mac');
@@ -124,7 +127,13 @@ const DeviceSelector: React.FC<DeviceSelectorProps> = ({
                     }`}
                   >
                     <div className="flex items-center gap-2 min-w-0">
-                      {isMac ? (
+                      {isMobile ? (
+                        <Smartphone
+                          className={`w-3.5 h-3.5 shrink-0 ${
+                            isSelected ? 'text-indigo-400' : 'text-slate-400'
+                          }`}
+                        />
+                      ) : isMac ? (
                         <Laptop
                           className={`w-3.5 h-3.5 shrink-0 ${
                             isSelected ? 'text-indigo-400' : 'text-slate-400'

@@ -56,7 +56,7 @@ const MobileWebDropSection: React.FC<{ effectiveMobileUrl: string | null }> = ({
       <span>Наведите камеру телефона для Web Drop</span>
     </div>
     <p className="text-[11px] text-slate-400 max-w-[290px] leading-relaxed">
-      Откроется веб-страница для быстрой отправки файлов и фото без установки приложений.
+      Позволяет безопасно обмениваться файлами в текущей сессии без установки приложений.
     </p>
   </div>
 );

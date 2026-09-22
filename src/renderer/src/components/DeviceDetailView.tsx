@@ -143,6 +143,10 @@ export const DeviceDetailView: React.FC<DeviceDetailViewProps> = ({
   };
 
   const handleDeleteDevice = async () => {
+    if (device.id === 'mobile-web') {
+      onBack(); // Just go back, can't delete virtual device
+      return;
+    }
     if (window.macdrop?.removeDevice) {
       await window.macdrop.removeDevice(device.id);
       onDeviceRemoved(device.id);
@@ -308,10 +312,12 @@ export const DeviceDetailView: React.FC<DeviceDetailViewProps> = ({
           handleCopyId={handleCopyId}
         />
 
-        <DeviceReceiveToggle
-          isReceiveEnabled={isReceiveEnabled}
-          handleToggleReceive={handleToggleReceive}
-        />
+        {device.id !== 'mobile-web' && (
+          <DeviceReceiveToggle
+            isReceiveEnabled={isReceiveEnabled}
+            handleToggleReceive={handleToggleReceive}
+          />
+        )}
 
         {/* Notice Banner (Warning if receiving is disabled / Error / Success) */}
         {sendNotice && (
@@ -341,6 +347,7 @@ export const DeviceDetailView: React.FC<DeviceDetailViewProps> = ({
           isConfirmingDelete={isConfirmingDelete}
           setIsConfirmingDelete={setIsConfirmingDelete}
           handleDeleteDevice={handleDeleteDevice}
+          hideDelete={device.id === 'mobile-web'}
         />
       </div>
 

@@ -1,0 +1,20 @@
+cat << 'DIFF' > devdetail.diff
+<<<<<<< SEARCH
+        <DeviceActionButtons
+          isSending={isSending}
+          handlePickAndSend={handlePickAndSend}
+          isConfirmingDelete={isConfirmingDelete}
+          setIsConfirmingDelete={setIsConfirmingDelete}
+          handleDeleteDevice={handleDeleteDevice}
+        />
+=======
+        <DeviceActionButtons
+          isSending={isSending}
+          handlePickAndSend={handlePickAndSend}
+          isConfirmingDelete={isConfirmingDelete}
+          setIsConfirmingDelete={setIsConfirmingDelete}
+          handleDeleteDevice={handleDeleteDevice}
+          hideDelete={device.id === 'mobile-web'}
+        />
+>>>>>>> REPLACE
+DIFF

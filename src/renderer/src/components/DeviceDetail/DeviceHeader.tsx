@@ -1,5 +1,5 @@
 import React from 'react';
-import { Laptop, Monitor, Globe, WifiOff, CheckCircle2, Edit2, Check, X } from 'lucide-react';
+import { Laptop, Monitor, Globe, WifiOff, CheckCircle2, Edit2, Check, X, Smartphone } from 'lucide-react';
 import { PairedDevice } from '../DeviceDetailView';
 
 interface DeviceHeaderProps {
@@ -21,13 +21,14 @@ export const DeviceHeader: React.FC<DeviceHeaderProps> = ({
   handleSaveName,
   setIsEditingName
 }) => {
+  const isMobile = device.id === 'mobile-web';
   return (
     <div className="flex items-start justify-between">
       <div className="flex items-center gap-3">
         <div className={`w-12 h-12 rounded-2xl flex items-center justify-center relative ${
           isMac ? 'bg-indigo-500/15 text-indigo-300 border border-indigo-500/30' : 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30'
         }`}>
-          {isMac ? <Laptop className="w-6 h-6" /> : <Monitor className="w-6 h-6" />}
+          {isMobile ? <Smartphone className="w-6 h-6" /> : isMac ? <Laptop className="w-6 h-6" /> : <Monitor className="w-6 h-6" />}
           {device.connectionMode === 'remote' ? (
             <span className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full border-2 border-[#111319] bg-cyan-500 shadow-sm shadow-cyan-500/50 flex items-center justify-center" title="Подключено удалённо">
               <Globe className="w-2.5 h-2.5 text-white" />
