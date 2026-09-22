@@ -9,7 +9,7 @@ import { Notification, shell, app } from 'electron';
 import { PeerDiscovery } from './discovery';
 import { isPrivateIp, UpnpStatus } from './upnp';
 import { getMobileWebHtml } from './mobileWeb';
-import { createZipFromFolder, isArchiveFile, FolderZipResult } from './archiver';
+import { createZipFromFolder, FolderZipResult } from './archiver';
 
 function formatFileSize(bytes: number): string {
   if (!bytes || bytes === 0) return '0 B';
@@ -106,6 +106,7 @@ export class SyncEngine extends EventEmitter {
   private healthCheckTimer: NodeJS.Timeout | null = null;
   private isDownloadingRemote = false;
   private activeCancelHandlers: Set<() => void> = new Set();
+  private deviceMap: Map<string, PairedDevice> = new Map();
   private pendingPairingRequests: Map<string, {
     res: http.ServerResponse;
     timer: NodeJS.Timeout;
@@ -120,7 +121,15 @@ export class SyncEngine extends EventEmitter {
   constructor(config: AppConfig) {
     super();
     this.config = config;
+    this.rebuildDeviceMap();
     this.loadHistory();
+  }
+
+  private rebuildDeviceMap() {
+    this.deviceMap.clear();
+    for (const d of this.config.pairedDevices) {
+      this.deviceMap.set(d.id, d);
+    }
   }
 
   public getMobileSessionToken(): string {
@@ -232,6 +241,7 @@ export class SyncEngine extends EventEmitter {
   public updateConfig(newConfig: AppConfig) {
     const folderChanged = this.config.targetFolder !== newConfig.targetFolder;
     this.config = newConfig;
+    this.rebuildDeviceMap();
     saveConfig(this.config);
 
     if (folderChanged) {
@@ -245,7 +255,7 @@ export class SyncEngine extends EventEmitter {
   }
 
   public updateDeviceCustomName(deviceId: string, newCustomName: string): boolean {
-    const dev = this.config.pairedDevices.find(d => d.id === deviceId);
+    const dev = this.deviceMap.get(deviceId);
     if (dev) {
       dev.customName = newCustomName.trim() || dev.originalName;
       saveConfig(this.config);
@@ -259,6 +269,7 @@ export class SyncEngine extends EventEmitter {
     const initialLen = this.config.pairedDevices.length;
     this.config.pairedDevices = this.config.pairedDevices.filter(d => d.id !== deviceId);
     if (this.config.pairedDevices.length !== initialLen) {
+      this.deviceMap.delete(deviceId);
       saveConfig(this.config);
       this.emit('status-changed', this.getStatus());
       return true;
@@ -267,7 +278,7 @@ export class SyncEngine extends EventEmitter {
   }
 
   public toggleDeviceReceive(deviceId: string, enabled: boolean): boolean {
-    const dev = this.config.pairedDevices.find(d => d.id === deviceId);
+    const dev = this.deviceMap.get(deviceId);
     if (dev) {
       dev.receiveEnabled = enabled;
       saveConfig(this.config);
@@ -353,7 +364,7 @@ export class SyncEngine extends EventEmitter {
     const cleanIp = ip.replace(/^::ffff:/, '').trim();
     if (cleanIp === '127.0.0.1' || cleanIp === '::1') return false;
 
-    const peer = this.config.pairedDevices.find(d => d.id === deviceId);
+    const peer = this.deviceMap.get(deviceId);
     if (peer) {
       let changed = false;
       const isPrivate = isPrivateIp(cleanIp);
@@ -523,7 +534,7 @@ export class SyncEngine extends EventEmitter {
   private startHealthCheck() {
     if (this.healthCheckTimer) clearInterval(this.healthCheckTimer);
     this.healthCheckTimer = setInterval(async () => {
-      for (const peer of this.config.pairedDevices) {
+      await Promise.all(this.config.pairedDevices.map(async (peer) => {
         const localPort = peer.port || 8384;
         const isLocal = peer.ip && await this.checkPeerPing(peer.ip, localPort);
         if (isLocal) {
@@ -532,7 +543,7 @@ export class SyncEngine extends EventEmitter {
             peer.lastSeen = Date.now();
             this.emit('status-changed', this.getStatus());
           }
-          continue;
+          return;
         }
 
         const remoteHost = peer.remoteIp || this.config.customRemoteHost;
@@ -544,7 +555,7 @@ export class SyncEngine extends EventEmitter {
             peer.lastSeen = Date.now();
             this.emit('status-changed', this.getStatus());
           }
-          continue;
+          return;
         }
 
         // If not responding to direct ping, check if seen in last 40 seconds (from reverse poll)
@@ -559,7 +570,7 @@ export class SyncEngine extends EventEmitter {
             this.emit('status-changed', this.getStatus());
           }
         }
-      }
+      }));
     }, 12000);
   }
 
@@ -661,7 +672,7 @@ export class SyncEngine extends EventEmitter {
               const originalName = data.deviceName || 'Устройство';
               const sharedToken = data.authToken || localToken;
 
-              let existing = this.config.pairedDevices.find(d => d.id === deviceId);
+              let existing = this.deviceMap.get(deviceId);
               if (existing) {
                 existing.ip = cleanIp;
                 existing.port = peerPort;
@@ -685,6 +696,7 @@ export class SyncEngine extends EventEmitter {
                   lastSeen: Date.now()
                 };
                 this.config.pairedDevices.push(existing);
+                this.deviceMap.set(existing.id, existing);
               }
 
               saveConfig(this.config);
@@ -739,7 +751,7 @@ export class SyncEngine extends EventEmitter {
     }
 
     const sharedToken = data.authToken || crypto.randomBytes(24).toString('hex');
-    let existing = this.config.pairedDevices.find(d => d.id === data.deviceId);
+    let existing = this.deviceMap.get(data.deviceId);
     if (existing) {
       existing.ip = cleanIp;
       existing.port = data.port || 8384;
@@ -764,6 +776,7 @@ export class SyncEngine extends EventEmitter {
         lastSeen: Date.now()
       };
       this.config.pairedDevices.push(existing);
+      this.deviceMap.set(existing.id, existing);
     }
 
     saveConfig(this.config);
@@ -818,11 +831,19 @@ export class SyncEngine extends EventEmitter {
       // --- Mobile Web Endpoints ---
       if (isMobileWeb) {
         const queryToken = url.searchParams.get('token') || (req.headers['x-mobile-token'] as string);
-        const isAuthorized = Boolean(queryToken && queryToken === this.mobileSessionToken);
+        let isAuthorized = false;
+        if (queryToken) {
+          const tokenBuf = Buffer.from(queryToken);
+          const sessionBuf = Buffer.from(this.mobileSessionToken);
+          if (tokenBuf.length === sessionBuf.length && crypto.timingSafeEqual(tokenBuf, sessionBuf)) {
+            isAuthorized = true;
+          }
+        }
 
         // 1. Mobile Web UI entry point
         if (url.pathname === '/mobile' && req.method === 'GET') {
           if (!isAuthorized) {
+            req.destroy();
             res.writeHead(401, { 'Content-Type': 'text/html; charset=utf-8' });
             res.end(`<!DOCTYPE html><html><body style="background:#121214;color:#fff;font-family:sans-serif;padding:30px;text-align:center;"><h2>401 Доступ запрещен</h2><p style="color:#a1a1aa;">Недействительный или устаревший токен сессии MacDrop.<br>Отсканируйте QR-код в приложении заново.</p></body></html>`);
             return;
@@ -836,6 +857,7 @@ export class SyncEngine extends EventEmitter {
         }
 
         if (!isAuthorized) {
+          req.destroy();
           res.writeHead(401, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ error: 'Unauthorized: Invalid mobile token' }));
           return;
@@ -882,6 +904,7 @@ export class SyncEngine extends EventEmitter {
 
           const safePath = getSafeResolvedPath(this.config.targetFolder, '', filename);
           if (!safePath) {
+            req.destroy();
             res.writeHead(400, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ error: 'Недопустимое имя файла' }));
             return;
@@ -1068,7 +1091,7 @@ export class SyncEngine extends EventEmitter {
               const rawIp = req.socket.remoteAddress || '127.0.0.1';
               const cleanIp = rawIp.replace(/^::ffff:/, '');
 
-              let existing = this.config.pairedDevices.find(d => d.id === data.deviceId);
+              let existing = this.deviceMap.get(data.deviceId);
               const sharedToken = data.authToken || existing?.authToken || crypto.randomBytes(24).toString('hex');
 
               // If device was already paired, update IP/port and sync info without re-prompting
@@ -1113,6 +1136,7 @@ export class SyncEngine extends EventEmitter {
                   lastSeen: Date.now()
                 };
                 this.config.pairedDevices.push(existing);
+                this.deviceMap.set(existing.id, existing);
                 saveConfig(this.config);
                 console.log(`Device pairing auto-approved (outgoing pairing) from ${cleanIp}:`, existing);
                 this.emit('device-paired', existing);
@@ -1195,9 +1219,10 @@ export class SyncEngine extends EventEmitter {
         }
 
         // Security: Block unauthorized / unpaired clients from uploading files
-        const peer = this.config.pairedDevices.find(d => d.id === senderId);
+        const peer = this.deviceMap.get(senderId);
         if (!peer) {
           console.warn(`Blocked unauthorized upload attempt from unpaired device: ${senderId}`);
+          req.destroy();
           res.writeHead(401, { 'Content-Type': 'application/json; charset=utf-8' });
           res.end(JSON.stringify({
             error: 'Устройство не сопряжено. Выполните сопряжение в MacDrop.'
@@ -1207,6 +1232,7 @@ export class SyncEngine extends EventEmitter {
 
         if (peer.receiveEnabled === false) {
           console.log(`Receiving is disabled for peer ${peer.customName || peer.originalName} (${senderId}).`);
+          req.destroy();
           res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8' });
           res.end(JSON.stringify({
             error: `Получатель временно отключил приём файлов с вашего устройства.`
@@ -1216,8 +1242,9 @@ export class SyncEngine extends EventEmitter {
 
         // Security: Verify authToken if established during pairing
         const reqToken = req.headers['x-auth-token'] as string;
-        if (peer.authToken && reqToken && peer.authToken !== reqToken) {
+        if (peer.authToken && peer.authToken !== reqToken) {
           console.warn(`Blocked upload attempt with invalid auth token from ${senderId}`);
+          req.destroy();
           res.writeHead(401, { 'Content-Type': 'application/json; charset=utf-8' });
           res.end(JSON.stringify({ error: 'Неверный токен авторизации устройства' }));
           return;
@@ -1229,6 +1256,7 @@ export class SyncEngine extends EventEmitter {
         const safeTarget = getSafeResolvedPath(this.config.targetFolder, relPath, filename);
         if (!safeTarget) {
           console.warn(`Path Traversal attempt blocked from ${senderId}: relPath="${relPath}", filename="${filename}"`);
+          req.destroy();
           res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
           res.end(JSON.stringify({ error: 'Недопустимый путь файла (Path Traversal)' }));
           return;
@@ -1395,15 +1423,17 @@ export class SyncEngine extends EventEmitter {
           this.updatePeerAddress(senderId, rawIp, undefined, true);
         }
 
-        const peer = this.config.pairedDevices.find(d => d.id === senderId);
+        const peer = this.deviceMap.get(senderId);
         if (!peer) {
+          req.destroy();
           res.writeHead(401, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ error: 'Unpaired peer' }));
           return;
         }
 
         const reqToken = req.headers['x-auth-token'] as string;
-        if (peer.authToken && reqToken && peer.authToken !== reqToken) {
+        if (peer.authToken && peer.authToken !== reqToken) {
+          req.destroy();
           res.writeHead(401, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ error: 'Invalid auth token' }));
           return;
@@ -1440,9 +1470,10 @@ export class SyncEngine extends EventEmitter {
           return;
         }
 
-        const peer = this.config.pairedDevices.find(d => d.id === transfer.targetDeviceId);
+        const peer = this.deviceMap.get(transfer.targetDeviceId);
         const reqToken = req.headers['x-auth-token'] as string;
-        if (peer?.authToken && reqToken && peer.authToken !== reqToken) {
+        if (peer?.authToken && peer.authToken !== reqToken) {
+          req.destroy();
           res.writeHead(401, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ error: 'Invalid auth token' }));
           return;
@@ -1561,7 +1592,7 @@ export class SyncEngine extends EventEmitter {
 
     let peer: PairedDevice | undefined;
     if (targetDeviceId) {
-      peer = this.config.pairedDevices.find(d => d.id === targetDeviceId);
+      peer = this.deviceMap.get(targetDeviceId);
     } else {
       peer = this.config.pairedDevices[0];
     }
@@ -1798,17 +1829,18 @@ export class SyncEngine extends EventEmitter {
   }
 
   // Calculate recursive size of directory
-  private getFolderSize(dirPath: string): number {
+  private async getFolderSize(dirPath: string): Promise<number> {
     let total = 0;
     try {
-      const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+      const entries = await fs.promises.readdir(dirPath, { withFileTypes: true });
       for (const entry of entries) {
         const full = path.join(dirPath, entry.name);
         if (entry.isDirectory()) {
-          total += this.getFolderSize(full);
+          total += await this.getFolderSize(full);
         } else if (entry.isFile()) {
           try {
-            total += fs.statSync(full).size;
+            const stat = await fs.promises.stat(full);
+            total += stat.size;
           } catch {}
         }
       }
@@ -1832,20 +1864,23 @@ export class SyncEngine extends EventEmitter {
     let batchTotalBytes = 0;
     const itemSizes: number[] = [];
 
-    for (const p of validPaths) {
+    const statPromises = validPaths.map(async (p) => {
       try {
-        const stat = fs.statSync(p);
+        const stat = await fs.promises.stat(p);
         if (stat.isDirectory()) {
-          const dirSize = this.getFolderSize(p);
-          itemSizes.push(dirSize);
-          batchTotalBytes += dirSize;
+          return await this.getFolderSize(p);
         } else {
-          itemSizes.push(stat.size);
-          batchTotalBytes += stat.size;
+          return stat.size;
         }
       } catch {
-        itemSizes.push(0);
+        return 0;
       }
+    });
+
+    const resolvedSizes = await Promise.all(statPromises);
+    for (const size of resolvedSizes) {
+      itemSizes.push(size);
+      batchTotalBytes += size;
     }
 
     let batchCompletedBytes = 0;
@@ -1899,12 +1934,16 @@ export class SyncEngine extends EventEmitter {
     relativePrefix = '',
     overrideFilename?: string
   ): Promise<string[]> {
-    if (!fs.existsSync(itemPath)) return [];
-    const stat = fs.statSync(itemPath);
+    let stat;
+    try {
+      stat = await fs.promises.stat(itemPath);
+    } catch {
+      return [];
+    }
 
     if (stat.isDirectory()) {
       const ids: string[] = [];
-      const entries = fs.readdirSync(itemPath);
+      const entries = await fs.promises.readdir(itemPath);
       for (const entry of entries) {
         const fullChild = path.join(itemPath, entry);
         const childRel = path.join(relativePrefix || path.basename(itemPath), entry);
@@ -1928,7 +1967,7 @@ export class SyncEngine extends EventEmitter {
       createdAt: Date.now()
     });
 
-    const peer = this.config.pairedDevices.find(d => d.id === targetDeviceId);
+    const peer = this.deviceMap.get(targetDeviceId);
     const peerName = peer?.customName || peer?.originalName || 'Устройство';
 
     console.log(`Queued pending remote transfer ${transferId} (${filename}) for ${peerName}`);
@@ -2039,7 +2078,7 @@ export class SyncEngine extends EventEmitter {
       console.error('Failed to create target dir for remote download:', err);
     }
 
-    const peer = this.config.pairedDevices.find(d => d.id === senderDeviceId);
+    const peer = this.deviceMap.get(senderDeviceId);
     const peerName = peer?.customName || peer?.originalName || 'Устройство';
 
     return new Promise((resolve, reject) => {
