@@ -1832,20 +1832,23 @@ export class SyncEngine extends EventEmitter {
     let batchTotalBytes = 0;
     const itemSizes: number[] = [];
 
-    for (const p of validPaths) {
+    const statPromises = validPaths.map(async (p) => {
       try {
-        const stat = fs.statSync(p);
+        const stat = await fs.promises.stat(p);
         if (stat.isDirectory()) {
-          const dirSize = this.getFolderSize(p);
-          itemSizes.push(dirSize);
-          batchTotalBytes += dirSize;
+          return this.getFolderSize(p);
         } else {
-          itemSizes.push(stat.size);
-          batchTotalBytes += stat.size;
+          return stat.size;
         }
       } catch {
-        itemSizes.push(0);
+        return 0;
       }
+    });
+
+    const resolvedSizes = await Promise.all(statPromises);
+    for (const size of resolvedSizes) {
+      itemSizes.push(size);
+      batchTotalBytes += size;
     }
 
     let batchCompletedBytes = 0;
