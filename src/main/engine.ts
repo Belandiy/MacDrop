@@ -823,6 +823,7 @@ export class SyncEngine extends EventEmitter {
         // 1. Mobile Web UI entry point
         if (url.pathname === '/mobile' && req.method === 'GET') {
           if (!isAuthorized) {
+            req.destroy();
             res.writeHead(401, { 'Content-Type': 'text/html; charset=utf-8' });
             res.end(`<!DOCTYPE html><html><body style="background:#121214;color:#fff;font-family:sans-serif;padding:30px;text-align:center;"><h2>401 Доступ запрещен</h2><p style="color:#a1a1aa;">Недействительный или устаревший токен сессии MacDrop.<br>Отсканируйте QR-код в приложении заново.</p></body></html>`);
             return;
@@ -836,6 +837,7 @@ export class SyncEngine extends EventEmitter {
         }
 
         if (!isAuthorized) {
+          req.destroy();
           res.writeHead(401, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ error: 'Unauthorized: Invalid mobile token' }));
           return;
@@ -882,6 +884,7 @@ export class SyncEngine extends EventEmitter {
 
           const safePath = getSafeResolvedPath(this.config.targetFolder, '', filename);
           if (!safePath) {
+            req.destroy();
             res.writeHead(400, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ error: 'Недопустимое имя файла' }));
             return;
@@ -1198,6 +1201,7 @@ export class SyncEngine extends EventEmitter {
         const peer = this.config.pairedDevices.find(d => d.id === senderId);
         if (!peer) {
           console.warn(`Blocked unauthorized upload attempt from unpaired device: ${senderId}`);
+          req.destroy();
           res.writeHead(401, { 'Content-Type': 'application/json; charset=utf-8' });
           res.end(JSON.stringify({
             error: 'Устройство не сопряжено. Выполните сопряжение в MacDrop.'
@@ -1207,6 +1211,7 @@ export class SyncEngine extends EventEmitter {
 
         if (peer.receiveEnabled === false) {
           console.log(`Receiving is disabled for peer ${peer.customName || peer.originalName} (${senderId}).`);
+          req.destroy();
           res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8' });
           res.end(JSON.stringify({
             error: `Получатель временно отключил приём файлов с вашего устройства.`
@@ -1216,8 +1221,9 @@ export class SyncEngine extends EventEmitter {
 
         // Security: Verify authToken if established during pairing
         const reqToken = req.headers['x-auth-token'] as string;
-        if (peer.authToken && reqToken && peer.authToken !== reqToken) {
+        if (peer.authToken && peer.authToken !== reqToken) {
           console.warn(`Blocked upload attempt with invalid auth token from ${senderId}`);
+          req.destroy();
           res.writeHead(401, { 'Content-Type': 'application/json; charset=utf-8' });
           res.end(JSON.stringify({ error: 'Неверный токен авторизации устройства' }));
           return;
@@ -1229,6 +1235,7 @@ export class SyncEngine extends EventEmitter {
         const safeTarget = getSafeResolvedPath(this.config.targetFolder, relPath, filename);
         if (!safeTarget) {
           console.warn(`Path Traversal attempt blocked from ${senderId}: relPath="${relPath}", filename="${filename}"`);
+          req.destroy();
           res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
           res.end(JSON.stringify({ error: 'Недопустимый путь файла (Path Traversal)' }));
           return;
@@ -1403,7 +1410,8 @@ export class SyncEngine extends EventEmitter {
         }
 
         const reqToken = req.headers['x-auth-token'] as string;
-        if (peer.authToken && reqToken && peer.authToken !== reqToken) {
+        if (peer.authToken && peer.authToken !== reqToken) {
+          req.destroy();
           res.writeHead(401, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ error: 'Invalid auth token' }));
           return;
@@ -1442,7 +1450,8 @@ export class SyncEngine extends EventEmitter {
 
         const peer = this.config.pairedDevices.find(d => d.id === transfer.targetDeviceId);
         const reqToken = req.headers['x-auth-token'] as string;
-        if (peer?.authToken && reqToken && peer.authToken !== reqToken) {
+        if (peer?.authToken && peer.authToken !== reqToken) {
+          req.destroy();
           res.writeHead(401, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ error: 'Invalid auth token' }));
           return;
