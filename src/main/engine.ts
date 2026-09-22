@@ -818,7 +818,13 @@ export class SyncEngine extends EventEmitter {
       // --- Mobile Web Endpoints ---
       if (isMobileWeb) {
         const queryToken = url.searchParams.get('token') || (req.headers['x-mobile-token'] as string);
-        const isAuthorized = Boolean(queryToken && queryToken === this.mobileSessionToken);
+        let isAuthorized = false;
+        if (queryToken && queryToken.length === this.mobileSessionToken.length) {
+          isAuthorized = crypto.timingSafeEqual(
+            Buffer.from(queryToken),
+            Buffer.from(this.mobileSessionToken)
+          );
+        }
 
         // 1. Mobile Web UI entry point
         if (url.pathname === '/mobile' && req.method === 'GET') {
