@@ -210,11 +210,11 @@ export function useAppLogic() {
     }
   };
 
-  const handleQuickSend = async (deviceId: string) => {
+  const handleQuickSend = useCallback(async (deviceId: string) => {
     if (window.macdrop?.pickAndSendFiles) {
       await window.macdrop.pickAndSendFiles(deviceId);
     }
-  };
+  }, []);
 
   const handleOpenSettings = useCallback(() => setIsSettingsOpen(true), []);
   const handleOpenPairing = useCallback(() => setIsPairingOpen(true), []);

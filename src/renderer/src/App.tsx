@@ -67,8 +67,8 @@ export default function App() {
             {/* Connected Devices List */}
             <DeviceList
               devices={devices}
-              onSelectDevice={(dev) => setSelectedDevice(dev)}
-              onOpenPairing={() => setIsPairingOpen(true)}
+              onSelectDevice={setSelectedDevice}
+              onOpenPairing={handleOpenPairing}
               onQuickSend={handleQuickSend}
               currentProgress={status.currentProgress}
             />
@@ -80,7 +80,7 @@ export default function App() {
               devices={devices}
               selectedDeviceId={activeTargetDeviceId}
               onSelectDevice={setActiveTargetDeviceAndSave}
-              onOpenPairing={() => setIsPairingOpen(true)}
+              onOpenPairing={handleOpenPairing}
               onChooseFiles={handleChooseFiles}
             />
 

@@ -44,7 +44,9 @@ interface DeviceListItemProps {
   onQuickSend?: (e: React.MouseEvent, deviceId: string) => void;
 }
 
-const DeviceListItem: React.FC<DeviceListItemProps> = ({ device, onClick, onQuickSend }) => {
+// ⚡ Bolt Performance Optimization:
+// Wrapped DeviceListItem in React.memo to prevent re-renders when parent App updates frequently
+const DeviceListItem: React.FC<DeviceListItemProps> = React.memo(({ device, onClick, onQuickSend }) => {
   const isMobile = device.id === 'mobile-web';
   const isMac = device.id.startsWith('MAC') || device.originalName.toLowerCase().includes('mac');
 
@@ -116,7 +118,7 @@ const DeviceListItem: React.FC<DeviceListItemProps> = ({ device, onClick, onQuic
       </div>
     </div>
   );
-};
+});
 
 interface ActiveTransferProgressProps {
   progress: ProgressData | null;
@@ -126,7 +128,9 @@ interface ActiveTransferProgressProps {
   formatSpeed: (bps: number) => string;
 }
 
-const ActiveTransferProgress: React.FC<ActiveTransferProgressProps> = ({
+// ⚡ Bolt Performance Optimization:
+// Wrapped ActiveTransferProgress in React.memo to prevent re-renders of the progress bar if progress props don't change
+const ActiveTransferProgress: React.FC<ActiveTransferProgressProps> = React.memo(({
   progress,
   isVisible,
   isCompleted,
@@ -234,9 +238,13 @@ const ActiveTransferProgress: React.FC<ActiveTransferProgressProps> = ({
       )}
     </div>
   );
-};
+});
 
-export const DeviceList: React.FC<DeviceListProps> = ({
+// ⚡ Bolt Performance Optimization:
+// Wrapped DeviceList in React.memo. Prevents this component from re-rendering completely
+// on every byte transferred (when the parent `App` component updates due to `currentProgress` changing)
+// since `devices` reference stays stable during transfer.
+export const DeviceList: React.FC<DeviceListProps> = React.memo(({
   devices,
   onSelectDevice,
   onOpenPairing,
@@ -263,20 +271,20 @@ export const DeviceList: React.FC<DeviceListProps> = ({
   const hasMoreDevices = devices.length > 3;
   const hiddenCount = devices.length - 3;
 
-  const handleDeviceClick = (device: PairedDevice) => {
+  const handleDeviceClick = React.useCallback((device: PairedDevice) => {
     try {
       localStorage.setItem(`macdrop_last_active_${device.id}`, String(Date.now()));
     } catch {}
     onSelectDevice(device);
-  };
+  }, [onSelectDevice]);
 
-  const handleQuickSendClick = (e: React.MouseEvent, deviceId: string) => {
+  const handleQuickSendClick = React.useCallback((e: React.MouseEvent, deviceId: string) => {
     e.stopPropagation();
     try {
       localStorage.setItem(`macdrop_last_active_${deviceId}`, String(Date.now()));
     } catch {}
     onQuickSend?.(deviceId);
-  };
+  }, [onQuickSend]);
 
   const { progress, isVisible, isCompleted } = useSmoothProgress(currentProgress, 800);
 
@@ -357,4 +365,4 @@ export const DeviceList: React.FC<DeviceListProps> = ({
       />
     </div>
   );
-};
+});
