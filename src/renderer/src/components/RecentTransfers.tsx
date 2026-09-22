@@ -34,7 +34,11 @@ function timeAgo(timestamp: number): string {
   return `${hours} ч назад`;
 }
 
-export const RecentTransfers: React.FC<RecentTransfersProps> = ({ items, onOpenFile }) => {
+// ⚡ Bolt Performance Optimization:
+// Wrapped RecentTransfers in React.memo. Prevents this component (which can contain
+// multiple elements and relatively expensive format calls) from re-rendering on every
+// byte transferred, as `items` reference stays the same during transfer.
+export const RecentTransfers: React.FC<RecentTransfersProps> = React.memo(({ items, onOpenFile }) => {
   if (items.length === 0) {
     return (
       <div className="bg-[#111319]/60 border border-white/[0.06] rounded-2xl p-4 text-center">
@@ -102,4 +106,4 @@ export const RecentTransfers: React.FC<RecentTransfersProps> = ({ items, onOpenF
       </div>
     </div>
   );
-};
+});

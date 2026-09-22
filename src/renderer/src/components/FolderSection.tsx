@@ -7,7 +7,10 @@ interface FolderSectionProps {
   onOpenFolder: () => void;
 }
 
-export const FolderSection: React.FC<FolderSectionProps> = ({
+// ⚡ Bolt Performance Optimization:
+// Wrapped FolderSection in React.memo to prevent unnecessary re-renders when parent App state
+// updates. Dependencies (targetFolder, callbacks) remain stable most of the time.
+export const FolderSection: React.FC<FolderSectionProps> = React.memo(({
   targetFolder,
   onSelectFolder,
   onOpenFolder
@@ -56,4 +59,4 @@ export const FolderSection: React.FC<FolderSectionProps> = ({
       </div>
     </div>
   );
-};
+});

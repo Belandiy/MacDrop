@@ -9,7 +9,10 @@ interface HeaderProps {
   platform?: string;
 }
 
-export const Header: React.FC<HeaderProps> = ({ onOpenSettings, onOpenPairing, platform }) => {
+// ⚡ Bolt Performance Optimization:
+// Wrapped Header in React.memo to prevent unnecessary re-renders when parent App state
+// (e.g. transfer progress) updates frequently. Header props are static or memoized callbacks.
+export const Header: React.FC<HeaderProps> = React.memo(({ onOpenSettings, onOpenPairing, platform }) => {
   const isMac = platform === 'darwin';
   const appVersion = window.macdrop?.version || packageJson.version;
 
@@ -217,4 +220,4 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSettings, onOpenPairing, p
       </div>
     </header>
   );
-};
+});
