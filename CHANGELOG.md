@@ -2,6 +2,27 @@
 
 Все важные изменения проекта MacDrop фиксируются в этом файле.
 
+## [2.2.0] - 2026-09-22
+
+### Безопасность
+- **Исправление обхода авторизации (Auth Bypass)**: исправлена проверка токенов в `engine.ts` (`peer.authToken && peer.authToken !== reqToken`), блокирующая запросы без токена; добавлены вызовы `req.destroy()` на сокетах с ошибками 400/401/403.
+- **Устранение XSS в Mobile Web**: переход от `innerHTML` к безопасным DOM API (`document.createElement`, `.textContent`) при рендеринге списков файлов.
+- **Защита от Timing Attacks**: сверка сессионных токенов через `crypto.timingSafeEqual` с предварительной проверкой байтовой длины буферов.
+
+### Производительность
+- **O(1) поиск связанных устройств**: введен Map-индекс `deviceMap` в `SyncEngine` вместо O(N) линейного перебора массива.
+- **Параллельный опрос пиров**: конкурентный health-check оффлайн/онлайн пиров через `Promise.all` вместо последовательных таймаутов по 700 мс.
+- **Неблокирующий асинхронный I/O**: рекурсивный подсчет размера папок (`getFolderSize`), чтение директорий и очередей передачи переведены на `fs.promises`.
+
+### Архитектура и рефакторинг UI
+- **Декомпозиция `App.tsx`**: состояние, подписки и IPC вынесены в кастомный хук `useAppLogic` (файл сокращен с 285 до 46 строк).
+- **Модуляризация компонентов**: `DeviceDetailView`, `SettingsModal`, `Header`, `PairingModal`, `DropZone`, `DeviceList` разбиты на изолированные подкомпоненты.
+- **Структурирование Mobile Web**: разделение генерации HTML/CSS/JS на модульные функции `getCss()`, `getHtmlBody()`, `getScripts()`.
+
+### Тестирование
+- **Инфраструктура Vitest**: настроен единый раннер тестов с поддержкой JSDOM (`vitest.config.ts`, `vitest.setup.ts`).
+- **Тестовое покрытие**: добавлены тесты для `isPrivateIp`, `getSafeResolvedPath`, `getNonConflictingPath`, `calculateBroadcast`, `isArchiveFile`, `useSmoothProgress`, `getDefaultFolder`, `getServiceDir` (48 тестов, 100% pass).
+
 ## [2.1.0] - 2026-09-15
 
 ### Добавлено
