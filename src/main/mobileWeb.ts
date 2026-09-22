@@ -11,7 +11,16 @@ export function getMobileWebHtml(computerName: string, initialToken: string): st
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>MacDrop Mobile</title>
-  <style>
+  ${getCss()}
+</head>
+${getHtmlBody(computerName, initialToken)}
+${getScripts(initialToken)}
+</body>
+</html>`;
+}
+
+function getCss(): string {
+  return `<style>
     * {
       box-sizing: border-box;
       margin: 0;
@@ -295,9 +304,11 @@ export function getMobileWebHtml(computerName: string, initialToken: string): st
     input[type="file"] {
       display: none;
     }
-  </style>
-</head>
-<body>
+  </style>`;
+}
+
+function getHtmlBody(computerName: string, initialToken: string): string {
+  return `<body>
 
   <!-- Header -->
   <header>
@@ -383,7 +394,11 @@ export function getMobileWebHtml(computerName: string, initialToken: string): st
     </div>
   </div>
 
-  <script>
+  `;
+}
+
+function getScripts(initialToken: string): string {
+  return `<script>
     const urlParams = new URLSearchParams(window.location.search);
     const sessionToken = urlParams.get('token') || '${initialToken}';
 
@@ -593,8 +608,7 @@ export function getMobileWebHtml(computerName: string, initialToken: string): st
       }
     }
   </script>
-</body>
-</html>`;
+`;
 }
 
 function escapeHtml(str: string): string {
