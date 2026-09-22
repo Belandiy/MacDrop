@@ -1798,17 +1798,18 @@ export class SyncEngine extends EventEmitter {
   }
 
   // Calculate recursive size of directory
-  private getFolderSize(dirPath: string): number {
+  private async getFolderSize(dirPath: string): Promise<number> {
     let total = 0;
     try {
-      const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+      const entries = await fs.promises.readdir(dirPath, { withFileTypes: true });
       for (const entry of entries) {
         const full = path.join(dirPath, entry.name);
         if (entry.isDirectory()) {
-          total += this.getFolderSize(full);
+          total += await this.getFolderSize(full);
         } else if (entry.isFile()) {
           try {
-            total += fs.statSync(full).size;
+            const stat = await fs.promises.stat(full);
+            total += stat.size;
           } catch {}
         }
       }
@@ -1834,9 +1835,9 @@ export class SyncEngine extends EventEmitter {
 
     for (const p of validPaths) {
       try {
-        const stat = fs.statSync(p);
+        const stat = await fs.promises.stat(p);
         if (stat.isDirectory()) {
-          const dirSize = this.getFolderSize(p);
+          const dirSize = await this.getFolderSize(p);
           itemSizes.push(dirSize);
           batchTotalBytes += dirSize;
         } else {
