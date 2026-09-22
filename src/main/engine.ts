@@ -9,7 +9,7 @@ import { Notification, shell, app } from 'electron';
 import { PeerDiscovery } from './discovery';
 import { isPrivateIp, UpnpStatus } from './upnp';
 import { getMobileWebHtml } from './mobileWeb';
-import { createZipFromFolder, isArchiveFile, FolderZipResult } from './archiver';
+import { createZipFromFolder, FolderZipResult } from './archiver';
 
 function formatFileSize(bytes: number): string {
   if (!bytes || bytes === 0) return '0 B';
