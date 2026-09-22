@@ -106,6 +106,7 @@ export class SyncEngine extends EventEmitter {
   private healthCheckTimer: NodeJS.Timeout | null = null;
   private isDownloadingRemote = false;
   private activeCancelHandlers: Set<() => void> = new Set();
+  private deviceMap: Map<string, PairedDevice> = new Map();
   private pendingPairingRequests: Map<string, {
     res: http.ServerResponse;
     timer: NodeJS.Timeout;
@@ -120,7 +121,15 @@ export class SyncEngine extends EventEmitter {
   constructor(config: AppConfig) {
     super();
     this.config = config;
+    this.rebuildDeviceMap();
     this.loadHistory();
+  }
+
+  private rebuildDeviceMap() {
+    this.deviceMap.clear();
+    for (const d of this.config.pairedDevices) {
+      this.deviceMap.set(d.id, d);
+    }
   }
 
   public getMobileSessionToken(): string {
@@ -232,6 +241,7 @@ export class SyncEngine extends EventEmitter {
   public updateConfig(newConfig: AppConfig) {
     const folderChanged = this.config.targetFolder !== newConfig.targetFolder;
     this.config = newConfig;
+    this.rebuildDeviceMap();
     saveConfig(this.config);
 
     if (folderChanged) {
@@ -245,7 +255,7 @@ export class SyncEngine extends EventEmitter {
   }
 
   public updateDeviceCustomName(deviceId: string, newCustomName: string): boolean {
-    const dev = this.config.pairedDevices.find(d => d.id === deviceId);
+    const dev = this.deviceMap.get(deviceId);
     if (dev) {
       dev.customName = newCustomName.trim() || dev.originalName;
       saveConfig(this.config);
@@ -259,6 +269,7 @@ export class SyncEngine extends EventEmitter {
     const initialLen = this.config.pairedDevices.length;
     this.config.pairedDevices = this.config.pairedDevices.filter(d => d.id !== deviceId);
     if (this.config.pairedDevices.length !== initialLen) {
+      this.deviceMap.delete(deviceId);
       saveConfig(this.config);
       this.emit('status-changed', this.getStatus());
       return true;
@@ -267,7 +278,7 @@ export class SyncEngine extends EventEmitter {
   }
 
   public toggleDeviceReceive(deviceId: string, enabled: boolean): boolean {
-    const dev = this.config.pairedDevices.find(d => d.id === deviceId);
+    const dev = this.deviceMap.get(deviceId);
     if (dev) {
       dev.receiveEnabled = enabled;
       saveConfig(this.config);
@@ -353,7 +364,7 @@ export class SyncEngine extends EventEmitter {
     const cleanIp = ip.replace(/^::ffff:/, '').trim();
     if (cleanIp === '127.0.0.1' || cleanIp === '::1') return false;
 
-    const peer = this.config.pairedDevices.find(d => d.id === deviceId);
+    const peer = this.deviceMap.get(deviceId);
     if (peer) {
       let changed = false;
       const isPrivate = isPrivateIp(cleanIp);
@@ -661,7 +672,7 @@ export class SyncEngine extends EventEmitter {
               const originalName = data.deviceName || 'Устройство';
               const sharedToken = data.authToken || localToken;
 
-              let existing = this.config.pairedDevices.find(d => d.id === deviceId);
+              let existing = this.deviceMap.get(deviceId);
               if (existing) {
                 existing.ip = cleanIp;
                 existing.port = peerPort;
@@ -685,6 +696,7 @@ export class SyncEngine extends EventEmitter {
                   lastSeen: Date.now()
                 };
                 this.config.pairedDevices.push(existing);
+                this.deviceMap.set(existing.id, existing);
               }
 
               saveConfig(this.config);
@@ -739,7 +751,7 @@ export class SyncEngine extends EventEmitter {
     }
 
     const sharedToken = data.authToken || crypto.randomBytes(24).toString('hex');
-    let existing = this.config.pairedDevices.find(d => d.id === data.deviceId);
+    let existing = this.deviceMap.get(data.deviceId);
     if (existing) {
       existing.ip = cleanIp;
       existing.port = data.port || 8384;
@@ -764,6 +776,7 @@ export class SyncEngine extends EventEmitter {
         lastSeen: Date.now()
       };
       this.config.pairedDevices.push(existing);
+      this.deviceMap.set(existing.id, existing);
     }
 
     saveConfig(this.config);
@@ -1068,7 +1081,7 @@ export class SyncEngine extends EventEmitter {
               const rawIp = req.socket.remoteAddress || '127.0.0.1';
               const cleanIp = rawIp.replace(/^::ffff:/, '');
 
-              let existing = this.config.pairedDevices.find(d => d.id === data.deviceId);
+              let existing = this.deviceMap.get(data.deviceId);
               const sharedToken = data.authToken || existing?.authToken || crypto.randomBytes(24).toString('hex');
 
               // If device was already paired, update IP/port and sync info without re-prompting
@@ -1113,6 +1126,7 @@ export class SyncEngine extends EventEmitter {
                   lastSeen: Date.now()
                 };
                 this.config.pairedDevices.push(existing);
+                this.deviceMap.set(existing.id, existing);
                 saveConfig(this.config);
                 console.log(`Device pairing auto-approved (outgoing pairing) from ${cleanIp}:`, existing);
                 this.emit('device-paired', existing);
@@ -1195,7 +1209,7 @@ export class SyncEngine extends EventEmitter {
         }
 
         // Security: Block unauthorized / unpaired clients from uploading files
-        const peer = this.config.pairedDevices.find(d => d.id === senderId);
+        const peer = this.deviceMap.get(senderId);
         if (!peer) {
           console.warn(`Blocked unauthorized upload attempt from unpaired device: ${senderId}`);
           res.writeHead(401, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -1395,7 +1409,7 @@ export class SyncEngine extends EventEmitter {
           this.updatePeerAddress(senderId, rawIp, undefined, true);
         }
 
-        const peer = this.config.pairedDevices.find(d => d.id === senderId);
+        const peer = this.deviceMap.get(senderId);
         if (!peer) {
           res.writeHead(401, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ error: 'Unpaired peer' }));
@@ -1440,7 +1454,7 @@ export class SyncEngine extends EventEmitter {
           return;
         }
 
-        const peer = this.config.pairedDevices.find(d => d.id === transfer.targetDeviceId);
+        const peer = this.deviceMap.get(transfer.targetDeviceId);
         const reqToken = req.headers['x-auth-token'] as string;
         if (peer?.authToken && reqToken && peer.authToken !== reqToken) {
           res.writeHead(401, { 'Content-Type': 'application/json' });
@@ -1561,7 +1575,7 @@ export class SyncEngine extends EventEmitter {
 
     let peer: PairedDevice | undefined;
     if (targetDeviceId) {
-      peer = this.config.pairedDevices.find(d => d.id === targetDeviceId);
+      peer = this.deviceMap.get(targetDeviceId);
     } else {
       peer = this.config.pairedDevices[0];
     }
@@ -1928,7 +1942,7 @@ export class SyncEngine extends EventEmitter {
       createdAt: Date.now()
     });
 
-    const peer = this.config.pairedDevices.find(d => d.id === targetDeviceId);
+    const peer = this.deviceMap.get(targetDeviceId);
     const peerName = peer?.customName || peer?.originalName || 'Устройство';
 
     console.log(`Queued pending remote transfer ${transferId} (${filename}) for ${peerName}`);
@@ -2039,7 +2053,7 @@ export class SyncEngine extends EventEmitter {
       console.error('Failed to create target dir for remote download:', err);
     }
 
-    const peer = this.config.pairedDevices.find(d => d.id === senderDeviceId);
+    const peer = this.deviceMap.get(senderDeviceId);
     const peerName = peer?.customName || peer?.originalName || 'Устройство';
 
     return new Promise((resolve, reject) => {
