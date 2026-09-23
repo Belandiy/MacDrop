@@ -129,7 +129,7 @@ export function useAppLogic() {
     }
   }, []);
 
-  const handleFilesDropped = async (paths: string[], targetDeviceId?: string) => {
+  const handleFilesDropped = useCallback(async (paths: string[], targetDeviceId?: string) => {
     if (window.macdrop) {
       const targetId =
         targetDeviceId ||
@@ -139,7 +139,7 @@ export function useAppLogic() {
       return await window.macdrop.sendDroppedFiles(paths, targetId);
     }
     return [];
-  };
+  }, [selectedDevice, activeTargetDeviceId, devices]);
 
   const handleToggleAutoStart = async (enable: boolean) => {
     if (window.macdrop) {
@@ -219,20 +219,20 @@ export function useAppLogic() {
   const handleOpenSettings = useCallback(() => setIsSettingsOpen(true), []);
   const handleOpenPairing = useCallback(() => setIsPairingOpen(true), []);
 
-  const setActiveTargetDeviceAndSave = (id: string) => {
+  const setActiveTargetDeviceAndSave = useCallback((id: string) => {
     setActiveTargetDeviceId(id);
     try {
       localStorage.setItem('macdrop_target_device_id', id);
     } catch {}
-  };
+  }, []);
 
-  const handleChooseFiles = (targetId?: string) => {
+  const handleChooseFiles = useCallback((targetId?: string) => {
     const effectiveTargetId =
       targetId ||
       activeTargetDeviceId ||
       (devices.length > 0 ? devices[0].id : undefined);
     window.macdrop?.pickAndSendFiles(effectiveTargetId);
-  };
+  }, [activeTargetDeviceId, devices]);
 
   return {
     config,

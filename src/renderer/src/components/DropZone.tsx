@@ -306,7 +306,10 @@ const DropZoneContent: React.FC<DropZoneContentProps> = ({
   );
 };
 
-export const DropZone: React.FC<DropZoneProps> = ({
+// ⚡ Bolt Performance Optimization:
+// Wrapped DropZone in React.memo to prevent unnecessary re-renders when parent App updates frequently
+// (e.g. during file transfer progress).
+export const DropZone: React.FC<DropZoneProps> = React.memo(({
   onFilesDropped,
   targetFolder,
   onChooseFiles,
@@ -455,4 +458,4 @@ export const DropZone: React.FC<DropZoneProps> = ({
       />
     </div>
   );
-};
+});
