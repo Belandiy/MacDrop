@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { UploadCloud, FileCheck, Ban, AlertCircle, Laptop, Monitor, Radio, FileUp, ChevronDown, Check, Smartphone } from 'lucide-react';
 import { PairedDevice } from './DeviceDetailView';
 
@@ -221,7 +221,6 @@ const EmptyDeviceSelector: React.FC<EmptyDeviceSelectorProps> = ({ onOpenPairing
 
 interface DropZoneContentProps {
   statusMessage: { type: 'success' | 'warning' | 'error'; text: string } | null;
-  isDragging: boolean;
   targetName: string | null;
   targetDevice?: PairedDevice;
   onChooseFiles?: (targetDeviceId?: string) => void;
@@ -229,23 +228,20 @@ interface DropZoneContentProps {
 
 const DropZoneContent: React.FC<DropZoneContentProps> = ({
   statusMessage,
-  isDragging,
   targetName,
   targetDevice,
   onChooseFiles
 }) => {
   return (
-    <div className="flex flex-col items-center justify-center gap-2">
+    <div className="flex flex-col items-center justify-center gap-2 pointer-events-none">
       <div
-        className={`w-13 h-13 p-3 rounded-2xl flex items-center justify-center transition-all ${
+        className={`drop-icon w-13 h-13 p-3 rounded-2xl flex items-center justify-center transition-all ${
           statusMessage?.type === 'warning'
             ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
             : statusMessage?.type === 'error'
             ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
             : statusMessage?.type === 'success'
             ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-            : isDragging
-            ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/40'
             : 'bg-gradient-to-br from-indigo-500/20 via-indigo-600/15 to-cyan-500/20 border border-indigo-400/35 text-indigo-300 shadow-md shadow-indigo-500/15'
         }`}
       >
@@ -260,33 +256,53 @@ const DropZoneContent: React.FC<DropZoneContentProps> = ({
         )}
       </div>
 
-      <div>
-        <div
-          className={`text-sm font-bold tracking-tight ${
-            statusMessage?.type === 'warning'
-              ? 'text-amber-300'
-              : statusMessage?.type === 'error'
-              ? 'text-rose-400'
-              : 'text-white'
-          }`}
-        >
-          {statusMessage
-            ? statusMessage.text
-            : isDragging
-            ? targetName
-              ? `Отпустите для отправки на ${targetName}!`
-              : 'Отпустите файлы или папки сюда!'
-            : 'Перетащите файлы, архивы или папки сюда'}
-        </div>
-        <p className="text-xs text-slate-400 mt-0.5">
-          {statusMessage?.type === 'warning'
-            ? 'Связь сохранена, но приём временно запрещён вторым клиентом'
-            : isDragging && targetName
-            ? `Файлы или папка сразу отправятся на ${targetName}`
-            : targetName
-            ? `Прямая P2P-передача (папки автоматически упакуются в .zip)`
-            : 'Подключите устройство для отправки файлов'}
-        </p>
+      <div className="min-h-[44px] flex flex-col justify-center">
+        {/* Status message text (always visible when present, hides idle/drag texts) */}
+        {statusMessage ? (
+          <div
+            className={`text-sm font-bold tracking-tight ${
+              statusMessage.type === 'warning'
+                ? 'text-amber-300'
+                : statusMessage.type === 'error'
+                ? 'text-rose-400'
+                : 'text-white'
+            }`}
+          >
+            {statusMessage.text}
+          </div>
+        ) : (
+          <>
+            {/* Idle text — hidden by CSS when .drop-active is on parent */}
+            <div className="drop-text-idle text-sm font-bold tracking-tight text-white">
+              Перетащите файлы, архивы или папки сюда
+            </div>
+            {/* Drag text — shown by CSS when .drop-active is on parent */}
+            <div className="drop-text-drag text-sm font-bold tracking-tight text-white">
+              {targetName
+                ? `Отпустите для отправки на ${targetName}!`
+                : 'Отпустите файлы или папки сюда!'}
+            </div>
+          </>
+        )}
+
+        {statusMessage?.type === 'warning' ? (
+          <p className="text-xs text-slate-400 mt-0.5">
+            Связь сохранена, но приём временно запрещён вторым клиентом
+          </p>
+        ) : (
+          <>
+            <p className="drop-text-idle text-xs text-slate-400 mt-0.5">
+              {targetName
+                ? 'Прямая P2P-передача'
+                : 'Подключите устройство для отправки файлов'}
+            </p>
+            <p className="drop-text-drag text-xs text-slate-400 mt-0.5">
+              {targetName
+                ? `Прямая отправка на ${targetName}`
+                : 'Файлы сразу отправятся'}
+            </p>
+          </>
+        )}
       </div>
 
       {onChooseFiles && (
@@ -296,7 +312,7 @@ const DropZoneContent: React.FC<DropZoneContentProps> = ({
             e.stopPropagation();
             onChooseFiles(targetDevice?.id);
           }}
-          className="text-xs bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 active:scale-95 text-white font-semibold px-4 py-2 rounded-xl shadow-md shadow-indigo-600/30 transition-all flex items-center gap-1.5 mt-1"
+          className="pointer-events-auto text-xs bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 active:scale-95 text-white font-semibold px-4 py-2 rounded-xl shadow-md shadow-indigo-600/30 transition-all flex items-center gap-1.5 mt-1"
         >
           <FileUp className="w-3.5 h-3.5" />
           <span>{targetName ? `Выбрать для ${targetName}` : 'Выбрать в Finder'}</span>
@@ -306,7 +322,7 @@ const DropZoneContent: React.FC<DropZoneContentProps> = ({
   );
 };
 
-export const DropZone: React.FC<DropZoneProps> = ({
+export const DropZone: React.FC<DropZoneProps> = React.memo(({
   onFilesDropped,
   targetFolder,
   onChooseFiles,
@@ -315,144 +331,248 @@ export const DropZone: React.FC<DropZoneProps> = ({
   onSelectDevice,
   onOpenPairing
 }) => {
-  const [isDragging, setIsDragging] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{
     type: 'success' | 'warning' | 'error';
     text: string;
   } | null>(null);
 
+  const zoneRef = useRef<HTMLDivElement>(null);
+  const isDragActiveRef = useRef(false);
+  /** Stable ref to latest props for use inside window-level listeners */
+  const propsRef = useRef({ onFilesDropped, devices, selectedDeviceId });
+  propsRef.current = { onFilesDropped, devices, selectedDeviceId };
+
   const targetDevice = devices.find((d) => d.id === selectedDeviceId) || devices[0];
   const targetName = targetDevice ? (targetDevice.customName || targetDevice.originalName) : null;
+  const targetNameRef = useRef(targetName);
+  targetNameRef.current = targetName;
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(true);
-  };
+  const setStatusRef = useRef(setStatusMessage);
+  setStatusRef.current = setStatusMessage;
 
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-  };
-
-  const handleDrop = async (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-
-    const files = Array.from(e.dataTransfer.files);
-    if (files.length > 0) {
-      const paths = files
-        .map((f: any) => {
-          if (window.macdrop?.getPathForFile) {
-            try {
-              const p = window.macdrop.getPathForFile(f);
-              if (p) return p;
-            } catch {}
-          }
-          return f.path || '';
-        })
-        .filter(Boolean);
-
-      if (paths.length > 0) {
-        try {
-          const effectiveTargetId = targetDevice?.id;
-          const res = await onFilesDropped(paths, effectiveTargetId);
-          if (Array.isArray(res) && res.length > 0) {
-            const blocked = res.find(
-              (r) =>
-                r.error &&
-                (r.error.includes('отключил приём') ||
-                  r.error.includes('выключен приём') ||
-                  r.error.includes('403'))
-            );
-            const failed = res.find((r) => !r.success);
-
-            if (blocked) {
-              setStatusMessage({
-                type: 'warning',
-                text: `${targetName || 'Устройство'}: выключен приём файлов`
-              });
-            } else if (failed) {
-              setStatusMessage({
-                type: 'error',
-                text: failed.error || 'Ошибка при отправке файла'
-              });
-            } else {
-              setStatusMessage({
-                type: 'success',
-                text: targetName
-                  ? `Отправлено ${files.length} файл(ов) на ${targetName}!`
-                  : `Отправлено ${files.length} файл(ов)!`
-              });
-            }
-          } else {
-            setStatusMessage({
-              type: 'success',
-              text: targetName
-                ? `Отправлено ${files.length} файл(ов) на ${targetName}!`
-                : `Отправлено ${files.length} файл(ов)!`
-            });
-          }
-        } catch (err: any) {
-          const msg = err?.message || '';
-          if (
-            msg.includes('отключил приём') ||
-            msg.includes('выключен приём') ||
-            msg.includes('403')
-          ) {
-            setStatusMessage({
-              type: 'warning',
-              text: `${targetName || 'Устройство'}: выключен приём файлов`
-            });
-          } else {
-            setStatusMessage({
-              type: 'error',
-              text: msg || 'Ошибка отправки'
-            });
-          }
-        }
-        setTimeout(() => setStatusMessage(null), 4000);
-      }
+  // Ensure .drop-active class persists across React re-renders without DOM blink
+  useLayoutEffect(() => {
+    if (isDragActiveRef.current && zoneRef.current) {
+      zoneRef.current.classList.add('drop-active');
     }
-  };
+  });
+
+  /**
+   * Window-level geometry-based drag tracking.
+   * Instead of relying on which DOM element receives the event (child vs parent),
+   * we check cursor position against the zone's bounding rect on every dragover.
+   * This makes children, scroll containers, and transitions completely irrelevant.
+   */
+  useEffect(() => {
+    const el = zoneRef.current;
+    if (!el) return;
+
+    const isFileDrag = (e: DragEvent): boolean =>
+      !!e.dataTransfer && Array.from(e.dataTransfer.types).some(t => t.toLowerCase() === 'files');
+
+    const setActive = (active: boolean): void => {
+      if (isDragActiveRef.current === active) return;
+      isDragActiveRef.current = active;
+      if (el.classList.contains('drop-active') !== active) {
+        el.classList.toggle('drop-active', active);
+      }
+    };
+
+    const isInsideZone = (e: DragEvent): boolean => {
+      const r = el.getBoundingClientRect();
+      // Hysteresis margin: entering requires crossing physical bounds;
+      // leaving requires moving 8px away, preventing border flutter/shimmer.
+      const buffer = isDragActiveRef.current ? 8 : 0;
+      return (
+        e.clientX >= r.left - buffer &&
+        e.clientX <= r.right + buffer &&
+        e.clientY >= r.top - buffer &&
+        e.clientY <= r.bottom + buffer
+      );
+    };
+
+    let leaveTimeout: ReturnType<typeof setTimeout> | null = null;
+
+    const clearLeaveTimeout = (): void => {
+      if (leaveTimeout) {
+        clearTimeout(leaveTimeout);
+        leaveTimeout = null;
+      }
+    };
+
+    const forceReset = (): void => {
+      clearLeaveTimeout();
+      setActive(false);
+    };
+
+    const handleWindowDragOver = (e: DragEvent): void => {
+      if (!isFileDrag(e)) return;
+      e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+
+      // As long as dragover is firing, cursor is active within the window. Clear pending leave timer.
+      clearLeaveTimeout();
+
+      setActive(isInsideZone(e));
+    };
+
+    const handleWindowDrop = (e: DragEvent): void => {
+      e.preventDefault();
+      const wasInside = isInsideZone(e);
+      forceReset();
+
+      if (wasInside && e.dataTransfer?.files.length) {
+        const files = Array.from(e.dataTransfer.files);
+        const paths = files
+          .map((f: any) => {
+            if (window.macdrop?.getPathForFile) {
+              try {
+                const p = window.macdrop.getPathForFile(f);
+                if (p) return p;
+              } catch {}
+            }
+            return f.path || '';
+          })
+          .filter(Boolean);
+
+        if (paths.length > 0) {
+          const { onFilesDropped: sendFiles, devices: devs, selectedDeviceId: selId } = propsRef.current;
+          const td = devs.find((d) => d.id === selId) || devs[0];
+          const effectiveTargetId = td?.id;
+          const tName = targetNameRef.current;
+
+          Promise.resolve(sendFiles(paths, effectiveTargetId))
+            .then((res: any) => {
+              if (Array.isArray(res) && res.length > 0) {
+                const blocked = res.find(
+                  (r: any) =>
+                    r.error &&
+                    (r.error.includes('отключил приём') ||
+                      r.error.includes('выключен приём') ||
+                      r.error.includes('403'))
+                );
+                const failed = res.find((r: any) => !r.success);
+
+                if (blocked) {
+                  setStatusRef.current({
+                    type: 'warning',
+                    text: `${tName || 'Устройство'}: выключен приём файлов`
+                  });
+                } else if (failed) {
+                  setStatusRef.current({
+                    type: 'error',
+                    text: failed.error || 'Ошибка при отправке файла'
+                  });
+                } else {
+                  setStatusRef.current({
+                    type: 'success',
+                    text: tName
+                      ? `Отправлено ${files.length} файл(ов) на ${tName}!`
+                      : `Отправлено ${files.length} файл(ов)!`
+                  });
+                }
+              } else {
+                setStatusRef.current({
+                  type: 'success',
+                  text: tName
+                    ? `Отправлено ${files.length} файл(ов) на ${tName}!`
+                    : `Отправлено ${files.length} файл(ов)!`
+                });
+              }
+            })
+            .catch((err: any) => {
+              const msg = err?.message || '';
+              if (
+                msg.includes('отключил приём') ||
+                msg.includes('выключен приём') ||
+                msg.includes('403')
+              ) {
+                setStatusRef.current({
+                  type: 'warning',
+                  text: `${tName || 'Устройство'}: выключен приём файлов`
+                });
+              } else {
+                setStatusRef.current({
+                  type: 'error',
+                  text: msg || 'Ошибка отправки'
+                });
+              }
+            });
+
+          setTimeout(() => setStatusRef.current(null), 4000);
+        }
+      }
+    };
+
+    /**
+     * In Chromium, dragleave coordinates are 0,0 and relatedTarget is null on child element transitions.
+     * We debounce deactivation: if the user is merely crossing an internal DOM element,
+     * the next dragover will arrive within a few milliseconds and cancel this timeout.
+     * If the user truly left the window, dragover stops, and after 300ms we deactivate cleanly.
+     */
+    const handleWindowDragLeave = (): void => {
+      clearLeaveTimeout();
+      leaveTimeout = setTimeout(() => {
+        setActive(false);
+        leaveTimeout = null;
+      }, 300);
+    };
+
+    const handleVisibilityChange = (): void => {
+      if (document.hidden) forceReset();
+    };
+
+    const handleDragEnd = (): void => forceReset();
+
+    window.addEventListener('dragover', handleWindowDragOver);
+    window.addEventListener('drop', handleWindowDrop);
+    window.addEventListener('dragleave', handleWindowDragLeave);
+    window.addEventListener('dragend', handleDragEnd);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearLeaveTimeout();
+      window.removeEventListener('dragover', handleWindowDragOver);
+      window.removeEventListener('drop', handleWindowDrop);
+      window.removeEventListener('dragleave', handleWindowDragLeave);
+      window.removeEventListener('dragend', handleDragEnd);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
 
   return (
     <div
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
-      className={`relative rounded-2xl p-5 text-center transition-all duration-200 orbital-glow ${
-        isDragging
-          ? 'border-2 border-indigo-500 bg-indigo-500/15 scale-[1.01] shadow-xl shadow-indigo-500/25'
-          : statusMessage?.type === 'warning'
-          ? 'border-2 border-dashed border-amber-500/40 bg-amber-500/5'
+      ref={zoneRef}
+      className={`drop-zone relative rounded-2xl p-5 text-center orbital-glow border-2 ${
+        statusMessage?.type === 'warning'
+          ? 'border-dashed border-amber-500/40 bg-amber-500/5'
           : statusMessage?.type === 'error'
-          ? 'border-2 border-dashed border-rose-500/40 bg-rose-500/5'
-          : 'border border-dashed border-indigo-500/30 bg-gradient-to-b from-[#181b26]/70 to-[#10121a]/90 hover:border-indigo-400/60 hover:shadow-lg hover:shadow-indigo-500/10'
+          ? 'border-dashed border-rose-500/40 bg-rose-500/5'
+          : 'border-dashed border-indigo-500/30 bg-gradient-to-b from-[#181b26]/70 to-[#10121a]/90 hover:border-indigo-400/60 hover:shadow-lg hover:shadow-indigo-500/10'
       }`}
     >
-      {devices.length > 0 && (
-        <DeviceSelector
-          devices={devices}
+      <div>
+        {devices.length > 0 && (
+          <DeviceSelector
+            devices={devices}
+            targetDevice={targetDevice}
+            onSelectDevice={onSelectDevice}
+            onOpenPairing={onOpenPairing}
+          />
+        )}
+
+        {devices.length === 0 && (
+          <EmptyDeviceSelector onOpenPairing={onOpenPairing} />
+        )}
+
+        <DropZoneContent
+          statusMessage={statusMessage}
+          targetName={targetName}
           targetDevice={targetDevice}
-          onSelectDevice={onSelectDevice}
-          onOpenPairing={onOpenPairing}
+          onChooseFiles={onChooseFiles}
         />
-      )}
-
-      {devices.length === 0 && (
-        <EmptyDeviceSelector onOpenPairing={onOpenPairing} />
-      )}
-
-      <DropZoneContent
-        statusMessage={statusMessage}
-        isDragging={isDragging}
-        targetName={targetName}
-        targetDevice={targetDevice}
-        onChooseFiles={onChooseFiles}
-      />
+      </div>
     </div>
   );
-};
+});
+

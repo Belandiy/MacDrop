@@ -647,6 +647,11 @@ function getScripts(initialToken: string): string {
         container.innerHTML = '<div class="empty-placeholder" style="color: #f87171;">Не удалось загрузить файлы с ПК</div>';
       }
     }
+
+    // Heartbeat ping to keep PC aware of active mobile browser tab
+    setInterval(function() {
+      fetch('/api/mobile/status?token=' + encodeURIComponent(sessionToken)).catch(function() {});
+    }, 15000);
   </script>
 `;
 }

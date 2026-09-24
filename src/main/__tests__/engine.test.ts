@@ -139,3 +139,43 @@ describe('getNonConflictingPath', () => {
     expect(result).toBe(path.join('/fake/dir', 'file (1)'));
   });
 });
+
+describe('SyncEngine Mobile Session Lifecycle', () => {
+  it('should not include virtual mobile device when no mobile session is active', async () => {
+    const { SyncEngine } = await import('../engine');
+    const mockConfig: any = {
+      deviceId: 'TEST-DEV',
+      deviceName: 'Test Machine',
+      targetFolder: '/test/folder',
+      pairedDevices: []
+    };
+
+    const engine = new SyncEngine(mockConfig);
+    const status = engine.getStatus();
+
+    expect(status.isConnected).toBe(false);
+    expect(status.pairedDevices.some((d: any) => d.id === 'mobile-web')).toBe(false);
+  });
+
+  it('should include virtual mobile device after mobile activity is marked and exclude after token reset', async () => {
+    const { SyncEngine } = await import('../engine');
+    const mockConfig: any = {
+      deviceId: 'TEST-DEV',
+      deviceName: 'Test Machine',
+      targetFolder: '/test/folder',
+      pairedDevices: []
+    };
+
+    const engine = new SyncEngine(mockConfig);
+    engine.markMobileActivity();
+
+    let status = engine.getStatus();
+    expect(status.isConnected).toBe(true);
+    expect(status.pairedDevices.some((d: any) => d.id === 'mobile-web')).toBe(true);
+
+    engine.regenerateMobileSessionToken();
+    status = engine.getStatus();
+    expect(status.isConnected).toBe(false);
+    expect(status.pairedDevices.some((d: any) => d.id === 'mobile-web')).toBe(false);
+  });
+});

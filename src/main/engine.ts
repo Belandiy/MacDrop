@@ -118,6 +118,7 @@ export class SyncEngine extends EventEmitter {
   private isBatchCancelled = false;
   private batchReceiverTimeout: NodeJS.Timeout | null = null;
   private mobileSessionQueue: Array<{ filename: string; path: string; size: number; mtimeMs: number }> = [];
+  private lastMobileSeen: number = 0;
 
   constructor(config: AppConfig) {
     super();
@@ -137,9 +138,23 @@ export class SyncEngine extends EventEmitter {
     return this.mobileSessionToken;
   }
 
+  public isMobileSessionActive(): boolean {
+    return (Date.now() - this.lastMobileSeen < 60000) || (this.mobileSessionQueue.length > 0);
+  }
+
+  public markMobileActivity() {
+    const wasActive = this.isMobileSessionActive();
+    this.lastMobileSeen = Date.now();
+    if (!wasActive) {
+      this.emit('status-changed', this.getStatus());
+    }
+  }
+
   public regenerateMobileSessionToken(): string {
     this.mobileSessionToken = crypto.randomBytes(16).toString('hex');
     this.mobileSessionQueue = [];
+    this.lastMobileSeen = 0;
+    this.emit('status-changed', this.getStatus());
     return this.mobileSessionToken;
   }
 
@@ -318,21 +333,23 @@ export class SyncEngine extends EventEmitter {
   }
 
   public getStatus() {
-    // Append virtual mobile device to UI
-    const virtualMobileDevice: PairedDevice = {
+    const isMobileActive = this.isMobileSessionActive();
+    const virtualMobileDevice: PairedDevice | null = isMobileActive ? {
       id: 'mobile-web',
       originalName: 'Телефон (Web Drop)',
       customName: 'Телефон (Web Drop)',
       ip: '127.0.0.1',
       port: 8384,
       pairedAt: new Date().toISOString(),
-      lastSeen: Date.now(),
+      lastSeen: this.lastMobileSeen || Date.now(),
       connectionMode: 'local'
-    };
+    } : null;
 
-    const pairedWithVirtual = [...this.config.pairedDevices, virtualMobileDevice];
+    const pairedWithVirtual = virtualMobileDevice
+      ? [...this.config.pairedDevices, virtualMobileDevice]
+      : [...this.config.pairedDevices];
 
-    const isConnected = pairedWithVirtual.length > 0;
+    const isConnected = this.config.pairedDevices.length > 0 || isMobileActive;
     return {
       isConnected,
       deviceName: this.config.deviceName,
@@ -601,6 +618,12 @@ export class SyncEngine extends EventEmitter {
           }
         }
       }));
+
+      // Check if temporary mobile session timed out
+      if (this.lastMobileSeen > 0 && !this.isMobileSessionActive() && this.mobileSessionQueue.length === 0) {
+        this.lastMobileSeen = 0;
+        this.emit('status-changed', this.getStatus());
+      }
     }, 12000);
   }
 
@@ -868,6 +891,10 @@ export class SyncEngine extends EventEmitter {
           if (tokenBuf.length === sessionBuf.length && crypto.timingSafeEqual(tokenBuf, sessionBuf)) {
             isAuthorized = true;
           }
+        }
+
+        if (isAuthorized) {
+          this.markMobileActivity();
         }
 
         // 1. Mobile Web UI entry point

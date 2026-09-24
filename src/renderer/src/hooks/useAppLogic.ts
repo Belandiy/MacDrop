@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { PairedDevice } from '../components/DeviceDetailView';
 import { PairingRequest } from '../components/PairingRequestModal';
 
@@ -33,7 +33,10 @@ export function useAppLogic() {
   });
 
   const platform = window.macdrop?.platform || 'win32';
-  const devices: PairedDevice[] = config.pairedDevices || status.pairedDevices || [];
+  const devicesRaw = config.pairedDevices || status.pairedDevices || [];
+  // Stabilize reference — only changes when actual device data changes
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const devices: PairedDevice[] = useMemo(() => devicesRaw, [JSON.stringify(devicesRaw)]);
 
   useEffect(() => {
     if (window.macdrop) {
@@ -107,12 +110,12 @@ export function useAppLogic() {
     }
   }, [devices, activeTargetDeviceId]);
 
-  const handleRespondPairingRequest = async (requestId: string, approved: boolean) => {
+  const handleRespondPairingRequest = useCallback(async (requestId: string, approved: boolean) => {
     if (window.macdrop?.respondPairingRequest) {
       await window.macdrop.respondPairingRequest(requestId, approved);
     }
     setIncomingPairingRequest(null);
-  };
+  }, []);
 
   const handleSelectFolder = useCallback(async () => {
     if (window.macdrop) {
@@ -129,7 +132,7 @@ export function useAppLogic() {
     }
   }, []);
 
-  const handleFilesDropped = async (paths: string[], targetDeviceId?: string) => {
+  const handleFilesDropped = useCallback(async (paths: string[], targetDeviceId?: string) => {
     if (window.macdrop) {
       const targetId =
         targetDeviceId ||
@@ -139,23 +142,23 @@ export function useAppLogic() {
       return await window.macdrop.sendDroppedFiles(paths, targetId);
     }
     return [];
-  };
+  }, [selectedDevice?.id, activeTargetDeviceId, devices]);
 
-  const handleToggleAutoStart = async (enable: boolean) => {
+  const handleToggleAutoStart = useCallback(async (enable: boolean) => {
     if (window.macdrop) {
       await window.macdrop.toggleAutostart(enable);
       setConfig((prev: any) => ({ ...prev, autoStart: enable }));
     }
-  };
+  }, []);
 
-  const handleToggleNotifications = async (enable: boolean) => {
+  const handleToggleNotifications = useCallback(async (enable: boolean) => {
     if (window.macdrop) {
       const updated = await window.macdrop.saveConfig({ notifications: enable });
       setConfig(updated);
     }
-  };
+  }, []);
 
-  const handlePairWithCode = async (target: string): Promise<{ success: boolean; error?: string }> => {
+  const handlePairWithCode = useCallback(async (target: string): Promise<{ success: boolean; error?: string }> => {
     if (window.macdrop?.pairDevice) {
       const res = await window.macdrop.pairDevice(target);
       if (res.success && res.peer) {
@@ -178,37 +181,39 @@ export function useAppLogic() {
       return { success: false, error: res.error || 'Не удалось подключиться' };
     }
     return { success: false, error: 'API недоступен' };
-  };
+  }, []);
 
-  const handleUnpairDevice = async (deviceId?: string) => {
+  const handleUnpairDevice = useCallback(async (deviceId?: string) => {
     if (window.macdrop?.unpairDevice) {
       await window.macdrop.unpairDevice(deviceId);
       const targetId = deviceId || (devices.length > 0 ? devices[0].id : null);
       if (targetId) {
-        handleDeviceRemoved(targetId);
+        setConfig((prev: any) => ({
+          ...prev,
+          pairedDevices: (prev.pairedDevices || []).filter((d: PairedDevice) => d.id !== targetId)
+        }));
+        setSelectedDevice((current) => current?.id === targetId ? null : current);
       }
     }
-  };
+  }, [devices]);
 
-  const handleDeviceUpdated = (updated: PairedDevice) => {
+  const handleDeviceUpdated = useCallback((updated: PairedDevice) => {
     setConfig((prev: any) => {
       const currentList = prev.pairedDevices || [];
       const updatedList = currentList.map((d: PairedDevice) => (d.id === updated.id ? updated : d));
       return { ...prev, pairedDevices: updatedList };
     });
     setSelectedDevice(updated);
-  };
+  }, []);
 
-  const handleDeviceRemoved = (deviceId: string) => {
+  const handleDeviceRemoved = useCallback((deviceId: string) => {
     setConfig((prev: any) => {
       const currentList = prev.pairedDevices || [];
       const updatedList = currentList.filter((d: PairedDevice) => d.id !== deviceId);
       return { ...prev, pairedDevices: updatedList };
     });
-    if (selectedDevice?.id === deviceId) {
-      setSelectedDevice(null);
-    }
-  };
+    setSelectedDevice((current) => current?.id === deviceId ? null : current);
+  }, []);
 
   const handleQuickSend = useCallback(async (deviceId: string) => {
     if (window.macdrop?.pickAndSendFiles) {
@@ -219,20 +224,20 @@ export function useAppLogic() {
   const handleOpenSettings = useCallback(() => setIsSettingsOpen(true), []);
   const handleOpenPairing = useCallback(() => setIsPairingOpen(true), []);
 
-  const setActiveTargetDeviceAndSave = (id: string) => {
+  const setActiveTargetDeviceAndSave = useCallback((id: string) => {
     setActiveTargetDeviceId(id);
     try {
       localStorage.setItem('macdrop_target_device_id', id);
     } catch {}
-  };
+  }, []);
 
-  const handleChooseFiles = (targetId?: string) => {
+  const handleChooseFiles = useCallback((targetId?: string) => {
     const effectiveTargetId =
       targetId ||
       activeTargetDeviceId ||
       (devices.length > 0 ? devices[0].id : undefined);
     window.macdrop?.pickAndSendFiles(effectiveTargetId);
-  };
+  }, [activeTargetDeviceId, devices]);
 
   return {
     config,
