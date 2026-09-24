@@ -10,7 +10,9 @@ interface DeviceActionButtonsProps {
   hideDelete?: boolean;
 }
 
-export const DeviceActionButtons: React.FC<DeviceActionButtonsProps> = ({
+// ⚡ Bolt Performance Optimization:
+// Wrapped DeviceActionButtons in React.memo to prevent unnecessary re-renders when parent App updates frequently.
+export const DeviceActionButtons: React.FC<DeviceActionButtonsProps> = React.memo(({
   isSending,
   handlePickAndSend,
   isConfirmingDelete,
@@ -56,4 +58,4 @@ export const DeviceActionButtons: React.FC<DeviceActionButtonsProps> = ({
       ))}
     </div>
   );
-};
+});

@@ -10,7 +10,9 @@ interface ActiveTransferProgressProps {
   percent: number;
 }
 
-export const ActiveTransferProgress: React.FC<ActiveTransferProgressProps> = ({
+// ⚡ Bolt Performance Optimization:
+// Wrapped ActiveTransferProgress in React.memo to prevent unnecessary re-renders when parent App updates frequently.
+export const ActiveTransferProgress: React.FC<ActiveTransferProgressProps> = React.memo(({
   isVisible,
   progress,
   isCompleted,
@@ -104,4 +106,4 @@ export const ActiveTransferProgress: React.FC<ActiveTransferProgressProps> = ({
       )}
     </div>
   );
-};
+});
