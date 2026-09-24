@@ -45,8 +45,11 @@ export interface MacDropApi {
   getUpnpStatus: () => Promise<any>;
   checkForUpdates: () => Promise<any>;
   installUpdate: () => Promise<void>;
+  getUpdateStatus?: () => Promise<UpdateStateInfo>;
   onUpdateAvailable: (callback: (version: string) => void) => () => void;
   onUpdateDownloaded: (callback: (version: string) => void) => () => void;
+  onUpdateStatus?: (callback: (state: UpdateStateInfo) => void) => () => void;
+  onUpdateProgress?: (callback: (progress: UpdateProgressInfo) => void) => () => void;
   cancelTransfer?: () => Promise<boolean>;
   respondPairingRequest?: (requestId: string, approved: boolean) => Promise<boolean>;
   onPairingRequest?: (callback: (request: { requestId: string; deviceId: string; deviceName: string; ip: string; port: number }) => void) => () => void;
@@ -57,6 +60,23 @@ export interface MacDropApi {
   openLogsFolder?: () => Promise<boolean>;
   onLogEntry?: (callback: (entry: LogEntry) => void) => () => void;
   onLogsCleared?: (callback: () => void) => () => void;
+}
+
+export interface UpdateProgressInfo {
+  percent: number;
+  transferred: number;
+  total: number;
+  bytesPerSecond: number;
+}
+
+export interface UpdateStateInfo {
+  status: 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'not-available' | 'error';
+  version?: string;
+  percent?: number;
+  transferred?: number;
+  total?: number;
+  bytesPerSecond?: number;
+  error?: string;
 }
 
 export interface LogEntry {

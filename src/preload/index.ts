@@ -31,8 +31,11 @@ export interface MacDropApi {
   getUpnpStatus: () => Promise<any>;
   checkForUpdates: () => Promise<any>;
   installUpdate: () => Promise<void>;
+  getUpdateStatus: () => Promise<UpdateStateInfo>;
   onUpdateAvailable: (callback: (version: string) => void) => () => void;
   onUpdateDownloaded: (callback: (version: string) => void) => () => void;
+  onUpdateStatus: (callback: (state: UpdateStateInfo) => void) => () => void;
+  onUpdateProgress: (callback: (progress: UpdateProgressInfo) => void) => () => void;
   cancelTransfer: () => Promise<boolean>;
   respondPairingRequest: (requestId: string, approved: boolean) => Promise<boolean>;
   onPairingRequest: (callback: (request: any) => void) => () => void;
@@ -43,6 +46,23 @@ export interface MacDropApi {
   openLogsFolder: () => Promise<boolean>;
   onLogEntry: (callback: (entry: LogEntry) => void) => () => void;
   onLogsCleared: (callback: () => void) => () => void;
+}
+
+export interface UpdateProgressInfo {
+  percent: number;
+  transferred: number;
+  total: number;
+  bytesPerSecond: number;
+}
+
+export interface UpdateStateInfo {
+  status: 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'not-available' | 'error';
+  version?: string;
+  percent?: number;
+  transferred?: number;
+  total?: number;
+  bytesPerSecond?: number;
+  error?: string;
 }
 
 export interface LogEntry {
@@ -110,6 +130,7 @@ const api: MacDropApi = {
   getUpnpStatus: () => ipcRenderer.invoke('get-upnp-status'),
   checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
   installUpdate: () => ipcRenderer.invoke('install-update'),
+  getUpdateStatus: () => ipcRenderer.invoke('get-update-status'),
   onUpdateAvailable: (callback) => {
     const handler = (_: any, ver: string) => callback(ver);
     ipcRenderer.on('update-available', handler);
@@ -119,6 +140,16 @@ const api: MacDropApi = {
     const handler = (_: any, ver: string) => callback(ver);
     ipcRenderer.on('update-downloaded', handler);
     return () => ipcRenderer.removeListener('update-downloaded', handler);
+  },
+  onUpdateStatus: (callback) => {
+    const handler = (_: any, data: UpdateStateInfo) => callback(data);
+    ipcRenderer.on('update-status', handler);
+    return () => ipcRenderer.removeListener('update-status', handler);
+  },
+  onUpdateProgress: (callback) => {
+    const handler = (_: any, data: UpdateProgressInfo) => callback(data);
+    ipcRenderer.on('update-download-progress', handler);
+    return () => ipcRenderer.removeListener('update-download-progress', handler);
   },
   getMobileShareInfo: () => ipcRenderer.invoke('get-mobile-share-info'),
   regenerateMobileToken: () => ipcRenderer.invoke('regenerate-mobile-token'),

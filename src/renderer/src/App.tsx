@@ -20,6 +20,8 @@ export default function App() {
     setIsPairingOpen,
     isSettingsOpen,
     setIsSettingsOpen,
+    settingsTab,
+    updateState,
     discoveredPeers,
     incomingPairingRequest,
     activeTargetDeviceId,
@@ -39,7 +41,9 @@ export default function App() {
     handleQuickSend,
     handleOpenSettings,
     handleOpenPairing,
-    handleChooseFiles
+    handleChooseFiles,
+    handleCheckForUpdates,
+    handleInstallUpdate
   } = useAppLogic();
 
   return (
@@ -48,6 +52,8 @@ export default function App() {
         onOpenSettings={handleOpenSettings}
         onOpenPairing={handleOpenPairing}
         platform={platform}
+        updateState={updateState}
+        onInstallUpdate={handleInstallUpdate}
       />
 
       <main className="flex-1 overflow-y-auto px-4 py-4 space-y-3.5">
@@ -119,6 +125,7 @@ export default function App() {
 
       <SettingsModal
         isOpen={isSettingsOpen}
+        initialTab={settingsTab}
         onClose={() => setIsSettingsOpen(false)}
         autoStart={config.autoStart}
         notifications={config.notifications}
@@ -128,6 +135,10 @@ export default function App() {
         onUnpairDevice={handleUnpairDevice}
         onSelectFolder={handleSelectFolder}
         targetFolder={config.targetFolder}
+        updateState={updateState}
+        onCheckForUpdates={handleCheckForUpdates}
+        onInstallUpdate={handleInstallUpdate}
+        platform={platform}
       />
     </div>
   );

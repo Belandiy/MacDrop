@@ -1,36 +1,39 @@
-import React, { useState, useEffect } from 'react';
-import { Send, Settings, QrCode, Monitor, Laptop, Minus, X, ArrowUpCircle, Plus } from 'lucide-react';
+import React from 'react';
+import { Settings, QrCode, Monitor, Minus, X, Plus } from 'lucide-react';
 import logoImg from '../assets/logo.png';
 import packageJson from '../../../../package.json';
+import { CircularUpdateProgress } from './CircularUpdateProgress';
+import { UpdateStateInfo } from '../vite-env';
 
 interface HeaderProps {
-  onOpenSettings: () => void;
+  onOpenSettings: (tab?: 'general' | 'updates' | 'logs') => void;
   onOpenPairing: () => void;
   platform?: string;
+  updateState?: UpdateStateInfo;
+  onInstallUpdate?: () => void;
 }
-
 
 interface BaseHeaderProps {
   appVersion: string;
-  updateAvailable: string | null;
-  updateDownloaded: string | null;
+  updateState: UpdateStateInfo;
   handleClose: () => void;
   handleMinimize: () => void;
   handleMaximize: () => void;
   handleInstallUpdate: () => void;
-  onOpenSettings: () => void;
+  onOpenSettings: (tab?: 'general' | 'updates' | 'logs') => void;
   onOpenPairing: () => void;
+  onOpenUpdatesSettings: () => void;
 }
 
 const MacHeader: React.FC<BaseHeaderProps> = ({
   appVersion,
-  updateAvailable,
-  updateDownloaded,
+  updateState,
   handleClose,
   handleMinimize,
   handleMaximize,
   handleInstallUpdate,
   onOpenSettings,
+  onOpenUpdatesSettings
 }) => {
   return (
     <header
@@ -62,7 +65,7 @@ const MacHeader: React.FC<BaseHeaderProps> = ({
         </button>
       </div>
 
-      {/* Center: Logo, Title, and Version (Demo 1 style) */}
+      {/* Center: Logo, Title, and Version */}
       <div className="flex items-center gap-2 pointer-events-none">
         <div className="w-4 h-4 rounded-md overflow-hidden shrink-0 shadow-sm border border-white/10">
           <img src={logoImg} alt="MacDrop" className="w-full h-full object-cover" />
@@ -73,32 +76,19 @@ const MacHeader: React.FC<BaseHeaderProps> = ({
         </span>
       </div>
 
-      {/* Right: Actions (Settings & Updates) */}
+      {/* Right: Actions (Settings & Circular Update Indicator) */}
       <div style={{ WebkitAppRegion: 'no-drag' } as any} className="flex items-center gap-1.5">
-        {updateDownloaded && (
-          <button
-            onClick={handleInstallUpdate}
-            title="Скачать новую версию"
-            className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 hover:bg-emerald-500/30 transition-all animate-pulse shadow-sm"
-          >
-            <ArrowUpCircle className="w-3 h-3" />
-            <span>Обновить</span>
-          </button>
-        )}
-
-        {updateAvailable && !updateDownloaded && (
-          <span
-            title="Доступно обновление"
-            className="flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-lg bg-indigo-500/15 text-indigo-300 border border-indigo-500/25"
-          >
-            <ArrowUpCircle className="w-3.5 h-3.5 animate-pulse" />
-          </span>
-        )}
+        {/* Circular progress bar with down arrow */}
+        <CircularUpdateProgress
+          updateState={updateState}
+          onOpenUpdatesSettings={onOpenUpdatesSettings}
+          onInstallUpdate={handleInstallUpdate}
+        />
 
         <button
-          onClick={onOpenSettings}
+          onClick={() => onOpenSettings('general')}
           title="Настройки"
-          className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.08] transition-colors"
+          className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer"
         >
           <Settings className="w-3.5 h-3.5" />
         </button>
@@ -109,13 +99,13 @@ const MacHeader: React.FC<BaseHeaderProps> = ({
 
 const WindowsHeader: React.FC<BaseHeaderProps> = ({
   appVersion,
-  updateAvailable,
-  updateDownloaded,
+  updateState,
   handleClose,
   handleMinimize,
   handleInstallUpdate,
   onOpenSettings,
   onOpenPairing,
+  onOpenUpdatesSettings
 }) => {
   return (
     <header
@@ -141,39 +131,25 @@ const WindowsHeader: React.FC<BaseHeaderProps> = ({
       </div>
 
       <div style={{ WebkitAppRegion: 'no-drag' } as any} className="flex items-center gap-1">
-        {updateDownloaded && (
-          <button
-            onClick={handleInstallUpdate}
-            title="Нажмите для перезапуска и обновления"
-            className="flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 hover:bg-emerald-500/30 transition-all animate-pulse mr-1 shadow-sm"
-          >
-            <ArrowUpCircle className="w-3.5 h-3.5" />
-            <span>Обновить до v{updateDownloaded}</span>
-          </button>
-        )}
-
-        {updateAvailable && !updateDownloaded && (
-          <span
-            title="Загрузка обновления в фоне..."
-            className="flex items-center gap-1 text-[10px] font-medium px-2 py-1 rounded-lg bg-blue-500/15 text-blue-300 border border-blue-500/25 mr-1"
-          >
-            <ArrowUpCircle className="w-3.5 h-3.5 animate-spin" />
-            <span>Загрузка v{updateAvailable}...</span>
-          </span>
-        )}
+        {/* Circular progress bar with down arrow */}
+        <CircularUpdateProgress
+          updateState={updateState}
+          onOpenUpdatesSettings={onOpenUpdatesSettings}
+          onInstallUpdate={handleInstallUpdate}
+        />
 
         <button
           onClick={onOpenPairing}
           title="Связать устройства (QR / Код)"
-          className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors flex items-center gap-1 text-xs font-medium"
+          className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors flex items-center gap-1 text-xs font-medium cursor-pointer"
         >
           <QrCode className="w-4 h-4" />
           <span className="hidden sm:inline">Связать</span>
         </button>
         <button
-          onClick={onOpenSettings}
+          onClick={() => onOpenSettings('general')}
           title="Настройки"
-          className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+          className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
         >
           <Settings className="w-4 h-4" />
         </button>
@@ -183,14 +159,14 @@ const WindowsHeader: React.FC<BaseHeaderProps> = ({
         <button
           onClick={handleMinimize}
           title="Свернуть"
-          className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+          className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
         >
           <Minus className="w-4 h-4" />
         </button>
         <button
           onClick={handleClose}
           title="Свернуть в трей"
-          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/15 transition-colors"
+          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/15 transition-colors cursor-pointer"
         >
           <X className="w-4 h-4" />
         </button>
@@ -199,34 +175,17 @@ const WindowsHeader: React.FC<BaseHeaderProps> = ({
   );
 };
 
-// ⚡ Bolt Performance Optimization:
-// Wrapped Header in React.memo to prevent unnecessary re-renders when parent App state
-// (e.g. transfer progress) updates frequently. Header props are static or memoized callbacks.
-export const Header: React.FC<HeaderProps> = React.memo(({ onOpenSettings, onOpenPairing, platform }) => {
+const defaultUpdateState: UpdateStateInfo = { status: 'idle' };
+
+export const Header: React.FC<HeaderProps> = React.memo(({
+  onOpenSettings,
+  onOpenPairing,
+  platform,
+  updateState = defaultUpdateState,
+  onInstallUpdate
+}) => {
   const isMac = platform === 'darwin';
   const appVersion = window.macdrop?.version || packageJson.version;
-
-  const [updateAvailable, setUpdateAvailable] = useState<string | null>(null);
-  const [updateDownloaded, setUpdateDownloaded] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (window.macdrop?.onUpdateAvailable) {
-      const unsub = window.macdrop.onUpdateAvailable((ver: string) => {
-        setUpdateAvailable(ver);
-      });
-      return unsub;
-    }
-  }, []);
-
-  useEffect(() => {
-    if (window.macdrop?.onUpdateDownloaded) {
-      const unsub = window.macdrop.onUpdateDownloaded((ver: string) => {
-        setUpdateAvailable(null);
-        setUpdateDownloaded(ver);
-      });
-      return unsub;
-    }
-  }, []);
 
   const handleMaximize = () => {
     if (window.macdrop?.maximizeWindow) {
@@ -247,21 +206,27 @@ export const Header: React.FC<HeaderProps> = React.memo(({ onOpenSettings, onOpe
   };
 
   const handleInstallUpdate = () => {
-    if (window.macdrop?.installUpdate) {
+    if (onInstallUpdate) {
+      onInstallUpdate();
+    } else if (window.macdrop?.installUpdate) {
       window.macdrop.installUpdate();
     }
   };
 
-  const baseProps = {
+  const handleOpenUpdatesSettings = () => {
+    onOpenSettings('updates');
+  };
+
+  const baseProps: BaseHeaderProps = {
     appVersion,
-    updateAvailable,
-    updateDownloaded,
+    updateState,
     handleClose,
     handleMinimize,
     handleMaximize,
     handleInstallUpdate,
     onOpenSettings,
     onOpenPairing,
+    onOpenUpdatesSettings: handleOpenUpdatesSettings
   };
 
   if (isMac) {

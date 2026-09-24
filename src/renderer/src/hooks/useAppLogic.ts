@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { PairedDevice } from '../components/DeviceDetailView';
 import { PairingRequest } from '../components/PairingRequestModal';
+import { SettingsTab } from '../components/SettingsModal';
+import { UpdateStateInfo } from '../vite-env';
 
 export function useAppLogic() {
   const [config, setConfig] = useState<any>({
@@ -22,6 +24,9 @@ export function useAppLogic() {
   const [selectedDevice, setSelectedDevice] = useState<PairedDevice | null>(null);
   const [isPairingOpen, setIsPairingOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<SettingsTab>('general');
+  const [updateState, setUpdateState] = useState<UpdateStateInfo>({ status: 'idle' });
+
   const [discoveredPeers, setDiscoveredPeers] = useState<any[]>([]);
   const [incomingPairingRequest, setIncomingPairingRequest] = useState<PairingRequest | null>(null);
   const [activeTargetDeviceId, setActiveTargetDeviceId] = useState<string>(() => {
@@ -97,6 +102,53 @@ export function useAppLogic() {
     }
   }, []);
 
+  // Listen for auto-updater events and status
+  useEffect(() => {
+    if (window.macdrop?.getUpdateStatus) {
+      window.macdrop.getUpdateStatus().then((st) => {
+        if (st) setUpdateState(st);
+      }).catch(() => {});
+    }
+
+    const unsubStatus = window.macdrop?.onUpdateStatus?.((st) => {
+      setUpdateState(st);
+    });
+
+    const unsubProgress = window.macdrop?.onUpdateProgress?.((prog) => {
+      setUpdateState((prev) => ({
+        ...prev,
+        status: 'downloading',
+        percent: prog.percent,
+        transferred: prog.transferred,
+        total: prog.total,
+        bytesPerSecond: prog.bytesPerSecond
+      }));
+    });
+
+    const unsubAvailable = window.macdrop?.onUpdateAvailable?.((ver) => {
+      setUpdateState((prev) => ({
+        ...prev,
+        status: 'available',
+        version: ver
+      }));
+    });
+
+    const unsubDownloaded = window.macdrop?.onUpdateDownloaded?.((ver) => {
+      setUpdateState({
+        status: 'downloaded',
+        version: ver,
+        percent: 100
+      });
+    });
+
+    return () => {
+      unsubStatus?.();
+      unsubProgress?.();
+      unsubAvailable?.();
+      unsubDownloaded?.();
+    };
+  }, []);
+
   // Ensure activeTargetDeviceId always points to a valid connected device if available
   useEffect(() => {
     if (devices.length > 0) {
@@ -113,41 +165,42 @@ export function useAppLogic() {
   const handleRespondPairingRequest = useCallback(async (requestId: string, approved: boolean) => {
     if (window.macdrop?.respondPairingRequest) {
       await window.macdrop.respondPairingRequest(requestId, approved);
+      setIncomingPairingRequest(null);
     }
-    setIncomingPairingRequest(null);
   }, []);
 
   const handleSelectFolder = useCallback(async () => {
     if (window.macdrop) {
-      const newFolder = await window.macdrop.selectFolder();
-      if (newFolder) {
-        setConfig((prev: any) => ({ ...prev, targetFolder: newFolder }));
+      const folder = await window.macdrop.selectFolder();
+      if (folder) {
+        const updated = await window.macdrop.saveConfig({ targetFolder: folder });
+        setConfig(updated);
       }
     }
   }, []);
 
-  const handleOpenFolder = useCallback(async () => {
+  const handleOpenFolder = useCallback(() => {
     if (window.macdrop) {
-      await window.macdrop.openFolder();
+      window.macdrop.openFolder();
     }
   }, []);
 
-  const handleFilesDropped = useCallback(async (paths: string[], targetDeviceId?: string) => {
-    if (window.macdrop) {
-      const targetId =
-        targetDeviceId ||
-        selectedDevice?.id ||
-        activeTargetDeviceId ||
-        (devices.length > 0 ? devices[0].id : undefined);
-      return await window.macdrop.sendDroppedFiles(paths, targetId);
+  const handleFilesDropped = useCallback(async (filePaths: string[]) => {
+    if (window.macdrop && filePaths.length > 0) {
+      try {
+        const targetId = activeTargetDeviceId || (devices.length > 0 ? devices[0].id : undefined);
+        await window.macdrop.sendDroppedFiles(filePaths, targetId);
+      } catch (err) {
+        console.error('Failed to send dropped files:', err);
+      }
     }
-    return [];
-  }, [selectedDevice?.id, activeTargetDeviceId, devices]);
+  }, [activeTargetDeviceId, devices]);
 
   const handleToggleAutoStart = useCallback(async (enable: boolean) => {
     if (window.macdrop) {
       await window.macdrop.toggleAutostart(enable);
-      setConfig((prev: any) => ({ ...prev, autoStart: enable }));
+      const updated = await window.macdrop.saveConfig({ autoStart: enable });
+      setConfig(updated);
     }
   }, []);
 
@@ -158,44 +211,40 @@ export function useAppLogic() {
     }
   }, []);
 
-  const handlePairWithCode = useCallback(async (target: string): Promise<{ success: boolean; error?: string }> => {
-    if (window.macdrop?.pairDevice) {
-      const res = await window.macdrop.pairDevice(target);
+  const handlePairWithCode = useCallback(async (code: string) => {
+    if (window.macdrop) {
+      const res = await window.macdrop.pairDevice(code);
       if (res.success && res.peer) {
-        const newPeer = res.peer;
         setConfig((prev: any) => {
-          const currentList = prev.pairedDevices || [];
-          const idx = currentList.findIndex((d: any) => d.id === newPeer.id);
+          const current = prev.pairedDevices || [];
+          const idx = current.findIndex((d: PairedDevice) => d.id === res.peer.id);
           const updated = idx >= 0
-            ? currentList.map((d: any) => d.id === newPeer.id ? newPeer : d)
-            : [...currentList, newPeer];
+            ? current.map((d: PairedDevice) => (d.id === res.peer.id ? res.peer : d))
+            : [...current, res.peer];
           return { ...prev, pairedDevices: updated };
         });
-        setStatus((prev: any) => ({
-          ...prev,
-          isConnected: true,
-          pairedDevices: [...(prev.pairedDevices || []).filter((d: any) => d.id !== newPeer.id), newPeer]
-        }));
         return { success: true };
       }
-      return { success: false, error: res.error || 'Не удалось подключиться' };
+      return { success: false, error: res.error || 'Failed to pair device' };
     }
-    return { success: false, error: 'API недоступен' };
+    return { success: false, error: 'Bridge not available' };
   }, []);
 
   const handleUnpairDevice = useCallback(async (deviceId?: string) => {
-    if (window.macdrop?.unpairDevice) {
+    if (window.macdrop) {
       await window.macdrop.unpairDevice(deviceId);
-      const targetId = deviceId || (devices.length > 0 ? devices[0].id : null);
-      if (targetId) {
-        setConfig((prev: any) => ({
+      setConfig((prev: any) => {
+        if (!deviceId) return { ...prev, pairedDevices: [] };
+        return {
           ...prev,
-          pairedDevices: (prev.pairedDevices || []).filter((d: PairedDevice) => d.id !== targetId)
-        }));
-        setSelectedDevice((current) => current?.id === targetId ? null : current);
+          pairedDevices: (prev.pairedDevices || []).filter((d: PairedDevice) => d.id !== deviceId)
+        };
+      });
+      if (!deviceId || selectedDevice?.id === deviceId) {
+        setSelectedDevice(null);
       }
     }
-  }, [devices]);
+  }, [selectedDevice]);
 
   const handleDeviceUpdated = useCallback((updated: PairedDevice) => {
     setConfig((prev: any) => {
@@ -221,8 +270,25 @@ export function useAppLogic() {
     }
   }, []);
 
-  const handleOpenSettings = useCallback(() => setIsSettingsOpen(true), []);
+  const handleOpenSettings = useCallback((tab: SettingsTab = 'general') => {
+    setSettingsTab(tab);
+    setIsSettingsOpen(true);
+  }, []);
+
   const handleOpenPairing = useCallback(() => setIsPairingOpen(true), []);
+
+  const handleCheckForUpdates = useCallback(async () => {
+    if (window.macdrop?.checkForUpdates) {
+      setUpdateState((prev) => ({ ...prev, status: 'checking', error: undefined }));
+      await window.macdrop.checkForUpdates();
+    }
+  }, []);
+
+  const handleInstallUpdate = useCallback(() => {
+    if (window.macdrop?.installUpdate) {
+      window.macdrop.installUpdate();
+    }
+  }, []);
 
   const setActiveTargetDeviceAndSave = useCallback((id: string) => {
     setActiveTargetDeviceId(id);
@@ -248,6 +314,9 @@ export function useAppLogic() {
     setIsPairingOpen,
     isSettingsOpen,
     setIsSettingsOpen,
+    settingsTab,
+    setSettingsTab,
+    updateState,
     discoveredPeers,
     incomingPairingRequest,
     activeTargetDeviceId,
@@ -267,6 +336,8 @@ export function useAppLogic() {
     handleQuickSend,
     handleOpenSettings,
     handleOpenPairing,
-    handleChooseFiles
+    handleChooseFiles,
+    handleCheckForUpdates,
+    handleInstallUpdate
   };
 }
