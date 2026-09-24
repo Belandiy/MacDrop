@@ -100,7 +100,7 @@ export default function App() {
         )}
       </main>
 
-      {/* Modals */}
+      {/* Modals rendered instantly without lazy load pause */}
       <PairingModal
         isOpen={isPairingOpen}
         onClose={() => setIsPairingOpen(false)}

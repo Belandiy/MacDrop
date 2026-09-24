@@ -4,31 +4,34 @@ import fs from 'fs';
 import { SyncEngine } from './engine';
 import { AppConfig } from './config';
 
+let cachedTrayIconPath: string | null = null;
+
 function getIconPath(): string {
+  if (cachedTrayIconPath !== null) return cachedTrayIconPath;
   const isMac = process.platform === 'darwin';
   const specificName = isMac ? 'tray-icon-mac.png' : 'tray-icon-win.png';
   const defaultName = 'tray-icon.png';
 
   const candidates = [
+    path.join(process.resourcesPath, specificName),
     path.join(__dirname, '../dist', specificName),
     path.join(__dirname, '../public', specificName),
     path.join(app.getAppPath(), 'dist', specificName),
     path.join(app.getAppPath(), 'public', specificName),
-    path.join(process.resourcesPath, specificName),
+    path.join(process.resourcesPath, defaultName),
     path.join(__dirname, '../dist', defaultName),
-    path.join(__dirname, '../public', defaultName),
-    path.join(app.getAppPath(), 'dist', defaultName),
-    path.join(app.getAppPath(), 'public', defaultName),
-    path.join(process.resourcesPath, defaultName)
+    path.join(__dirname, '../public', defaultName)
   ];
 
   for (const p of candidates) {
     try {
       if (fs.existsSync(p)) {
+        cachedTrayIconPath = p;
         return p;
       }
     } catch {}
   }
+  cachedTrayIconPath = '';
   return '';
 }
 

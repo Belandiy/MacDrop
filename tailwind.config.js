@@ -35,14 +35,25 @@ export default {
       },
       fontFamily: {
         sans: [
-          '"Plus Jakarta Sans"',
           '-apple-system',
           'BlinkMacSystemFont',
+          '"Segoe UI"',
+          'Roboto',
+          '"Plus Jakarta Sans"',
           '"SF Pro Display"',
+          'Helvetica',
+          'Arial',
           'sans-serif'
         ],
         mono: [
+          'ui-monospace',
+          'SFMono-Regular',
+          'Menlo',
+          'Monaco',
+          'Consolas',
           '"JetBrains Mono"',
+          '"Liberation Mono"',
+          '"Courier New"',
           'monospace'
         ]
       },

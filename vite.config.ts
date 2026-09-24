@@ -46,7 +46,10 @@ export default defineConfig({
   ],
   build: {
     outDir: path.join(__dirname, 'dist'),
-    emptyOutDir: true
+    emptyOutDir: true,
+    target: 'esnext',
+    cssCodeSplit: true,
+    minify: 'esbuild'
   },
   server: {
     port: 5173

@@ -74,11 +74,23 @@ const configFile = path.join(configDir, 'settings.json');
 
 export function loadConfig(): AppConfig {
   if (!fs.existsSync(configDir)) {
-    fs.mkdirSync(configDir, { recursive: true });
+    try {
+      fs.mkdirSync(configDir, { recursive: true });
+    } catch {}
+  }
+
+  let parsed: any = null;
+  if (fs.existsSync(configFile)) {
+    try {
+      const data = fs.readFileSync(configFile, 'utf-8');
+      parsed = JSON.parse(data);
+    } catch (e) {
+      console.error('Error reading settings.json, recreating defaults', e);
+    }
   }
 
   let config: AppConfig = {
-    targetFolder: getDefaultFolder(),
+    targetFolder: (parsed && typeof parsed.targetFolder === 'string' && parsed.targetFolder) ? parsed.targetFolder : getDefaultFolder(),
     autoStart: true,
     notifications: true,
     deviceId: generateShortDeviceId(),
@@ -89,62 +101,56 @@ export function loadConfig(): AppConfig {
     upnpEnabled: true
   };
 
-  if (fs.existsSync(configFile)) {
-    try {
-      const data = fs.readFileSync(configFile, 'utf-8');
-      const parsed = JSON.parse(data);
-      config = { ...config, ...parsed };
+  if (parsed) {
+    config = { ...config, ...parsed };
 
-      // Migrate single pairedDevice to pairedDevices array if needed
-      if ((parsed as any).pairedDevice && (!config.pairedDevices || config.pairedDevices.length === 0)) {
-        const old = (parsed as any).pairedDevice;
-        config.pairedDevices = [{
-          id: old.id,
-          originalName: old.name || 'Устройство',
-          customName: old.name || 'Устройство',
-          ip: old.ip || '127.0.0.1',
-          port: old.port || 8384,
-          pairedAt: old.pairedAt || new Date().toISOString(),
-          lastSeen: Date.now()
-        }];
-      }
+    // Migrate single pairedDevice to pairedDevices array if needed
+    if ((parsed as any).pairedDevice && (!config.pairedDevices || config.pairedDevices.length === 0)) {
+      const old = (parsed as any).pairedDevice;
+      config.pairedDevices = [{
+        id: old.id,
+        originalName: old.name || 'Устройство',
+        customName: old.name || 'Устройство',
+        ip: old.ip || '127.0.0.1',
+        port: old.port || 8384,
+        pairedAt: old.pairedAt || new Date().toISOString(),
+        lastSeen: Date.now()
+      }];
+    }
 
-      // Ensure internal service directory exists
-      getServiceDir();
+    // Ensure internal service directory exists
+    getServiceDir();
 
-      // Migration for macOS: ~/.macdrop is service dir, ~/MacDrop is user file folder
-      if (isMac) {
-        const legacyServiceTarget = path.join(os.homedir(), '.macdrop');
-        const legacyDesktopTarget = path.join(os.homedir(), 'Desktop', 'MacDrop');
-        if (config.targetFolder === legacyServiceTarget || config.targetFolder === legacyDesktopTarget) {
-          config.targetFolder = path.join(os.homedir(), 'MacDrop');
-          saveConfig(config);
+    // Migration for macOS: ~/.macdrop is service dir, ~/MacDrop is user file folder
+    if (isMac) {
+      const legacyServiceTarget = path.join(os.homedir(), '.macdrop');
+      const legacyDesktopTarget = path.join(os.homedir(), 'Desktop', 'MacDrop');
+      if (config.targetFolder === legacyServiceTarget || config.targetFolder === legacyDesktopTarget) {
+        config.targetFolder = path.join(os.homedir(), 'MacDrop');
+        saveConfig(config);
 
-          // Migrate any user files from ~/.macdrop to ~/MacDrop
-          try {
-            if (fs.existsSync(legacyServiceTarget)) {
-              if (!fs.existsSync(config.targetFolder)) {
-                fs.mkdirSync(config.targetFolder, { recursive: true });
-              }
-              const entries = fs.readdirSync(legacyServiceTarget);
-              for (const file of entries) {
-                // Keep service and hidden files in ~/.macdrop
-                if (file.startsWith('.') || file.endsWith('.json')) continue;
-                const oldPath = path.join(legacyServiceTarget, file);
-                const newPath = path.join(config.targetFolder, file);
-                if (!fs.existsSync(newPath) && fs.statSync(oldPath).isFile()) {
-                  fs.renameSync(oldPath, newPath);
-                  console.log(`[Config] Migrated user file to ~/MacDrop: ${file}`);
-                }
+        // Migrate any user files from ~/.macdrop to ~/MacDrop
+        try {
+          if (fs.existsSync(legacyServiceTarget)) {
+            if (!fs.existsSync(config.targetFolder)) {
+              fs.mkdirSync(config.targetFolder, { recursive: true });
+            }
+            const entries = fs.readdirSync(legacyServiceTarget);
+            for (const file of entries) {
+              // Keep service and hidden files in ~/.macdrop
+              if (file.startsWith('.') || file.endsWith('.json')) continue;
+              const oldPath = path.join(legacyServiceTarget, file);
+              const newPath = path.join(config.targetFolder, file);
+              if (!fs.existsSync(newPath) && fs.statSync(oldPath).isFile()) {
+                fs.renameSync(oldPath, newPath);
+                console.log(`[Config] Migrated user file to ~/MacDrop: ${file}`);
               }
             }
-          } catch (mErr) {
-            console.error('Migration error from legacy ~/.macdrop:', mErr);
           }
+        } catch (mErr) {
+          console.error('Migration error from legacy ~/.macdrop:', mErr);
         }
       }
-    } catch (e) {
-      console.error('Error reading settings.json, recreating defaults', e);
     }
   } else {
     saveConfig(config);
