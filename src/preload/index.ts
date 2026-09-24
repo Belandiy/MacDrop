@@ -38,6 +38,20 @@ export interface MacDropApi {
   onPairingRequest: (callback: (request: any) => void) => () => void;
   getMobileShareInfo: () => Promise<{ ips: string[]; port: number; token: string; url: string; computerName: string }>;
   regenerateMobileToken: () => Promise<{ ips: string[]; port: number; token: string; url: string; computerName: string }>;
+  getLogs: () => Promise<LogEntry[]>;
+  clearLogs: () => Promise<boolean>;
+  openLogsFolder: () => Promise<boolean>;
+  onLogEntry: (callback: (entry: LogEntry) => void) => () => void;
+  onLogsCleared: (callback: () => void) => () => void;
+}
+
+export interface LogEntry {
+  id: string;
+  timestamp: number;
+  level: 'info' | 'warn' | 'error' | 'debug';
+  tag: string;
+  message: string;
+  details?: string;
 }
 
 const api: MacDropApi = {
@@ -107,7 +121,20 @@ const api: MacDropApi = {
     return () => ipcRenderer.removeListener('update-downloaded', handler);
   },
   getMobileShareInfo: () => ipcRenderer.invoke('get-mobile-share-info'),
-  regenerateMobileToken: () => ipcRenderer.invoke('regenerate-mobile-token')
+  regenerateMobileToken: () => ipcRenderer.invoke('regenerate-mobile-token'),
+  getLogs: () => ipcRenderer.invoke('get-logs'),
+  clearLogs: () => ipcRenderer.invoke('clear-logs'),
+  openLogsFolder: () => ipcRenderer.invoke('open-logs-folder'),
+  onLogEntry: (callback) => {
+    const handler = (_: any, data: LogEntry) => callback(data);
+    ipcRenderer.on('new-log-entry', handler);
+    return () => ipcRenderer.removeListener('new-log-entry', handler);
+  },
+  onLogsCleared: (callback) => {
+    const handler = () => callback();
+    ipcRenderer.on('logs-cleared', handler);
+    return () => ipcRenderer.removeListener('logs-cleared', handler);
+  }
 };
 
 contextBridge.exposeInMainWorld('macdrop', api);

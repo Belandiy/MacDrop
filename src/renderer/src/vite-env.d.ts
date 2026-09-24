@@ -52,6 +52,20 @@ export interface MacDropApi {
   onPairingRequest?: (callback: (request: { requestId: string; deviceId: string; deviceName: string; ip: string; port: number }) => void) => () => void;
   getMobileShareInfo?: () => Promise<{ ips: string[]; port: number; token: string; url: string; computerName: string }>;
   regenerateMobileToken?: () => Promise<{ ips: string[]; port: number; token: string; url: string; computerName: string }>;
+  getLogs?: () => Promise<LogEntry[]>;
+  clearLogs?: () => Promise<boolean>;
+  openLogsFolder?: () => Promise<boolean>;
+  onLogEntry?: (callback: (entry: LogEntry) => void) => () => void;
+  onLogsCleared?: (callback: () => void) => () => void;
+}
+
+export interface LogEntry {
+  id: string;
+  timestamp: number;
+  level: 'info' | 'warn' | 'error' | 'debug';
+  tag: string;
+  message: string;
+  details?: string;
 }
 
 declare global {

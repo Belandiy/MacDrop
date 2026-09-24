@@ -10,6 +10,7 @@ import { PeerDiscovery } from './discovery';
 import { isPrivateIp, UpnpStatus } from './upnp';
 import { getMobileWebHtml } from './mobileWeb';
 import { createZipFromFolder, FolderZipResult } from './archiver';
+import { logger } from './logger';
 
 function formatFileSize(bytes: number): string {
   if (!bytes || bytes === 0) return '0 B';
@@ -833,6 +834,7 @@ export class SyncEngine extends EventEmitter {
     }
 
     saveConfig(this.config);
+    logger.info('Security', `Device pairing approved by user from ${cleanIp}: ${existing.customName || existing.originalName} (${existing.id})`);
     console.log(`Device pairing approved by user from ${cleanIp}:`, existing);
     this.emit('device-paired', existing);
     this.emit('status-changed', this.getStatus());
@@ -1182,6 +1184,7 @@ export class SyncEngine extends EventEmitter {
                 this.config.pairedDevices.push(existing);
                 this.deviceMap.set(existing.id, existing);
                 saveConfig(this.config);
+                logger.info('Security', `Device pairing auto-approved from ${cleanIp}: ${existing.customName || existing.originalName} (${existing.id})`);
                 console.log(`Device pairing auto-approved (outgoing pairing) from ${cleanIp}:`, existing);
                 this.emit('device-paired', existing);
                 this.emit('status-changed', this.getStatus());
@@ -1200,6 +1203,7 @@ export class SyncEngine extends EventEmitter {
 
               // Interactive Security: Ask user in UI before allowing new device pairing
               const requestId = crypto.randomUUID();
+              logger.info('Security', `Incoming pairing request [${requestId}] from "${data.deviceName}" (${cleanIp}). Awaiting user approval...`);
               console.log(`[Security] Incoming pairing request [${requestId}] from "${data.deviceName}" (${cleanIp}). Awaiting user approval...`);
 
               const timer = setTimeout(() => {
@@ -1265,6 +1269,7 @@ export class SyncEngine extends EventEmitter {
         // Security: Block unauthorized / unpaired clients from uploading files
         const peer = this.deviceMap.get(senderId);
         if (!peer) {
+          logger.warn('Security', `Blocked unauthorized upload attempt from unpaired device: ${senderId}`);
           console.warn(`Blocked unauthorized upload attempt from unpaired device: ${senderId}`);
           req.destroy();
           res.writeHead(401, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -1275,6 +1280,7 @@ export class SyncEngine extends EventEmitter {
         }
 
         if (peer.receiveEnabled === false) {
+          logger.info('Engine', `Receiving is disabled for peer ${peer.customName || peer.originalName} (${senderId}).`);
           console.log(`Receiving is disabled for peer ${peer.customName || peer.originalName} (${senderId}).`);
           req.destroy();
           res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -1287,6 +1293,7 @@ export class SyncEngine extends EventEmitter {
         // Security: Verify authToken if established during pairing
         const reqToken = req.headers['x-auth-token'] as string;
         if (peer.authToken && peer.authToken !== reqToken) {
+          logger.warn('Security', `Blocked upload attempt with invalid auth token from ${senderId}`);
           console.warn(`Blocked upload attempt with invalid auth token from ${senderId}`);
           req.destroy();
           res.writeHead(401, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -1299,6 +1306,7 @@ export class SyncEngine extends EventEmitter {
         // Security: Path Traversal defense - ensure resolved path strictly resides within targetFolder
         const safeTarget = getSafeResolvedPath(this.config.targetFolder, relPath, filename);
         if (!safeTarget) {
+          logger.warn('Security', `Path Traversal attempt blocked from ${senderId}: relPath="${relPath}", filename="${filename}"`);
           console.warn(`Path Traversal attempt blocked from ${senderId}: relPath="${relPath}", filename="${filename}"`);
           req.destroy();
           res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -1319,6 +1327,7 @@ export class SyncEngine extends EventEmitter {
           console.error('Failed to create target dir:', targetDir, e);
         }
 
+        logger.info('Transfer', `Receiving from ${peerName}: ${actualFilename} -> ${targetPath}`);
         console.log(`Receiving from ${peerName}: ${actualFilename} -> ${targetPath}`);
 
         let writtenBytes = 0;
@@ -1407,6 +1416,7 @@ export class SyncEngine extends EventEmitter {
             peerName
           });
           this.saveHistory();
+          logger.info('Transfer', `Received file complete: ${actualFilename} (${formatFileSize(totalSize)}) from ${peerName}`);
           this.emit('status-changed', this.getStatus());
 
           if (this.config.notifications && Notification.isSupported()) {
@@ -1441,6 +1451,7 @@ export class SyncEngine extends EventEmitter {
 
         writeStream.on('error', (err) => {
           cleanupCancel();
+          logger.error('Transfer', `File write stream error for ${actualFilename}:`, err);
           console.error('File write stream error:', err);
           if (this.batchReceiverTimeout) {
             clearTimeout(this.batchReceiverTimeout);
@@ -1611,10 +1622,12 @@ export class SyncEngine extends EventEmitter {
     });
 
     this.server.listen(port, '0.0.0.0', () => {
+      logger.info('Engine', `MacDrop server listening on port ${port}`);
       console.log(`MacDrop server listening on port ${port}`);
     });
 
     this.server.on('error', (err: any) => {
+      logger.error('Engine', `Server error on port ${port}:`, err);
       if (err.code === 'EADDRINUSE') {
         this.config.apiPort = port + 1;
         this.server?.listen(this.config.apiPort, '0.0.0.0');
@@ -1967,6 +1980,8 @@ export class SyncEngine extends EventEmitter {
     const validPaths = itemPaths.filter(p => fs.existsSync(p));
     if (validPaths.length === 0) return results;
 
+    logger.info('Transfer', `Starting outgoing transfer of ${validPaths.length} items to ${targetDeviceId || 'selected target'}`);
+
     const totalCount = validPaths.length;
     let batchTotalBytes = 0;
     const itemSizes: number[] = [];
@@ -2016,9 +2031,11 @@ export class SyncEngine extends EventEmitter {
         if (onFileSuccess) {
           try { onFileSuccess(p, filename); } catch {}
         }
+        logger.info('Transfer', `Sent item successfully: ${filename}`);
         results.push({ name: filename, success: true });
       } catch (err: any) {
         batchCompletedBytes += currentItemSize;
+        logger.error('Transfer', `Failed to send item ${filename}:`, err);
         results.push({ name: filename, success: false, error: err?.message || 'Ошибка передачи' });
         if (isLastItem || this.isBatchCancelled) {
           this.currentProgress = null;

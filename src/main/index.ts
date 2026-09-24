@@ -8,6 +8,7 @@ import { createTray } from './tray';
 import { setupIpc } from './ipc';
 import { setupAutoUpdater } from './updater';
 import { UpnpManager } from './upnp';
+import { logger } from './logger';
 
 // Disable standard menu bar completely
 Menu.setApplicationMenu(null);
@@ -123,6 +124,7 @@ app.whenReady().then(() => {
   }
 
   const config = loadConfig();
+  logger.info('App', `MacDrop v${app.getVersion()} started on ${process.platform} (${process.arch})`);
   engine = new SyncEngine(config);
   engine.start();
 
@@ -158,15 +160,19 @@ app.whenReady().then(() => {
 
   // Relay engine and discovery events to renderer
   engine.on('status-changed', (status) => {
-    mainWindow?.webContents.send('status-update', status);
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('status-update', status);
+    }
   });
 
   engine.on('progress', (progress) => {
-    mainWindow?.webContents.send('progress-update', progress);
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('progress-update', progress);
+    }
   });
 
   engine.on('pairing-request', (req) => {
-    if (mainWindow) {
+    if (mainWindow && !mainWindow.isDestroyed()) {
       if (mainWindow.isMinimized()) mainWindow.restore();
       mainWindow.show();
       mainWindow.focus();
@@ -175,7 +181,9 @@ app.whenReady().then(() => {
   });
 
   discovery.on('peers-changed', (peers) => {
-    mainWindow?.webContents.send('peers-update', peers);
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('peers-update', peers);
+    }
   });
 
   app.on('activate', () => {

@@ -2,6 +2,7 @@ import { ipcMain, dialog, shell, app, BrowserWindow } from 'electron';
 import { SyncEngine } from './engine';
 import { PeerDiscovery } from './discovery';
 import { AppConfig, saveConfig } from './config';
+import { logger } from './logger';
 import fs from 'fs';
 import path from 'path';
 
@@ -250,6 +251,39 @@ export function setupIpc(
   ipcMain.on('close-window', () => {
     const win = getMainWindow();
     win?.hide();
+  });
+
+  // Logger IPC Handlers
+  ipcMain.handle('get-logs', () => {
+    return logger.getLogs();
+  });
+
+  ipcMain.handle('clear-logs', () => {
+    return logger.clearLogs();
+  });
+
+  ipcMain.handle('open-logs-folder', () => {
+    const dir = logger.getLogDir();
+    if (fs.existsSync(dir)) {
+      shell.openPath(dir);
+      return true;
+    }
+    return false;
+  });
+
+  // Stream new logs to renderer in real-time
+  logger.on('entry', (entry) => {
+    const win = getMainWindow();
+    if (win && !win.isDestroyed()) {
+      win.webContents.send('new-log-entry', entry);
+    }
+  });
+
+  logger.on('cleared', () => {
+    const win = getMainWindow();
+    if (win && !win.isDestroyed()) {
+      win.webContents.send('logs-cleared');
+    }
   });
 }
 
