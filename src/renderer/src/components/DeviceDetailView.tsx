@@ -131,7 +131,7 @@ export const DeviceDetailView: React.FC<DeviceDetailViewProps> = ({
     }
   }, [currentProgress]);
 
-  const handleSaveName = async () => {
+  const handleSaveName = React.useCallback(async () => {
     const trimmed = nameInput.trim();
     if (!trimmed) return;
     if (window.macdrop?.updateDeviceName) {
@@ -140,9 +140,9 @@ export const DeviceDetailView: React.FC<DeviceDetailViewProps> = ({
       onDeviceUpdated(updated);
       setIsEditingName(false);
     }
-  };
+  }, [nameInput, device.id, device, onDeviceUpdated, setIsEditingName]);
 
-  const handleDeleteDevice = async () => {
+  const handleDeleteDevice = React.useCallback(async () => {
     if (device.id === 'mobile-web') {
       onBack(); // Just go back, can't delete virtual device
       return;
@@ -152,19 +152,19 @@ export const DeviceDetailView: React.FC<DeviceDetailViewProps> = ({
       onDeviceRemoved(device.id);
       onBack();
     }
-  };
+  }, [device.id, onBack, onDeviceRemoved]);
 
   const isReceiveEnabled = device.receiveEnabled !== false;
 
-  const handleToggleReceive = async (enabled: boolean) => {
+  const handleToggleReceive = React.useCallback(async (enabled: boolean) => {
     if (window.macdrop?.toggleDeviceReceive) {
       await window.macdrop.toggleDeviceReceive(device.id, enabled);
       const updated = { ...device, receiveEnabled: enabled };
       onDeviceUpdated(updated);
     }
-  };
+  }, [device.id, device, onDeviceUpdated]);
 
-  const handlePickAndSend = async () => {
+  const handlePickAndSend = React.useCallback(async () => {
     if (window.macdrop?.pickAndSendFiles) {
       setIsSending(true);
       setSendNotice(null);
@@ -189,9 +189,9 @@ export const DeviceDetailView: React.FC<DeviceDetailViewProps> = ({
         setIsSending(false);
       }
     }
-  };
+  }, [device.id]);
 
-  const handleDrop = async (e: React.DragEvent) => {
+  const handleDrop = React.useCallback(async (e: React.DragEvent) => {
     e.preventDefault();
     setIsDraggingOver(false);
 
@@ -264,13 +264,13 @@ export const DeviceDetailView: React.FC<DeviceDetailViewProps> = ({
         }
       }
     }
-  };
+  }, [device.id]);
 
-  const handleCopyId = () => {
+  const handleCopyId = React.useCallback(() => {
     navigator.clipboard.writeText(device.id);
     setCopiedId(true);
     setTimeout(() => setCopiedId(false), 2000);
-  };
+  }, [device.id]);
 
   return (
     <div

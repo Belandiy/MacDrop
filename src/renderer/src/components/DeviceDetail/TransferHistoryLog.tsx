@@ -7,7 +7,9 @@ interface TransferHistoryLogProps {
   onOpenFile: (filename: string) => void;
 }
 
-export const TransferHistoryLog: React.FC<TransferHistoryLogProps> = ({
+// ⚡ Bolt Performance Optimization:
+// Wrapped TransferHistoryLog in React.memo to prevent unnecessary re-renders when parent App updates frequently.
+export const TransferHistoryLog: React.FC<TransferHistoryLogProps> = React.memo(({
   history,
   onOpenFile
 }) => {
@@ -72,4 +74,4 @@ export const TransferHistoryLog: React.FC<TransferHistoryLogProps> = ({
       )}
     </div>
   );
-};
+});

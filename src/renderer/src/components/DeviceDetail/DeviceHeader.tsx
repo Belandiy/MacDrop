@@ -12,7 +12,9 @@ interface DeviceHeaderProps {
   setIsEditingName: (isEditing: boolean) => void;
 }
 
-export const DeviceHeader: React.FC<DeviceHeaderProps> = ({
+// ⚡ Bolt Performance Optimization:
+// Wrapped DeviceHeader in React.memo to prevent unnecessary re-renders when parent App updates frequently.
+export const DeviceHeader: React.FC<DeviceHeaderProps> = React.memo(({
   device,
   isMac,
   isEditingName,
@@ -110,4 +112,4 @@ export const DeviceHeader: React.FC<DeviceHeaderProps> = ({
       )}
     </div>
   );
-};
+});
