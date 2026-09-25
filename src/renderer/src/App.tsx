@@ -1,21 +1,15 @@
-import React from 'react';
-import { Header } from './components/Header';
-import { DeviceList } from './components/DeviceList';
-import { DeviceDetailView } from './components/DeviceDetailView';
-import { FolderSection } from './components/FolderSection';
-import { DropZone } from './components/DropZone';
+import React, { useState, useEffect } from 'react';
 import { PairingModal } from './components/PairingModal';
 import { PairingRequestModal } from './components/PairingRequestModal';
 import { SettingsModal } from './components/SettingsModal';
-import { RecentTransfers } from './components/RecentTransfers';
+import { DevToolbar } from './components/DevToolbar';
 import { useAppLogic } from './hooks/useAppLogic';
+import { availableDesigns, getDesignById } from './designs';
 
 export default function App() {
+  const appLogic = useAppLogic();
   const {
     config,
-    status,
-    selectedDevice,
-    setSelectedDevice,
     isPairingOpen,
     setIsPairingOpen,
     isSettingsOpen,
@@ -24,89 +18,53 @@ export default function App() {
     updateState,
     discoveredPeers,
     incomingPairingRequest,
-    activeTargetDeviceId,
-    setActiveTargetDeviceAndSave,
     platform,
     devices,
     handleRespondPairingRequest,
     handleSelectFolder,
-    handleOpenFolder,
-    handleFilesDropped,
     handleToggleAutoStart,
     handleToggleNotifications,
     handlePairWithCode,
     handleUnpairDevice,
-    handleDeviceUpdated,
-    handleDeviceRemoved,
-    handleQuickSend,
-    handleOpenSettings,
-    handleOpenPairing,
-    handleChooseFiles,
     handleCheckForUpdates,
     handleInstallUpdate
-  } = useAppLogic();
+  } = appLogic;
+
+  // Active design selection with localStorage persistence
+  const [activeDesignId, setActiveDesignId] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem('macdrop_active_design');
+      if (saved && availableDesigns.some((d) => d.id === saved)) {
+        return saved;
+      }
+    } catch {}
+    return availableDesigns[0]?.id || 'default';
+  });
+
+  const handleSelectDesign = (id: string) => {
+    setActiveDesignId(id);
+    try {
+      localStorage.setItem('macdrop_active_design', id);
+    } catch {}
+  };
+
+  const currentDesign = getDesignById(activeDesignId);
+  const ActiveDesignComponent = currentDesign.component;
 
   return (
-    <div className="flex flex-col h-screen bg-[#090a0f] text-slate-100 select-none antialiased">
-      <Header
-        onOpenSettings={handleOpenSettings}
-        onOpenPairing={handleOpenPairing}
-        platform={platform}
-        updateState={updateState}
-        onInstallUpdate={handleInstallUpdate}
+    <div className="flex flex-col h-screen bg-[#090a0f] text-slate-100 select-none antialiased overflow-hidden">
+      {/* Dev Mode Design Switcher Bar */}
+      <DevToolbar
+        currentDesignId={activeDesignId}
+        onSelectDesign={handleSelectDesign}
       />
 
-      <main className="flex-1 overflow-y-auto px-4 py-4 space-y-3.5">
-        {selectedDevice ? (
-          /* Device Detail Drill-Down View */
-          <DeviceDetailView
-            device={selectedDevice}
-            onBack={() => setSelectedDevice(null)}
-            onDeviceUpdated={handleDeviceUpdated}
-            onDeviceRemoved={handleDeviceRemoved}
-            onOpenFile={handleOpenFolder}
-            currentProgress={status.currentProgress}
-          />
-        ) : (
-          /* Main Dashboard */
-          <>
-            {/* Connected Devices List */}
-            <DeviceList
-              devices={devices}
-              onSelectDevice={setSelectedDevice}
-              onOpenPairing={handleOpenPairing}
-              onQuickSend={handleQuickSend}
-              currentProgress={status.currentProgress}
-            />
+      {/* Active Design Viewport */}
+      <div className="flex-1 overflow-hidden relative">
+        <ActiveDesignComponent {...appLogic} />
+      </div>
 
-            {/* Drag and Drop Zone */}
-            <DropZone
-              onFilesDropped={handleFilesDropped}
-              targetFolder={config.targetFolder}
-              devices={devices}
-              selectedDeviceId={activeTargetDeviceId}
-              onSelectDevice={setActiveTargetDeviceAndSave}
-              onOpenPairing={handleOpenPairing}
-              onChooseFiles={handleChooseFiles}
-            />
-
-            {/* Target Folder Selector */}
-            <FolderSection
-              targetFolder={config.targetFolder}
-              onSelectFolder={handleSelectFolder}
-              onOpenFolder={handleOpenFolder}
-            />
-
-            {/* Global Recent Transfers List */}
-            <RecentTransfers
-              items={status.recentHistory || []}
-              onOpenFile={handleOpenFolder}
-            />
-          </>
-        )}
-      </main>
-
-      {/* Modals rendered instantly without lazy load pause */}
+      {/* Global Shared Modals */}
       <PairingModal
         isOpen={isPairingOpen}
         onClose={() => setIsPairingOpen(false)}

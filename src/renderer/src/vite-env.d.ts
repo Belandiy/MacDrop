@@ -33,6 +33,7 @@ export interface MacDropApi {
   minimizeWindow: () => void;
   maximizeWindow?: () => void;
   closeWindow: () => void;
+  resizeWindow?: (width: number, height: number) => void;
   pairDevice: (input: string) => Promise<{ success: boolean; peer?: any; error?: string }>;
   unpairDevice: (deviceId?: string) => Promise<boolean>;
   getDiscoveredPeers: () => Promise<any[]>;

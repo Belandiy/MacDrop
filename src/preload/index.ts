@@ -19,6 +19,7 @@ export interface MacDropApi {
   minimizeWindow: () => void;
   maximizeWindow: () => void;
   closeWindow: () => void;
+  resizeWindow?: (width: number, height: number) => void;
   pairDevice: (input: string) => Promise<{ success: boolean; peer?: any; error?: string }>;
   unpairDevice: (deviceId?: string) => Promise<boolean>;
   getDiscoveredPeers: () => Promise<any[]>;
@@ -106,6 +107,7 @@ const api: MacDropApi = {
   minimizeWindow: () => ipcRenderer.send('minimize-window'),
   maximizeWindow: () => ipcRenderer.send('maximize-window'),
   closeWindow: () => ipcRenderer.send('close-window'),
+  resizeWindow: (width: number, height: number) => ipcRenderer.send('resize-window', { width, height }),
   pairDevice: (input) => ipcRenderer.invoke('pair-device', input),
   unpairDevice: (deviceId) => ipcRenderer.invoke('unpair-device', deviceId),
   getDiscoveredPeers: () => ipcRenderer.invoke('get-discovered-peers'),

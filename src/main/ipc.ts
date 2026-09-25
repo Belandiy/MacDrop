@@ -253,6 +253,14 @@ export function setupIpc(
     win?.hide();
   });
 
+  ipcMain.on('resize-window', (_, { width, height }: { width: number; height: number }) => {
+    const win = getMainWindow();
+    if (win && !win.isDestroyed()) {
+      win.setSize(width, height);
+      win.center();
+    }
+  });
+
   // Logger IPC Handlers
   ipcMain.handle('get-logs', () => {
     return logger.getLogs();
