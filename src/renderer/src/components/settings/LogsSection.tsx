@@ -101,70 +101,70 @@ export const LogsSection: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col gap-2.5 w-full">
+    <div className="flex flex-col gap-2.5 w-full select-none">
       {/* Top Search */}
       <div className="relative w-full">
-        <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+        <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-[#8E8E93] pointer-events-none" />
         <input
           type="text"
           placeholder="Поиск по событиям и тегам..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full bg-[#0d0f15] border border-white/[0.08] rounded-xl pl-8 pr-16 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500/50 transition-colors h-8"
+          className="w-full bg-[#1A1A1A] border border-[#2C2C2E] rounded-[5px] pl-7 pr-14 py-1 text-[11px] text-[#F2F2F7] placeholder-[#636366] focus:outline-none focus:border-[#007AFF] transition-colors h-7"
         />
         {searchQuery && (
           <button
             onClick={() => setSearchQuery('')}
-            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 hover:text-white"
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-[#8E8E93] hover:text-white cursor-pointer"
           >
             Очистить
           </button>
         )}
       </div>
 
-      {/* Level Filters - Fixed 4-column grid with invariant button heights and borders */}
-      <div className="grid grid-cols-4 gap-1 bg-[#0d0f15] p-1 rounded-xl border border-white/[0.08] w-full shrink-0">
+      {/* Level Filters - Segmented style */}
+      <div className="grid grid-cols-4 gap-0.5 bg-[#252528] p-0.5 rounded-[6px] border border-[#333336] w-full shrink-0">
         <button
           onClick={() => setLevelFilter('all')}
-          className={`h-7 px-1 rounded-lg text-[10px] font-medium transition-colors border flex items-center justify-center gap-1 ${
+          className={`h-6 px-1 rounded-[4px] text-[10px] font-medium transition-colors flex items-center justify-center gap-1 cursor-pointer ${
             levelFilter === 'all'
-              ? 'bg-white/10 text-white border-white/10 shadow-sm'
-              : 'border-transparent text-slate-400 hover:text-white'
+              ? 'bg-[#3A3A3E] text-white shadow-sm'
+              : 'text-[#8E8E93] hover:text-[#E5E5EA]'
           }`}
         >
           <span className="truncate">Все ({counts.all})</span>
         </button>
         <button
           onClick={() => setLevelFilter('error')}
-          className={`h-7 px-1 rounded-lg text-[10px] font-medium transition-colors border flex items-center justify-center gap-1 ${
+          className={`h-6 px-1 rounded-[4px] text-[10px] font-medium transition-colors flex items-center justify-center gap-1 cursor-pointer ${
             levelFilter === 'error'
-              ? 'bg-red-500/20 text-red-300 border-red-500/30'
-              : 'border-transparent text-slate-400 hover:text-red-400'
+              ? 'bg-[#FF453A]/20 text-[#FF453A] shadow-sm'
+              : 'text-[#8E8E93] hover:text-[#FF453A]'
           }`}
         >
-          <AlertCircle className="w-3 h-3 text-red-400 shrink-0" />
+          <AlertCircle className="w-3 h-3 text-[#FF453A] shrink-0" />
           <span className="truncate">Ошибки ({counts.error})</span>
         </button>
         <button
           onClick={() => setLevelFilter('warn')}
-          className={`h-7 px-1 rounded-lg text-[10px] font-medium transition-colors border flex items-center justify-center gap-1 ${
+          className={`h-6 px-1 rounded-[4px] text-[10px] font-medium transition-colors flex items-center justify-center gap-1 cursor-pointer ${
             levelFilter === 'warn'
-              ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
-              : 'border-transparent text-slate-400 hover:text-amber-400'
+              ? 'bg-[#FFBD2E]/20 text-[#FFBD2E] shadow-sm'
+              : 'text-[#8E8E93] hover:text-[#FFBD2E]'
           }`}
         >
-          <AlertTriangle className="w-3 h-3 text-amber-400 shrink-0" />
+          <AlertTriangle className="w-3 h-3 text-[#FFBD2E] shrink-0" />
           <span className="truncate">Варн ({counts.warn})</span>
         </button>
         <button
           onClick={() => setLevelFilter('info')}
-          className={`h-7 px-1 rounded-lg text-[10px] font-medium transition-colors border flex items-center justify-center gap-1 ${
+          className={`h-6 px-1 rounded-[4px] text-[10px] font-medium transition-colors flex items-center justify-center gap-1 cursor-pointer ${
             levelFilter === 'info'
-              ? 'bg-sky-500/20 text-sky-300 border-sky-500/30'
-              : 'border-transparent text-slate-400 hover:text-sky-400'
+              ? 'bg-[#007AFF]/20 text-[#007AFF] shadow-sm'
+              : 'text-[#8E8E93] hover:text-[#007AFF]'
           }`}
         >
-          <Info className="w-3 h-3 text-sky-400 shrink-0" />
+          <Info className="w-3 h-3 text-[#007AFF] shrink-0" />
           <span className="truncate">Инфо ({counts.info})</span>
         </button>
       </div>
@@ -172,12 +172,12 @@ export const LogsSection: React.FC = () => {
       {/* Terminal View Container - Strictly locked height */}
       <div
         ref={listContainerRef}
-        className="bg-[#0b0c10] border border-white/[0.08] rounded-2xl p-2.5 h-[265px] min-h-[265px] max-h-[265px] overflow-y-auto font-mono text-[11px] flex flex-col gap-1.5 shadow-inner select-text"
+        className="bg-[#141416] border border-[#2C2C2E] rounded-[6px] p-2.5 h-[265px] min-h-[265px] max-h-[265px] overflow-y-auto font-mono text-[11px] flex flex-col gap-1 shadow-inner select-text"
       >
         {filteredLogs.length === 0 ? (
-          <div className="h-full flex-1 flex flex-col items-center justify-center text-center p-4 text-slate-500 select-none">
-            <FileText className="w-7 h-7 mb-1.5 opacity-30 text-indigo-400" />
-            <p className="text-xs font-sans">
+          <div className="h-full flex-1 flex flex-col items-center justify-center text-center p-4 text-[#8E8E93] select-none">
+            <FileText className="w-6 h-6 mb-1.5 opacity-30 text-[#007AFF]" />
+            <p className="text-[11px] font-sans">
               {logs.length === 0
                 ? 'Журнал пуст. События MacDrop будут появляться здесь в реальном времени.'
                 : 'Нет записей, соответствующих выбранному фильтру.'}
@@ -189,54 +189,54 @@ export const LogsSection: React.FC = () => {
             const isExpanded = !!expandedIds[entry.id];
             const hasDetails = Boolean(entry.details);
 
-            let badgeClass = 'bg-slate-800 text-slate-300 border-slate-700';
+            let badgeClass = 'bg-[#2C2C2E] text-[#D1D1D6] border-[#3A3A3C]';
             if (entry.level === 'error') {
-              badgeClass = 'bg-red-500/15 text-red-400 border-red-500/30';
+              badgeClass = 'bg-[#FF453A]/15 text-[#FF453A] border-[#FF453A]/30';
             } else if (entry.level === 'warn') {
-              badgeClass = 'bg-amber-500/15 text-amber-400 border-amber-500/30';
+              badgeClass = 'bg-[#FFBD2E]/15 text-[#FFBD2E] border-[#FFBD2E]/30';
             } else if (entry.level === 'info') {
-              badgeClass = 'bg-sky-500/15 text-sky-400 border-sky-500/30';
+              badgeClass = 'bg-[#007AFF]/15 text-[#007AFF] border-[#007AFF]/30';
             }
 
             return (
               <div
                 key={entry.id}
-                className="flex flex-col border-b border-white/[0.03] pb-1.5 last:border-b-0"
+                className="flex flex-col border-b border-[#242426] pb-1 last:border-b-0"
               >
                 <div className="flex items-start gap-1.5">
                   {/* Timestamp */}
-                  <span className="text-slate-500 shrink-0 select-none text-[10px] leading-relaxed">
+                  <span className="text-[#636366] shrink-0 select-none text-[10px] leading-relaxed">
                     {timeStr}
                   </span>
 
                   {/* Level Badge */}
                   <span
-                    className={`px-1 py-0.5 rounded text-[8px] uppercase font-bold tracking-wider border shrink-0 select-none leading-none ${badgeClass}`}
+                    className={`px-1 py-0.2 rounded-[3px] text-[8px] uppercase font-bold tracking-wider border shrink-0 select-none leading-none ${badgeClass}`}
                   >
                     {entry.level}
                   </span>
 
                   {/* Tag */}
-                  <span className="text-indigo-400/90 font-medium shrink-0 select-none text-[10px] leading-relaxed">
+                  <span className="text-[#007AFF] font-medium shrink-0 select-none text-[10px] leading-relaxed">
                     {entry.tag}
                   </span>
 
                   {/* Message */}
-                  <span className="text-slate-200 break-all flex-1 text-[10px] leading-relaxed">
+                  <span className="text-[#E5E5EA] flex-1 break-words leading-relaxed text-[11px]">
                     {entry.message}
                   </span>
 
-                  {/* Details Toggle Button */}
+                  {/* Details Toggle */}
                   {hasDetails && (
                     <button
                       onClick={() => toggleDetails(entry.id)}
-                      className="text-slate-400 hover:text-white p-0.5 rounded transition-colors shrink-0"
+                      className="p-0.5 text-[#8E8E93] hover:text-white transition-colors shrink-0 cursor-pointer"
                       title={isExpanded ? 'Скрыть детали' : 'Показать детали'}
                     >
                       {isExpanded ? (
-                        <ChevronDown className="w-3.5 h-3.5" />
+                        <ChevronDown className="w-3 h-3" />
                       ) : (
-                        <ChevronRight className="w-3.5 h-3.5" />
+                        <ChevronRight className="w-3 h-3" />
                       )}
                     </button>
                   )}
@@ -244,7 +244,7 @@ export const LogsSection: React.FC = () => {
 
                 {/* Collapsible Details */}
                 {hasDetails && isExpanded && (
-                  <div className="mt-1 ml-10 p-2 bg-black/50 border border-white/[0.06] rounded-lg text-slate-300 text-[9px] break-all whitespace-pre-wrap select-text">
+                  <div className="mt-1 ml-9 p-1.5 bg-[#18181A] border border-[#2C2C2E] rounded-[4px] text-[#AEAEB2] text-[9px] break-all whitespace-pre-wrap select-text">
                     {entry.details}
                   </div>
                 )}
@@ -255,57 +255,57 @@ export const LogsSection: React.FC = () => {
         <div ref={logsEndRef} />
       </div>
 
-      {/* Footer Actions - Compact single row, icon-only copy button */}
+      {/* Footer Actions */}
       <div className="flex items-center justify-between gap-2 flex-nowrap pt-0.5 w-full">
         {/* Auto-scroll */}
-        <label className="flex items-center gap-1.5 cursor-pointer text-slate-400 hover:text-slate-300 select-none shrink-0">
+        <label className="flex items-center gap-1.5 cursor-pointer text-[#8E8E93] hover:text-[#E5E5EA] select-none shrink-0">
           <input
             type="checkbox"
             checked={autoScroll}
             onChange={(e) => setAutoScroll(e.target.checked)}
-            className="rounded border-white/20 bg-white/5 text-indigo-500 focus:ring-0 w-3.5 h-3.5"
+            className="rounded border-[#3A3A3C] bg-[#1A1A1A] text-[#007AFF] focus:ring-0 w-3.5 h-3.5"
           />
           <span className="flex items-center gap-1 text-[11px]">
-            <ArrowDown className="w-3 h-3 text-slate-500" />
+            <ArrowDown className="w-3 h-3 text-[#8E8E93]" />
             Автопрокрутка
           </span>
         </label>
 
-        {/* Action Buttons: Copy (icon-only), Folder, Clear */}
+        {/* Action Buttons: Copy, Folder, Clear */}
         <div className="flex items-center gap-1.5 shrink-0">
           {/* Copy - Icon Only */}
           <button
             onClick={handleCopyLogs}
             disabled={filteredLogs.length === 0}
-            className="w-7 h-7 rounded-lg bg-white/[0.06] hover:bg-white/[0.1] text-slate-300 hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0 flex items-center justify-center"
+            className="w-6 h-6 rounded-[4px] bg-[#2C2C2E] hover:bg-[#38383A] text-[#D1D1D6] hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0 flex items-center justify-center cursor-pointer border border-[#3A3A3C]"
             title={copied ? 'Скопировано в буфер обмена!' : 'Скопировать журнал'}
           >
             {copied ? (
-              <Check className="w-3.5 h-3.5 text-emerald-400" />
+              <Check className="w-3 h-3 text-[#34C759]" />
             ) : (
-              <Copy className="w-3.5 h-3.5" />
+              <Copy className="w-3 h-3" />
             )}
           </button>
 
           {/* Open Logs Folder */}
           <button
             onClick={handleOpenFolder}
-            className="flex items-center gap-1 px-2 h-7 rounded-lg bg-white/[0.06] hover:bg-white/[0.1] text-xs text-slate-300 hover:text-white transition-colors shrink-0"
+            className="flex items-center gap-1 px-2 h-6 rounded-[4px] bg-[#2C2C2E] hover:bg-[#38383A] text-[11px] text-[#D1D1D6] hover:text-white border border-[#3A3A3C] transition-colors shrink-0 cursor-pointer"
             title="Открыть папку с логами в проводнике/Finder"
           >
-            <FolderOpen className="w-3.5 h-3.5 text-indigo-400" />
-            <span className="text-[11px]">Папка</span>
+            <FolderOpen className="w-3 h-3 text-[#007AFF]" />
+            <span>Папка</span>
           </button>
 
           {/* Clear Logs */}
           <button
             onClick={handleClear}
             disabled={logs.length === 0}
-            className="flex items-center gap-1 px-2 h-7 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-xs text-red-300 hover:text-red-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+            className="flex items-center gap-1 px-2 h-6 rounded-[4px] bg-[#FF453A]/10 hover:bg-[#FF453A]/20 text-[11px] text-[#FF453A] border border-[#FF453A]/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0 cursor-pointer"
             title="Очистить текущие логи"
           >
-            <Trash2 className="w-3.5 h-3.5" />
-            <span className="text-[11px]">Очистить</span>
+            <Trash2 className="w-3 h-3" />
+            <span>Очистить</span>
           </button>
         </div>
       </div>

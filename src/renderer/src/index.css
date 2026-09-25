@@ -97,4 +97,13 @@
   border-color: transparent !important;
   box-shadow: 0 10px 15px -3px rgba(79, 70, 229, 0.4) !important;
 }
-
+/* ── Modals & Overlays (Critical for Electron on macOS) ──
+ * Any overlay rendered above draggable headers must explicitly declare
+ * -webkit-app-region: no-drag so Chromium doesn't route clicks to window movement.
+ */
+.modal-overlay,
+.modal-overlay *,
+[data-modal],
+[data-modal] * {
+  -webkit-app-region: no-drag !important;
+}

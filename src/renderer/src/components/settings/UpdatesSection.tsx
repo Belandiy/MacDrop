@@ -51,28 +51,28 @@ export const UpdatesSection: React.FC<UpdatesSectionProps> = ({
   const percent = Math.min(Math.max(Math.round(updateState.percent || 0), 0), 100);
 
   return (
-    <div className="flex flex-col gap-3.5">
+    <div className="flex flex-col gap-3 select-none">
       {/* App & Version Info Card */}
-      <div className="flex items-center justify-between p-3.5 rounded-2xl bg-white/[0.04] border border-white/[0.08]">
+      <div className="flex items-center justify-between p-3 rounded-[6px] bg-[#1A1A1A] border border-[#2C2C2E]">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl overflow-hidden shrink-0 border border-white/10 shadow-sm bg-black/30">
+          <div className="w-9 h-9 rounded-[6px] overflow-hidden shrink-0 border border-[#2C2C2E] bg-[#202022] flex items-center justify-center">
             <img src={logoImg} alt="MacDrop" className="w-full h-full object-cover" />
           </div>
           <div>
             <div className="flex items-center gap-1.5">
-              <span className="font-bold text-sm text-white tracking-tight">MacDrop</span>
-              <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-500/15 text-indigo-300 border border-indigo-500/25">
+              <span className="font-semibold text-[13px] text-[#F2F2F7] tracking-tight">MacDrop</span>
+              <span className="font-mono text-[10px] font-medium px-1.5 py-0.2 rounded bg-[#2C2C2E] text-[#D1D1D6] border border-[#3A3A3C]">
                 v{appVersion}
               </span>
             </div>
-            <p className="text-[11px] text-slate-400 mt-0.5">
+            <p className="text-[11px] text-[#8E8E93] mt-0.5">
               {platform === 'darwin' ? 'macOS Edition' : 'Windows Edition'}
             </p>
           </div>
         </div>
 
         {isUpToDate && (
-          <span className="flex items-center gap-1 text-[11px] font-medium text-emerald-400 px-2 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+          <span className="flex items-center gap-1 text-[11px] font-medium text-[#34C759] px-2 py-0.5 rounded-[4px] bg-[#34C759]/10 border border-[#34C759]/25">
             <CheckCircle2 className="w-3.5 h-3.5" />
             <span>Актуально</span>
           </span>
@@ -81,24 +81,25 @@ export const UpdatesSection: React.FC<UpdatesSectionProps> = ({
 
       {/* Main Status Container */}
       {isDownloaded && (
-        <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex flex-col gap-3 shadow-lg shadow-emerald-950/20 animate-in fade-in duration-300">
-          <div className="flex items-start gap-3">
-            <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center shrink-0 text-emerald-400">
-              <Sparkles className="w-4 h-4" />
+        <div className="p-3.5 rounded-[6px] bg-[#1A1A1A] border border-[#34C759]/40 flex flex-col gap-3">
+          <div className="flex items-start gap-2.5">
+            <div className="w-7 h-7 rounded-[5px] bg-[#34C759]/15 border border-[#34C759]/30 flex items-center justify-center shrink-0 text-[#34C759]">
+              <Sparkles className="w-3.5 h-3.5" />
             </div>
             <div>
-              <h4 className="text-xs font-bold text-emerald-300">
+              <h4 className="text-[12px] font-semibold text-[#F2F2F7]">
                 Версия v{updateState.version} готова к установке
               </h4>
-              <p className="text-[11px] text-slate-300 mt-0.5 leading-relaxed">
+              <p className="text-[11px] text-[#8E8E93] mt-0.5 leading-relaxed">
                 Файлы обновления загружены на ваш компьютер. Нажмите кнопку ниже, чтобы перезагрузить приложение и применить обновление.
               </p>
             </div>
           </div>
 
           <button
+            type="button"
             onClick={onInstallUpdate}
-            className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white font-bold text-xs shadow-md shadow-emerald-500/20 active:scale-[0.98] transition-all cursor-pointer"
+            className="w-full flex items-center justify-center gap-2 py-1.5 px-3 rounded-[5px] bg-[#007AFF] hover:bg-[#0071E3] active:bg-[#0062C4] text-white font-medium text-[12px] shadow-[0_0.5px_1px_rgba(0,0,0,0.4)] transition-colors cursor-pointer"
           >
             <RefreshCw className="w-3.5 h-3.5" />
             <span>Перезагрузить и установить</span>
@@ -107,41 +108,41 @@ export const UpdatesSection: React.FC<UpdatesSectionProps> = ({
       )}
 
       {isDownloading && (
-        <div className="p-4 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 flex flex-col gap-3 shadow-lg shadow-indigo-950/20 animate-in fade-in duration-300">
+        <div className="p-3.5 rounded-[6px] bg-[#1A1A1A] border border-[#007AFF]/40 flex flex-col gap-2.5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
-                <ArrowDown className="w-4 h-4 animate-bounce" />
+              <div className="w-6 h-6 rounded-[5px] bg-[#007AFF]/20 border border-[#007AFF]/30 flex items-center justify-center text-[#007AFF]">
+                <ArrowDown className="w-3.5 h-3.5 animate-bounce" />
               </div>
               <div>
-                <h4 className="text-xs font-bold text-indigo-200">
+                <h4 className="text-[12px] font-medium text-[#F2F2F7]">
                   Загрузка v{updateState.version || 'обновления'}...
                 </h4>
-                <p className="text-[10px] text-slate-400">
+                <p className="text-[10px] text-[#8E8E93]">
                   Скачивание в фоновом режиме
                 </p>
               </div>
             </div>
-            <span className="font-mono text-sm font-bold text-indigo-300 px-2 py-0.5 rounded-md bg-indigo-500/20 border border-indigo-500/30">
+            <span className="font-mono text-[12px] font-medium text-[#007AFF] px-2 py-0.5 rounded-[4px] bg-[#007AFF]/10 border border-[#007AFF]/25">
               {percent}%
             </span>
           </div>
 
           {/* Progress Bar */}
-          <div className="h-2 w-full bg-black/40 rounded-full overflow-hidden border border-white/10">
+          <div className="h-1.5 w-full bg-[#2C2C2E] rounded-[2px] overflow-hidden">
             <div
-              className="h-full bg-gradient-to-r from-indigo-500 to-violet-500 rounded-full transition-all duration-300 ease-out shadow-[0_0_8px_rgba(99,102,241,0.5)]"
+              className="h-full bg-[#007AFF] rounded-[2px] transition-all duration-300 ease-out"
               style={{ width: `${percent}%` }}
             />
           </div>
 
           {/* Progress Metrics */}
-          <div className="flex items-center justify-between text-[11px] text-slate-400 font-mono">
+          <div className="flex items-center justify-between text-[10px] text-[#8E8E93] font-mono">
             <span>
               {formatBytes(updateState.transferred)} / {formatBytes(updateState.total)}
             </span>
             {updateState.bytesPerSecond && (
-              <span className="text-indigo-300">
+              <span className="text-[#007AFF]">
                 {formatSpeed(updateState.bytesPerSecond)}
               </span>
             )}
@@ -150,29 +151,30 @@ export const UpdatesSection: React.FC<UpdatesSectionProps> = ({
       )}
 
       {isChecking && (
-        <div className="p-5 rounded-2xl bg-white/[0.04] border border-white/[0.08] flex flex-col items-center justify-center text-center gap-2">
-          <RefreshCw className="w-5 h-5 text-indigo-400 animate-spin" />
-          <div className="text-xs font-semibold text-slate-200">Поиск обновлений...</div>
-          <div className="text-[11px] text-slate-400">Связываемся с GitHub Releases</div>
+        <div className="p-4 rounded-[6px] bg-[#1A1A1A] border border-[#2C2C2E] flex flex-col items-center justify-center text-center gap-1.5">
+          <RefreshCw className="w-4 h-4 text-[#007AFF] animate-spin" />
+          <div className="text-[12px] font-medium text-[#F2F2F7]">Поиск обновлений...</div>
+          <div className="text-[11px] text-[#8E8E93]">Связываемся с GitHub Releases</div>
         </div>
       )}
 
       {isError && (
-        <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/25 flex flex-col gap-3">
-          <div className="flex items-start gap-2.5">
-            <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+        <div className="p-3.5 rounded-[6px] bg-[#1A1A1A] border border-[#FF453A]/30 flex flex-col gap-2.5">
+          <div className="flex items-start gap-2">
+            <AlertCircle className="w-4 h-4 text-[#FF453A] shrink-0 mt-0.5" />
             <div>
-              <h4 className="text-xs font-bold text-rose-300">Не удалось проверить обновления</h4>
-              <p className="text-[11px] text-slate-300 mt-0.5 leading-relaxed">
+              <h4 className="text-[12px] font-semibold text-[#FF453A]">Не удалось проверить обновления</h4>
+              <p className="text-[11px] text-[#8E8E93] mt-0.5 leading-relaxed">
                 {updateState.error || 'Проверьте сетевое подключение и повторите попытку.'}
               </p>
             </div>
           </div>
 
           <button
+            type="button"
             onClick={handleManualCheck}
             disabled={isChecking}
-            className="flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-xl bg-white/[0.08] hover:bg-white/[0.12] text-slate-200 hover:text-white font-medium text-xs transition-colors border border-white/[0.08] cursor-pointer"
+            className="flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-[5px] bg-[#2C2C2E] hover:bg-[#38383A] text-[#D1D1D6] hover:text-white font-medium text-[11px] border border-[#3A3A3C] transition-colors cursor-pointer"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isChecking ? 'animate-spin' : ''}`} />
             <span>Повторить попытку</span>
@@ -181,27 +183,28 @@ export const UpdatesSection: React.FC<UpdatesSectionProps> = ({
       )}
 
       {isUpToDate && !isDownloaded && !isDownloading && !isChecking && !isError && (
-        <div className="p-4 rounded-2xl bg-white/[0.04] border border-white/[0.08] flex flex-col gap-3">
-          <div className="flex items-start gap-3">
-            <div className="w-7 h-7 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center shrink-0 text-emerald-400">
-              <CheckCircle2 className="w-4 h-4" />
+        <div className="p-3.5 rounded-[6px] bg-[#1A1A1A] border border-[#2C2C2E] flex flex-col gap-3">
+          <div className="flex items-start gap-2.5">
+            <div className="w-7 h-7 rounded-[5px] bg-[#34C759]/15 border border-[#34C759]/30 flex items-center justify-center shrink-0 text-[#34C759]">
+              <CheckCircle2 className="w-3.5 h-3.5" />
             </div>
             <div>
-              <h4 className="text-xs font-semibold text-slate-200">
+              <h4 className="text-[12px] font-medium text-[#F2F2F7]">
                 У вас установлена последняя версия
               </h4>
-              <p className="text-[11px] text-slate-400 mt-0.5">
+              <p className="text-[11px] text-[#8E8E93] mt-0.5 leading-relaxed">
                 Новые обновления отсутствуют. MacDrop автоматически проверяет релизы в фоновом режиме.
               </p>
             </div>
           </div>
 
           <button
+            type="button"
             onClick={handleManualCheck}
             disabled={isChecking}
-            className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-white/[0.08] hover:bg-white/[0.12] text-slate-200 hover:text-white font-medium text-xs transition-colors border border-white/[0.08] cursor-pointer"
+            className="w-full flex items-center justify-center gap-2 py-1.5 px-3 rounded-[5px] bg-[#2C2C2E] hover:bg-[#38383A] text-[#D1D1D6] hover:text-white font-medium text-[12px] border border-[#3A3A3C] shadow-[0_0.5px_1px_rgba(0,0,0,0.4)] transition-colors cursor-pointer"
           >
-            <RefreshCw className={`w-3.5 h-3.5 text-indigo-400 ${isChecking ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-3.5 h-3.5 text-[#007AFF] ${isChecking ? 'animate-spin' : ''}`} />
             <span>Проверить обновления</span>
           </button>
         </div>

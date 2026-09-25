@@ -90,6 +90,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     };
   }, []);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const isDownloading = updateState.status === 'downloading';
@@ -97,43 +108,67 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const isChecking = updateState.status === 'checking';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="bg-[#171a23] border border-white/[0.12] rounded-3xl w-full max-w-[430px] shadow-2xl overflow-hidden flex flex-col">
+    <div
+      data-modal
+      style={{ WebkitAppRegion: 'no-drag' } as any}
+      className="modal-overlay fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/65 backdrop-blur-sm animate-in fade-in duration-150 select-none"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+    >
+      <div
+        style={{ WebkitAppRegion: 'no-drag' } as any}
+        className="bg-[#161616] border border-[#2C2C2E] rounded-[10px] w-full max-w-[460px] shadow-[0_20px_45px_rgba(0,0,0,0.65),0_0_0_1px_#333336] overflow-hidden flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3.5 border-b border-white/[0.08] shrink-0">
-          <div className="flex items-center gap-1 bg-[#0d0f15] p-1 rounded-xl border border-white/[0.08]">
+        <div
+          style={{ WebkitAppRegion: 'no-drag' } as any}
+          className="h-[38px] px-3.5 bg-[#232326] border-b border-[#2C2C2E] flex items-center justify-between shrink-0"
+        >
+          {/* Segmented Control Tabs */}
+          <div
+            style={{ WebkitAppRegion: 'no-drag' } as any}
+            className="inline-flex p-0.5 rounded-[6px] bg-[#252528] border border-[#333336] text-[11px]"
+          >
             {/* General Tab */}
             <button
+              type="button"
+              style={{ WebkitAppRegion: 'no-drag' } as any}
               onClick={() => setActiveTab('general')}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors border ${
+              className={`flex items-center gap-1.5 px-2.5 py-0.5 rounded-[4px] font-medium transition-colors cursor-pointer ${
                 activeTab === 'general'
-                  ? 'bg-white/10 text-white border-white/10 shadow-sm'
-                  : 'border-transparent text-slate-400 hover:text-white'
+                  ? 'bg-[#3A3A3E] text-white shadow-sm'
+                  : 'text-[#8E8E93] hover:text-[#E5E5EA]'
               }`}
             >
-              <Sliders className="w-3.5 h-3.5 text-indigo-400" />
+              <Sliders className="w-3 h-3 text-[#007AFF]" />
               <span>Основные</span>
             </button>
 
             {/* Updates Tab */}
             <button
+              type="button"
+              style={{ WebkitAppRegion: 'no-drag' } as any}
               onClick={() => setActiveTab('updates')}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors border ${
+              className={`flex items-center gap-1.5 px-2.5 py-0.5 rounded-[4px] font-medium transition-colors cursor-pointer ${
                 activeTab === 'updates'
-                  ? 'bg-white/10 text-white border-white/10 shadow-sm'
-                  : 'border-transparent text-slate-400 hover:text-white'
+                  ? 'bg-[#3A3A3E] text-white shadow-sm'
+                  : 'text-[#8E8E93] hover:text-[#E5E5EA]'
               }`}
             >
               <RefreshCw
-                className={`w-3.5 h-3.5 text-indigo-400 ${isChecking || isDownloading ? 'animate-spin' : ''}`}
+                className={`w-3 h-3 text-[#007AFF] ${isChecking || isDownloading ? 'animate-spin' : ''}`}
               />
               <span>Обновление</span>
 
               {isDownloaded && (
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="w-1.5 h-1.5 rounded-full bg-[#34C759] animate-pulse" />
               )}
               {isDownloading && (
-                <span className="text-[10px] font-mono text-indigo-300 font-bold">
+                <span className="text-[10px] font-mono text-[#007AFF] font-medium">
                   {Math.round(updateState.percent || 0)}%
                 </span>
               )}
@@ -141,33 +176,39 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
             {/* Logs Tab */}
             <button
+              type="button"
+              style={{ WebkitAppRegion: 'no-drag' } as any}
               onClick={() => setActiveTab('logs')}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors border ${
+              className={`flex items-center gap-1.5 px-2.5 py-0.5 rounded-[4px] font-medium transition-colors cursor-pointer ${
                 activeTab === 'logs'
-                  ? 'bg-white/10 text-white border-white/10 shadow-sm'
-                  : 'border-transparent text-slate-400 hover:text-white'
+                  ? 'bg-[#3A3A3E] text-white shadow-sm'
+                  : 'text-[#8E8E93] hover:text-[#E5E5EA]'
               }`}
             >
-              <Terminal className="w-3.5 h-3.5 text-indigo-400" />
+              <Terminal className="w-3 h-3 text-[#007AFF]" />
               <span>Логи</span>
               {errorCount > 0 && (
-                <span className="px-1.5 py-0.2 bg-red-500/20 text-red-400 text-[10px] font-bold rounded-full border border-red-500/30">
+                <span className="px-1.5 py-0.1 bg-[#FF453A]/20 text-[#FF453A] text-[9px] font-bold rounded-full border border-[#FF453A]/30">
                   {errorCount}
                 </span>
               )}
             </button>
           </div>
 
+          {/* Close Button */}
           <button
+            type="button"
+            style={{ WebkitAppRegion: 'no-drag' } as any}
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.08] transition-colors"
+            className="w-6 h-6 flex items-center justify-center rounded text-[#8E8E93] hover:text-[#FFFFFF] hover:bg-[#2C2C2E] transition-colors cursor-pointer"
+            title="Закрыть"
           >
-            <X className="w-4 h-4" />
+            <X className="w-3.5 h-3.5" />
           </button>
         </div>
 
-        {/* Tab Content - Invariant height for all tabs */}
-        <div className="p-5 flex flex-col gap-4 h-[420px] max-h-[420px] overflow-y-auto">
+        {/* Tab Content */}
+        <div className="p-4 flex flex-col gap-3.5 h-[420px] max-h-[420px] overflow-y-auto">
           {activeTab === 'general' && (
             <>
               <TargetFolderSetting
@@ -175,15 +216,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 onSelectFolder={onSelectFolder}
               />
 
-              <div className="h-px bg-white/[0.08]" />
+              <div className="h-px bg-[#2C2C2E]" />
 
               <ToggleSetting
                 title="Автозапуск с системой"
                 description="Запуск в фоновом режиме"
                 icon={Power}
-                iconColorClass="text-indigo-300"
-                iconBgClass="bg-indigo-500/15"
-                iconBorderClass="border-indigo-500/25"
                 isActive={autoStart}
                 onToggle={onToggleAutoStart}
               />
@@ -192,9 +230,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 title="Всплывающие уведомления"
                 description="Системные баннеры о файлах"
                 icon={Bell}
-                iconColorClass="text-violet-300"
-                iconBgClass="bg-violet-500/15"
-                iconBorderClass="border-violet-500/25"
                 isActive={notifications}
                 onToggle={onToggleNotifications}
               />

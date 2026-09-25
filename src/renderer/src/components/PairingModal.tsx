@@ -29,62 +29,64 @@ interface PairingModalProps {
 
 const MobileWebDropSection: React.FC<{ effectiveMobileUrl: string | null }> = ({ effectiveMobileUrl }) => (
   <div className="flex flex-col items-center">
-    <div className="bg-white p-3.5 rounded-2xl shadow-xl mb-2.5 relative flex items-center justify-center">
-      {effectiveMobileUrl ? (
-        <>
-          <QRCodeSVG
-            value={effectiveMobileUrl}
-            size={134}
-            level="M"
-            includeMargin={false}
-          />
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="w-7 h-7 bg-[#090a0f] rounded-md border-2 border-white flex items-center justify-center text-[11px] font-black text-white shadow-md">
-              M
+    <div className="bg-[#1C1C1E] border border-[#2C2C2E] p-3 rounded-[8px] mb-2 relative flex items-center justify-center">
+      <div className="bg-white p-2.5 rounded-[6px] shadow-sm relative flex items-center justify-center">
+        {effectiveMobileUrl ? (
+          <>
+            <QRCodeSVG
+              value={effectiveMobileUrl}
+              size={120}
+              level="M"
+              includeMargin={false}
+            />
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div className="w-6 h-6 bg-[#161616] rounded-[4px] border-2 border-white flex items-center justify-center text-[10px] font-bold text-white shadow-sm">
+                M
+              </div>
             </div>
+          </>
+        ) : (
+          <div className="w-[120px] h-[120px] flex items-center justify-center text-[11px] text-[#8E8E93] font-sans">
+            Генерация QR...
           </div>
-        </>
-      ) : (
-        <div className="w-[134px] h-[134px] flex items-center justify-center text-xs text-slate-400 font-sans">
-          Генерация QR...
-        </div>
-      )}
+        )}
+      </div>
     </div>
 
-    <div className="text-xs font-bold text-white flex items-center gap-1.5 mb-0.5">
-      <Smartphone className="w-3.5 h-3.5 text-indigo-400" />
+    <div className="text-[12px] font-medium text-[#F2F2F7] flex items-center gap-1.5 mb-0.5">
+      <Smartphone className="w-3.5 h-3.5 text-[#007AFF]" />
       <span>Наведите камеру телефона для Web Drop</span>
     </div>
-    <p className="text-[11px] text-slate-400 max-w-[290px] leading-relaxed">
+    <p className="text-[11px] text-[#8E8E93] max-w-[280px] leading-relaxed">
       Позволяет безопасно обмениваться файлами в текущей сессии без установки приложений.
     </p>
   </div>
 );
 
 const CurrentComputerCodeSection: React.FC<{ deviceId: string; handleCopyCode: () => void; copied: boolean }> = ({ deviceId, handleCopyCode, copied }) => (
-  <div className="bg-[#111319] px-4 py-3 rounded-xl border border-white/[0.08] flex items-center justify-between text-left">
+  <div className="bg-[#1C1C1E] px-3.5 py-2.5 rounded-[8px] border border-[#2C2C2E] flex items-center justify-between text-left">
     <div>
-      <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+      <div className="text-[10px] font-medium text-[#8E8E93] uppercase tracking-wider">
         Код этого компьютера
       </div>
-      <div className="font-mono font-bold text-sm text-cyan-300 tracking-widest mt-0.5">
+      <div className="font-mono font-medium text-[13px] text-[#007AFF] tracking-wider mt-0.5">
         {deviceId}
       </div>
     </div>
     <button
       onClick={handleCopyCode}
-      className="flex items-center gap-1.5 text-xs bg-white/[0.06] hover:bg-white/[0.12] text-slate-200 hover:text-white px-2.5 py-1.5 rounded-lg border border-white/[0.08] transition-colors"
+      className="flex items-center gap-1.5 text-[11px] font-medium bg-[#2C2C2E] hover:bg-[#38383A] text-[#8E8E93] hover:text-[#F2F2F7] px-2.5 py-1 rounded-[5px] border border-[#3A3A3C] transition-colors"
       title="Скопировать код"
     >
       {copied ? (
         <>
-          <Check className="w-3.5 h-3.5 text-emerald-400" />
-          <span className="text-emerald-400 font-semibold">Скопировано</span>
+          <Check className="w-3 h-3 text-[#34C759]" />
+          <span className="text-[#34C759]">Скопировано</span>
         </>
       ) : (
         <>
-          <Copy className="w-3.5 h-3.5 text-slate-400" />
-          <span className="font-medium">Копировать</span>
+          <Copy className="w-3 h-3 text-[#8E8E93]" />
+          <span>Копировать</span>
         </>
       )}
     </button>
@@ -92,12 +94,12 @@ const CurrentComputerCodeSection: React.FC<{ deviceId: string; handleCopyCode: (
 );
 
 const NetworkDivider: React.FC = () => (
-  <div className="relative flex items-center justify-center pt-1">
+  <div className="relative flex items-center justify-center py-1">
     <div className="absolute inset-0 flex items-center">
-      <div className="w-full border-t border-white/[0.08]"></div>
+      <div className="w-full border-t border-[#2C2C2E]"></div>
     </div>
-    <div className="relative bg-[#171a23] px-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-      <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.7)]" />
+    <div className="relative bg-[#161616] px-2.5 text-[10px] font-medium text-[#8E8E93] uppercase tracking-wider flex items-center gap-1.5">
+      <span className="w-1.5 h-1.5 rounded-full bg-[#34C759]" />
       <span>Локальная сеть (Wi-Fi)</span>
     </div>
   </div>
@@ -110,24 +112,24 @@ const NearbyDiscoveredSection: React.FC<{
 }> = ({ discoveredPeers, handleConnectWith, isSubmitting }) => {
   if (discoveredPeers.length === 0) return null;
   return (
-    <div className="bg-[#111319] p-3 rounded-xl border border-emerald-500/25 text-left">
-      <div className="text-[11px] font-bold text-emerald-400 mb-2 flex items-center gap-1">
+    <div className="bg-[#1C1C1E] p-3 rounded-[8px] border border-[#2C2C2E] text-left">
+      <div className="text-[11px] font-medium text-[#34C759] mb-2 flex items-center gap-1">
         <span>Найдено рядом:</span>
       </div>
       <div className="space-y-1.5">
         {discoveredPeers.map((p) => (
           <div
             key={p.deviceId}
-            className="flex items-center justify-between bg-[#171a23] px-3 py-2 rounded-lg border border-white/[0.05]"
+            className="flex items-center justify-between bg-[#232326] px-3 py-2 rounded-[6px] border border-[#2C2C2E]"
           >
             <div className="truncate pr-2">
-              <div className="text-xs font-semibold text-white truncate">{p.deviceName}</div>
-              <div className="text-[10px] text-slate-400 font-mono">{p.deviceId} • {p.ip}</div>
+              <div className="text-[12px] font-medium text-[#F2F2F7] truncate">{p.deviceName}</div>
+              <div className="text-[10px] text-[#8E8E93] font-mono">{p.deviceId} • {p.ip}</div>
             </div>
             <button
               onClick={() => handleConnectWith(p.ip)}
               disabled={isSubmitting}
-              className="bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white text-[11px] font-semibold px-2.5 py-1 rounded-md transition-all shrink-0 flex items-center gap-1 shadow-sm"
+              className="bg-[#34C759] hover:bg-[#30B0C7] active:bg-[#28A745] text-white text-[11px] font-medium px-2.5 py-1 rounded-[5px] transition-colors shrink-0 flex items-center gap-1 shadow-sm"
             >
               <span>Связать</span>
             </button>
@@ -149,7 +151,7 @@ const ManualPairingSection: React.FC<{
   success: boolean;
 }> = ({ isMac, otherPlatformName, inputCode, setInputCode, handleSubmit, isSubmitting, error, success }) => (
   <form onSubmit={handleSubmit} className="text-left space-y-1.5">
-    <label className="text-[11px] font-semibold text-slate-400 block">
+    <label className="text-[11px] font-medium text-[#8E8E93] block">
       Или введите код другого {otherPlatformName} / IP:
     </label>
     <div className="flex gap-1.5">
@@ -158,12 +160,12 @@ const ManualPairingSection: React.FC<{
         placeholder={isMac ? "PC-5040 или 192.168.0.x" : "MAC-1234 или 192.168.0.x"}
         value={inputCode}
         onChange={(e) => setInputCode(e.target.value)}
-        className="bg-[#111319] border border-white/[0.12] rounded-xl px-3 py-2 text-xs text-white font-mono tracking-wider focus:outline-none focus:border-indigo-500 transition-colors placeholder:text-slate-600 flex-1 min-w-0"
+        className="bg-[#1A1A1A] border border-[#3A3A3C] rounded-[6px] px-2.5 py-1.5 text-[12px] text-[#F2F2F7] font-mono tracking-wider focus:outline-none focus:border-[#007AFF] focus:ring-1 focus:ring-[#007AFF]/50 transition-colors placeholder:text-[#636366] flex-1 min-w-0"
       />
       <button
         type="submit"
         disabled={isSubmitting || !inputCode.trim()}
-        className="bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-semibold px-3.5 py-2 rounded-xl transition-all shrink-0 flex items-center gap-1 shadow-md shadow-indigo-600/30 active:scale-95"
+        className="bg-[#007AFF] hover:bg-[#0071E3] active:bg-[#0062C4] disabled:opacity-50 disabled:cursor-not-allowed text-white text-[12px] font-medium px-3 py-1.5 rounded-[6px] transition-colors shrink-0 flex items-center gap-1 shadow-[0_0.5px_1px_rgba(0,0,0,0.4)]"
       >
         <span>{isSubmitting ? '...' : 'Связать'}</span>
         <ArrowRight className="w-3.5 h-3.5" />
@@ -171,13 +173,13 @@ const ManualPairingSection: React.FC<{
     </div>
 
     {error && (
-      <div className="text-[11px] text-rose-300 bg-rose-500/10 border border-rose-500/20 rounded-lg p-2 leading-relaxed">
+      <div className="text-[11px] text-[#FF453A] bg-[#FF453A]/10 border border-[#FF453A]/20 rounded-[6px] p-2 leading-relaxed">
         {error}
       </div>
     )}
 
     {success && (
-      <div className="text-[11px] text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-2 flex items-center gap-1.5 font-semibold">
+      <div className="text-[11px] text-[#34C759] bg-[#34C759]/10 border border-[#34C759]/20 rounded-[6px] p-2 flex items-center gap-1.5 font-medium">
         <Check className="w-3.5 h-3.5" />
         <span>Устройства успешно связаны!</span>
       </div>
@@ -191,17 +193,17 @@ const PairingFooter: React.FC<{
   setSelectedMobileIp: (val: string) => void;
   handleRegenerateMobileToken: () => void;
 }> = ({ mobileInfo, activeMobileIp, setSelectedMobileIp, handleRegenerateMobileToken }) => (
-  <div className="pt-2 flex items-center justify-between text-[10px] text-slate-500 border-t border-white/[0.06]">
+  <div className="pt-2 flex items-center justify-between text-[10px] text-[#8E8E93] border-t border-[#2C2C2E]">
     <div className="flex items-center gap-1 font-mono">
       {mobileInfo && mobileInfo.ips && mobileInfo.ips.length > 1 ? (
         <select
           value={activeMobileIp}
           onChange={(e) => setSelectedMobileIp(e.target.value)}
-          className="bg-transparent text-slate-400 font-mono text-[10px] focus:outline-none cursor-pointer hover:text-white"
+          className="bg-transparent text-[#8E8E93] font-mono text-[10px] focus:outline-none cursor-pointer hover:text-[#F2F2F7]"
           title="Выбрать сетевой интерфейс"
         >
           {mobileInfo.ips.map((ip) => (
-            <option key={ip} value={ip} className="bg-[#171a23] text-white">
+            <option key={ip} value={ip} className="bg-[#232326] text-[#F2F2F7]">
               IP: {ip}
             </option>
           ))}
@@ -213,7 +215,7 @@ const PairingFooter: React.FC<{
 
     <button
       onClick={handleRegenerateMobileToken}
-      className="text-slate-500 hover:text-slate-300 flex items-center gap-1 transition-colors"
+      className="text-[#8E8E93] hover:text-[#F2F2F7] flex items-center gap-1 transition-colors"
       title="Сгенерировать новый ключ безопасности Web Drop"
     >
       <RefreshCw className="w-2.5 h-2.5" />
@@ -269,6 +271,17 @@ export const PairingModal: React.FC<PairingModalProps> = ({
       setPairedNotice(null);
     }
   }, [isOpen, pairedDevices.length]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   useEffect(() => {
     if (isOpen) {
@@ -338,28 +351,46 @@ export const PairingModal: React.FC<PairingModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="bg-[#171a23] border border-white/[0.12] rounded-3xl w-full max-w-[420px] max-h-[92vh] shadow-2xl overflow-hidden flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.08] shrink-0">
+    <div
+      data-modal
+      style={{ WebkitAppRegion: 'no-drag' } as any}
+      className="modal-overlay fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+    >
+      <div
+        style={{ WebkitAppRegion: 'no-drag' } as any}
+        className="bg-[#161616] border border-[#2C2C2E] rounded-[10px] w-full max-w-[400px] max-h-[90vh] shadow-[0_20px_45px_rgba(0,0,0,0.65),0_0_0_1px_#333336] overflow-hidden flex flex-col select-none animate-in zoom-in-95 duration-150"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header (38px macOS Toolbar Style) */}
+        <div
+          style={{ WebkitAppRegion: 'no-drag' } as any}
+          className="h-[38px] px-3.5 bg-[#232326] border-b border-[#2C2C2E] flex items-center justify-between shrink-0"
+        >
           <div className="flex items-center gap-2">
-            <QrCode className="w-4 h-4 text-indigo-400" />
-            <h2 className="text-sm font-bold text-white tracking-tight">Связать устройства</h2>
+            <QrCode className="w-4 h-4 text-[#007AFF]" />
+            <h2 className="text-[13px] font-medium text-[#F2F2F7]">Связать устройства</h2>
           </div>
           <button
+            type="button"
+            style={{ WebkitAppRegion: 'no-drag' } as any}
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.08] transition-colors"
+            className="p-1 rounded-[5px] text-[#8E8E93] hover:text-[#F2F2F7] hover:bg-[#323236] transition-colors cursor-pointer"
           >
-            <X className="w-4 h-4" />
+            <X className="w-3.5 h-3.5" />
           </button>
         </div>
 
         {/* Scrollable Body */}
-        <div className="p-5 overflow-y-auto space-y-4 text-center">
+        <div className="p-4 overflow-y-auto space-y-3.5 text-center">
           {pairedNotice && (
-            <div className="bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 px-3.5 py-2.5 rounded-xl text-xs flex items-center gap-2 animate-in zoom-in-95">
-              <Check className="w-4 h-4 text-emerald-400 shrink-0" />
-              <span className="font-semibold">{pairedNotice}</span>
+            <div className="bg-[#34C759]/10 border border-[#34C759]/25 text-[#34C759] px-3 py-2 rounded-[6px] text-[12px] flex items-center gap-2 animate-in zoom-in-95">
+              <Check className="w-3.5 h-3.5 text-[#34C759] shrink-0" />
+              <span className="font-medium">{pairedNotice}</span>
             </div>
           )}
 

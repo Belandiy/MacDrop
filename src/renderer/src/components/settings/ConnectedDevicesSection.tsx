@@ -17,28 +17,29 @@ export const ConnectedDevicesSection: React.FC<ConnectedDevicesSectionProps> = (
 
   return (
     <>
-      <div className="h-px bg-white/[0.08]" />
-      <div className="flex flex-col gap-2 pt-1">
-        <div className="text-xs font-bold text-white">
+      <div className="h-px bg-[#2C2C2E]" />
+      <div className="flex flex-col gap-2 pt-0.5 select-none">
+        <div className="text-[10px] font-semibold text-[#8E8E93] uppercase tracking-wider">
           Связанные устройства ({pairedDevices.length})
         </div>
-        <div className="flex flex-col gap-2 max-h-36 overflow-y-auto">
+        <div className="flex flex-col gap-1.5 max-h-36 overflow-y-auto">
           {pairedDevices.map((dev) => (
             <div
               key={dev.id}
-              className="flex items-center justify-between p-2.5 rounded-xl bg-[#111319] border border-white/[0.06]"
+              className="flex items-center justify-between p-2 rounded-[6px] bg-[#1A1A1A] border border-[#2C2C2E]"
             >
-              <div className="truncate">
-                <div className="text-xs font-semibold text-slate-200 truncate">
+              <div className="truncate pr-2">
+                <div className="text-[12px] font-medium text-[#F2F2F7] truncate">
                   {dev.customName || dev.originalName}
                 </div>
-                <div className="text-[10px] text-slate-400 font-mono truncate">
+                <div className="text-[10px] text-[#8E8E93] font-mono truncate">
                   {dev.originalName} • {dev.id}
                 </div>
               </div>
               <button
+                type="button"
                 onClick={() => onUnpairDevice(dev.id)}
-                className="flex items-center gap-1 text-[11px] text-rose-300 hover:text-white bg-rose-500/15 hover:bg-rose-500/25 px-2.5 py-1.5 rounded-lg border border-rose-500/25 transition-colors shrink-0 ml-2 font-semibold"
+                className="flex items-center gap-1 text-[11px] text-[#FF453A] hover:text-white bg-[#FF453A]/10 hover:bg-[#FF453A]/20 px-2 py-1 rounded-[4px] border border-[#FF453A]/30 transition-colors shrink-0 cursor-pointer font-medium"
                 title="Разорвать связь с этим устройством"
               >
                 <Unlink className="w-3 h-3" />
