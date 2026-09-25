@@ -1,23 +1,14 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
-  Laptop,
-  Monitor,
-  Smartphone,
-  Folder,
-  Settings,
-  Plus,
-  ArrowUpRight,
-  ArrowDownLeft,
   X,
-  ExternalLink,
+  Check,
+  Search,
 } from 'lucide-react';
 import { DesignProps } from '../types';
-import { PairedDevice } from '../../components/DeviceDetailView';
 import { NativeDropZone } from '../../components/NativeDropZone';
-import packageJson from '../../../../../package.json';
 
 export const name = 'Classic Native (macOS)';
-export const windowSize = { width: 760, height: 490 };
+export const windowSize = { width: 760, height: 480 };
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B';
@@ -29,11 +20,11 @@ function formatBytes(bytes: number): string {
 
 function timeAgo(timestamp: number): string {
   const seconds = Math.floor((Date.now() - timestamp) / 1000);
-  if (seconds < 60) return 'только что';
+  if (seconds < 60) return 'just now';
   const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes} мин назад`;
+  if (minutes < 60) return `${minutes} min ago`;
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours} ч назад`;
+  if (hours < 24) return `${hours} hr ago`;
   return new Date(timestamp).toLocaleDateString();
 }
 
@@ -43,7 +34,6 @@ export default function ClassicNativeDesign(props: DesignProps) {
     status,
     activeTargetDeviceId,
     setActiveTargetDeviceAndSave,
-    platform,
     devices,
     handleSelectFolder,
     handleOpenFolder,
@@ -52,6 +42,9 @@ export default function ClassicNativeDesign(props: DesignProps) {
     handleOpenPairing,
     handleChooseFiles
   } = props;
+
+  // Filter state for transfers: All | Active | Completed
+  const [transferFilter, setTransferFilter] = useState<'all' | 'active' | 'completed'>('all');
 
   // Active target device
   const targetDevice = devices.find((d) => d.id === activeTargetDeviceId) || devices[0];
@@ -76,283 +69,331 @@ export default function ClassicNativeDesign(props: DesignProps) {
   };
 
   const currentProgress = status.currentProgress;
+  const recentHistory = status.recentHistory || [];
+
+  // Calculate ETA for active transfer
+  const getEtaString = () => {
+    if (!currentProgress || !currentProgress.bytesPerSecond || currentProgress.bytesPerSecond === 0) {
+      return '';
+    }
+    const remainingBytes = (currentProgress.total || 0) - (currentProgress.transferred || 0);
+    if (remainingBytes <= 0) return 'finishing...';
+    const seconds = Math.ceil(remainingBytes / currentProgress.bytesPerSecond);
+    if (seconds < 60) return `${seconds} sec left`;
+    return `${Math.ceil(seconds / 60)} min left`;
+  };
+
+  const hasActiveTransfer = Boolean(currentProgress);
+  const showActiveRow = hasActiveTransfer && (transferFilter === 'all' || transferFilter === 'active');
+  const showCompletedRows = transferFilter === 'all' || transferFilter === 'completed';
 
   return (
-    <div className="flex flex-col h-full bg-[#14161d] text-[#e1e4ea] select-none antialiased font-sans text-xs">
-      {/* Native-style macOS / Windows Titlebar */}
+    <div className="w-full h-full bg-[#161616] text-[#F2F2F7] flex flex-col overflow-hidden select-none font-sans antialiased">
+      {/* ========================================================
+          UNIFIED macOS TOOLBAR / TITLEBAR (38px)
+          ======================================================== */}
       <header
         style={{ WebkitAppRegion: 'drag' } as any}
-        className="h-10 px-3.5 flex items-center justify-between border-b border-white/[0.06] bg-[#1a1d26] shrink-0"
+        className="h-[38px] px-3 bg-[#232326] border-b border-[#2C2C2E] flex items-center justify-between shrink-0 relative select-none"
       >
-        {/* Left: Window Controls */}
-        <div style={{ WebkitAppRegion: 'no-drag' } as any} className="flex items-center gap-2">
-          {platform === 'darwin' ? (
-            <div className="flex items-center gap-1.5 group">
-              <button
-                onClick={() => window.macdrop?.closeWindow()}
-                className="w-3 h-3 rounded-full bg-[#ff5f56] hover:brightness-110 active:brightness-90 transition-all flex items-center justify-center cursor-pointer"
-              />
-              <button
-                onClick={() => window.macdrop?.minimizeWindow()}
-                className="w-3 h-3 rounded-full bg-[#ffbd2e] hover:brightness-110 active:brightness-90 transition-all flex items-center justify-center cursor-pointer"
-              />
-              <button
-                onClick={() => window.macdrop?.maximizeWindow?.()}
-                className="w-3 h-3 rounded-full bg-[#27c93f] hover:brightness-110 active:brightness-90 transition-all flex items-center justify-center cursor-pointer"
-              />
-            </div>
-          ) : (
-            <span className="font-semibold text-slate-300">MacDrop</span>
-          )}
-        </div>
-
-        {/* Center: Title & Version */}
-        <div className="flex items-center gap-2 pointer-events-none">
-          <span className="font-bold text-[12px] text-slate-200 tracking-tight">MacDrop</span>
-          <span className="font-mono text-[10px] text-slate-400 px-1 py-0.2 rounded bg-white/[0.05] border border-white/[0.06]">
-            v{packageJson.version}
-          </span>
-        </div>
-
-        {/* Right: Actions */}
-        <div style={{ WebkitAppRegion: 'no-drag' } as any} className="flex items-center gap-1">
+        {/* Genuine macOS Traffic Lights */}
+        <div style={{ WebkitAppRegion: 'no-drag' } as any} className="flex items-center gap-[7px]">
           <button
-            onClick={() => handleOpenSettings('general')}
-            title="Настройки"
-            className="p-1.5 rounded-md text-slate-400 hover:text-white hover:bg-white/[0.08] transition-colors"
-          >
-            <Settings className="w-3.5 h-3.5" />
-          </button>
-          {platform !== 'darwin' && (
-            <button
-              onClick={() => window.macdrop?.closeWindow()}
-              className="p-1.5 rounded-md text-slate-400 hover:text-white hover:bg-rose-500/20 hover:text-rose-300 transition-colors"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          )}
+            onClick={() => window.macdrop?.closeWindow()}
+            title="Close"
+            className="w-3 h-3 rounded-full bg-[#FF5F56] border border-[#E0443E]/60 flex items-center justify-center cursor-pointer transition-transform active:scale-95"
+          />
+          <button
+            onClick={() => window.macdrop?.minimizeWindow()}
+            title="Minimize"
+            className="w-3 h-3 rounded-full bg-[#FFBD2E] border border-[#DEA123]/60 flex items-center justify-center cursor-pointer transition-transform active:scale-95"
+          />
+          <button
+            onClick={() => window.macdrop?.maximizeWindow?.()}
+            title="Zoom"
+            className="w-3 h-3 rounded-full bg-[#27C93F] border border-[#1AAB29]/60 flex items-center justify-center cursor-pointer transition-transform active:scale-95"
+          />
         </div>
+
+        {/* Centered Window Title */}
+        <div className="absolute inset-x-0 flex items-center justify-center pointer-events-none">
+          <span className="text-[13px] font-medium text-[#F2F2F7] tracking-tight">MacDrop</span>
+        </div>
+
+        {/* Settings Icon Button (Right) */}
+        <button
+          style={{ WebkitAppRegion: 'no-drag' } as any}
+          onClick={() => handleOpenSettings('general')}
+          className="w-6 h-6 flex items-center justify-center rounded text-[#8E8E93] hover:text-[#FFFFFF] hover:bg-[#2C2C2E] transition-colors cursor-pointer"
+          title="Settings"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+        </button>
       </header>
 
-      {/* Main Split-View Body */}
+      {/* ========================================================
+          SPLIT-VIEW CONTAINER
+          ======================================================== */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Left Sidebar: 240px */}
-        <aside className="w-60 bg-[#161821] border-r border-white/[0.06] flex flex-col justify-between shrink-0">
-          <div className="p-3 overflow-y-auto flex-1 space-y-4">
-            {/* Devices Section */}
-            <div>
-              <div className="flex items-center justify-between px-1 mb-2">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                  Устройства ({devices.length})
-                </span>
-                <button
-                  onClick={handleOpenPairing}
-                  title="Подключить устройство"
-                  className="p-1 rounded text-slate-400 hover:text-white hover:bg-white/[0.08] transition-colors"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                </button>
-              </div>
+        {/* ================= LEFT SIDEBAR (220px) ================= */}
+        <aside className="w-[220px] bg-[#1E1E1E] border-r border-[#2C2C2E] p-[12px_10px] flex flex-col justify-between shrink-0 select-none">
+          {/* Top Section: Devices */}
+          <div>
+            <div className="px-2 py-1 text-[11px] font-semibold text-[#8E8E93] uppercase tracking-wider">
+              DEVICES
+            </div>
+            <nav className="mt-1 space-y-0.5">
+              {devices.length === 0 ? (
+                <div className="px-2 py-2 text-[12px] text-[#8E8E93]">
+                  No devices paired
+                </div>
+              ) : (
+                devices.map((device) => {
+                  const isSelected = targetDevice && targetDevice.id === device.id;
+                  const isRemote = device.connectionMode === 'remote';
+                  const isOffline = device.connectionMode === 'offline';
 
-              <div className="space-y-1">
-                {devices.length === 0 ? (
-                  <div className="px-2 py-3 rounded-lg bg-white/[0.02] border border-white/[0.04] text-center">
-                    <p className="text-[11px] text-slate-400 mb-2">Нет подключенных устройств</p>
+                  return (
                     <button
-                      onClick={handleOpenPairing}
-                      className="px-2.5 py-1 text-[11px] font-medium bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/30 rounded-md border border-indigo-500/30 transition-all"
+                      key={device.id}
+                      onClick={() => setActiveTargetDeviceAndSave(device.id)}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = 'copy';
+                      }}
+                      onDrop={(e) => handleFileDropOnTarget(e, device.id)}
+                      className={`w-full h-7 px-2 rounded-[6px] flex items-center justify-between text-[13px] font-normal transition-colors text-left cursor-pointer ${
+                        isSelected
+                          ? 'bg-[#007AFF] text-white shadow-sm'
+                          : 'text-[#E5E5EA] hover:bg-[#282828]'
+                      }`}
                     >
-                      + Подключить
-                    </button>
-                  </div>
-                ) : (
-                  devices.map((device) => {
-                    const isSelected = (targetDevice && targetDevice.id === device.id);
-                    const isMac = device.id.startsWith('MAC') || (device.originalName || '').toLowerCase().includes('mac');
-                    const isMobile = device.id === 'mobile-web';
-
-                    return (
-                      <div
-                        key={device.id}
-                        onClick={() => setActiveTargetDeviceAndSave(device.id)}
-                        onDragOver={(e) => {
-                          e.preventDefault();
-                          e.dataTransfer.dropEffect = 'copy';
-                        }}
-                        onDrop={(e) => handleFileDropOnTarget(e, device.id)}
-                        className={`flex items-center justify-between px-2.5 py-2 rounded-lg cursor-pointer transition-all border ${
-                          isSelected
-                            ? 'bg-indigo-600/20 text-white border-indigo-500/40 shadow-sm'
-                            : 'bg-white/[0.02] hover:bg-white/[0.06] text-slate-300 border-transparent'
+                      <span className="flex items-center gap-2 truncate">
+                        <span
+                          className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                            isRemote
+                              ? isSelected
+                                ? 'bg-white'
+                                : 'bg-[#007AFF]'
+                              : isOffline
+                              ? 'bg-[#636366]'
+                              : 'bg-[#34C759]'
+                          }`}
+                        />
+                        <span className="truncate">{device.customName || device.originalName}</span>
+                      </span>
+                      <span
+                        className={`text-[10px] font-medium shrink-0 ml-1.5 ${
+                          isSelected ? 'text-white/80' : 'text-[#8E8E93]'
                         }`}
                       >
-                        <div className="flex items-center gap-2 truncate">
-                          <div className={`p-1.5 rounded-md ${
-                            isSelected ? 'bg-indigo-500/30 text-indigo-200' : 'bg-white/[0.05] text-slate-400'
-                          }`}>
-                            {isMobile ? (
-                              <Smartphone className="w-3.5 h-3.5" />
-                            ) : isMac ? (
-                              <Laptop className="w-3.5 h-3.5" />
-                            ) : (
-                              <Monitor className="w-3.5 h-3.5" />
-                            )}
-                          </div>
+                        {isRemote ? 'P2P' : isOffline ? '' : 'LAN'}
+                      </span>
+                    </button>
+                  );
+                })
+              )}
+            </nav>
 
-                          <div className="truncate">
-                            <div className="text-[11px] font-medium truncate">
-                              {device.customName || device.originalName}
-                            </div>
-                            <div className="text-[9px] text-slate-400 flex items-center gap-1 font-mono">
-                              <span
-                                className={`w-1.5 h-1.5 rounded-full ${
-                                  device.connectionMode === 'remote'
-                                    ? 'bg-cyan-400'
-                                    : device.connectionMode === 'offline'
-                                    ? 'bg-slate-500'
-                                    : 'bg-emerald-400'
-                                }`}
-                              />
-                              <span>
-                                {device.connectionMode === 'remote'
-                                  ? 'Интернет'
-                                  : device.connectionMode === 'offline'
-                                  ? 'Офлайн'
-                                  : 'Локальная сеть'}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
-                        {isSelected && (
-                          <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0" />
-                        )}
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
+            {/* Add Device Link Button */}
+            <button
+              onClick={handleOpenPairing}
+              className="mt-2.5 px-2 py-1 text-[12px] text-[#8E8E93] hover:text-[#007AFF] transition-colors flex items-center gap-1.5 cursor-pointer"
+            >
+              + Add Device...
+            </button>
           </div>
 
-          {/* Storage Vault Block */}
-          <div className="p-3 border-t border-white/[0.06] bg-[#14161e]">
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                <Folder className="w-3 h-3 text-amber-400" />
-                Папка сохранения
-              </span>
+          {/* Bottom Section: Destination Folder */}
+          <div className="border-t border-[#2C2C2E] pt-2.5 mt-auto">
+            <div className="px-1 mb-1.5 text-[10px] font-semibold text-[#8E8E93] uppercase tracking-wider">
+              DESTINATION FOLDER
             </div>
-            <div
-              className="text-[10px] font-mono text-slate-300 truncate bg-black/30 px-2 py-1 rounded border border-white/[0.05] mb-2"
-              title={config.targetFolder}
-            >
-              {config.targetFolder}
-            </div>
-            <div className="grid grid-cols-2 gap-1.5">
+            <div className="flex items-center justify-between gap-1.5 px-1">
+              <div
+                onClick={handleOpenFolder}
+                className="flex items-center gap-1.5 min-w-0 cursor-pointer group"
+                title="Open folder in Finder / Explorer"
+              >
+                {/* Native macOS Folder Glyph */}
+                <svg className="w-3.5 h-3.5 text-[#007AFF] shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M19.5 21a3 3 0 0 0 3-3v-8a3 3 0 0 0-3-3h-7.66l-1.8-2.4A2.25 2.25 0 0 0 8.24 3.5H4.5A3 3 0 0 0 1.5 6.5v11.5a3 3 0 0 0 3 3h15z"></path>
+                </svg>
+                <span className="text-[11px] text-[#D1D1D6] group-hover:text-white font-mono truncate max-w-[110px]" title={config.targetFolder}>
+                  {config.targetFolder ? config.targetFolder.split(/[\\/]/).pop() || config.targetFolder : 'MacDrop'}
+                </span>
+              </div>
               <button
                 onClick={handleSelectFolder}
-                className="px-2 py-1 text-[10px] bg-white/[0.05] hover:bg-white/[0.1] text-slate-300 rounded border border-white/[0.06] transition-all text-center"
+                className="shrink-0 px-[7px] py-[2px] text-[11px] font-medium bg-[#2C2C2E] hover:bg-[#38383A] text-[#D1D1D6] hover:text-white border border-[#3A3A3C] rounded-[4px] shadow-[0_0.5px_1px_rgba(0,0,0,0.4)] transition-colors cursor-pointer"
               >
-                Изменить...
-              </button>
-              <button
-                onClick={handleOpenFolder}
-                className="px-2 py-1 text-[10px] bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-300 rounded border border-indigo-500/30 transition-all text-center flex items-center justify-center gap-1"
-              >
-                <span>Открыть</span>
-                <ExternalLink className="w-2.5 h-2.5" />
+                Change...
               </button>
             </div>
           </div>
         </aside>
 
-        {/* Right Main Content Pane */}
-        <main className="flex-1 flex flex-col overflow-y-auto p-4 gap-4 bg-[#11131a]">
-          {/* Active Transfer Progress Banner (if active) */}
-          {currentProgress && (
-            <div className="bg-indigo-950/40 border border-indigo-500/30 rounded-xl p-3 shadow-lg animate-in fade-in duration-200">
-              <div className="flex items-center justify-between mb-1.5">
-                <div className="flex items-center gap-2 truncate">
-                  <div className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse" />
-                  <span className="font-semibold text-white truncate text-[11px]">
-                    {currentProgress.filename}
-                  </span>
-                </div>
-                <span className="font-mono text-[11px] text-indigo-300">
-                  {Math.round(currentProgress.percent || 0)}%
-                </span>
-              </div>
-              <div className="w-full h-1.5 bg-black/40 rounded-full overflow-hidden mb-1.5">
-                <div
-                  className="h-full bg-gradient-to-r from-indigo-500 to-cyan-400 transition-all duration-150"
-                  style={{ width: `${currentProgress.percent || 0}%` }}
-                />
-              </div>
-              <div className="flex items-center justify-between text-[10px] text-slate-400 font-mono">
-                <span>{formatBytes(currentProgress.bytesPerSecond || 0)}/с</span>
-                <span>
-                  {formatBytes(currentProgress.transferred || 0)} / {formatBytes(currentProgress.total || 0)}
-                </span>
+        {/* ================= RIGHT MAIN AREA (540px) ================= */}
+        <main className="w-[540px] bg-[#161616] flex flex-col flex-1 overflow-hidden select-none">
+          {/* Top Section: Send / Drop Area (180px) */}
+          <section className="h-[180px] p-4 border-b border-[#2C2C2E] flex flex-col box-border justify-center">
+            <NativeDropZone
+              devices={devices}
+              targetDevice={targetDevice}
+              onFilesDropped={handleFilesDropped}
+              onChooseFiles={handleChooseFiles}
+            />
+          </section>
+
+          {/* Bottom Section: Transfers & Activity (Remaining Height) */}
+          <section className="flex-1 p-[14px_16px] flex flex-col overflow-hidden">
+            {/* Section Header Row */}
+            <div className="flex items-center justify-between mb-2.5">
+              <span className="text-[13px] font-semibold text-[#F2F2F7]">Transfers</span>
+
+              {/* macOS Segmented Control */}
+              <div className="inline-flex p-0.5 rounded-[6px] bg-[#252528] border border-[#333336] text-[11px]">
+                <button
+                  onClick={() => setTransferFilter('all')}
+                  className={`px-2.5 py-0.5 rounded-[4px] font-medium transition-all cursor-pointer ${
+                    transferFilter === 'all'
+                      ? 'bg-[#3A3A3E] text-white shadow-sm'
+                      : 'text-[#8E8E93] hover:text-[#E5E5EA]'
+                  }`}
+                >
+                  All
+                </button>
+                <button
+                  onClick={() => setTransferFilter('active')}
+                  className={`px-2.5 py-0.5 rounded-[4px] font-medium transition-all cursor-pointer ${
+                    transferFilter === 'active'
+                      ? 'bg-[#3A3A3E] text-white shadow-sm'
+                      : 'text-[#8E8E93] hover:text-[#E5E5EA]'
+                  }`}
+                >
+                  Active
+                </button>
+                <button
+                  onClick={() => setTransferFilter('completed')}
+                  className={`px-2.5 py-0.5 rounded-[4px] font-medium transition-all cursor-pointer ${
+                    transferFilter === 'completed'
+                      ? 'bg-[#3A3A3E] text-white shadow-sm'
+                      : 'text-[#8E8E93] hover:text-[#E5E5EA]'
+                  }`}
+                >
+                  Completed
+                </button>
               </div>
             </div>
-          )}
 
-          {/* NATIVE APP-KIT / SWIFTUI DROP ZONE */}
-          <NativeDropZone
-            devices={devices}
-            targetDevice={targetDevice}
-            onFilesDropped={handleFilesDropped}
-            onChooseFiles={handleChooseFiles}
-          />
+            {/* Clean Tabular Transfer List */}
+            <div className="flex-1 overflow-y-auto divide-y divide-[#242426]">
+              {/* Row 1: Active Transfer (if present) */}
+              {showActiveRow && currentProgress && (
+                <div className="h-11 flex items-center justify-between py-1">
+                  {/* Left: File Metadata */}
+                  <div className="flex items-center gap-2.5 min-w-0 pr-3">
+                    {/* Archive File Icon */}
+                    <div className="w-6 h-6 rounded bg-[#202838] border border-[#2D3850] flex items-center justify-center shrink-0 text-[#007AFF]">
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" viewBox="0 0 24 24">
+                        <rect height="18" rx="2" width="18" x="3" y="4"></rect>
+                        <line x1="12" x2="12" y1="4" y2="10"></line>
+                        <line x1="10" x2="14" y1="7" y2="7"></line>
+                      </svg>
+                    </div>
+                    <div className="truncate">
+                      <div className="text-[12px] font-medium text-[#F2F2F7] leading-tight truncate">
+                        {currentProgress.filename}
+                      </div>
+                      <div className="text-[11px] text-[#8E8E93] leading-tight font-mono">
+                        {formatBytes(currentProgress.bytesPerSecond || 0)}/s {getEtaString() && `• ${getEtaString()}`}
+                      </div>
+                    </div>
+                  </div>
 
-          {/* Transfers Activity List */}
-          <div className="flex-1 flex flex-col bg-[#161821] rounded-xl border border-white/[0.06] p-3 overflow-hidden">
-            <div className="flex items-center justify-between mb-2 pb-2 border-b border-white/[0.06]">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                История передач ({status.recentHistory?.length || 0})
-              </span>
-            </div>
-
-            <div className="flex-1 overflow-y-auto space-y-1.5 pr-1">
-              {!status.recentHistory || status.recentHistory.length === 0 ? (
-                <div className="h-full flex items-center justify-center text-slate-500 text-[11px]">
-                  Здесь будут отображаться переданные файлы
+                  {/* Center: Native Linear Progress Bar */}
+                  <div className="flex items-center gap-3 shrink-0">
+                    <div className="w-[140px] h-1 bg-[#2C2C2E] rounded-[2px] overflow-hidden">
+                      <div
+                        className="h-full bg-[#007AFF] rounded-[2px] transition-all duration-100"
+                        style={{ width: `${currentProgress.percent || 0}%` }}
+                      ></div>
+                    </div>
+                    {/* Right: Status Readout & Cancel Button */}
+                    <span className="text-[11px] text-[#8E8E93] font-mono w-7 text-right">
+                      {Math.round(currentProgress.percent || 0)}%
+                    </span>
+                    <button
+                      onClick={() => window.macdrop?.cancelTransfer?.()}
+                      className="w-4 h-4 rounded-full bg-[#2C2C2E] hover:bg-[#3A3A3C] text-[#8E8E93] hover:text-[#F2F2F7] flex items-center justify-center transition-colors cursor-pointer"
+                      title="Cancel"
+                    >
+                      <X className="w-2.5 h-2.5" />
+                    </button>
+                  </div>
                 </div>
-              ) : (
-                status.recentHistory.map((item: any) => (
+              )}
+
+              {/* Row 2+: Completed Transfers */}
+              {showCompletedRows && recentHistory.length > 0 ? (
+                recentHistory.map((item: any) => (
                   <div
                     key={item.id}
                     onClick={() => handleOpenFolder()}
-                    className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-white/[0.02] hover:bg-white/[0.06] border border-white/[0.04] transition-all cursor-pointer group"
+                    className="h-11 flex items-center justify-between py-1 hover:bg-[#1A1A1A] px-1 rounded transition-colors cursor-pointer group"
                   >
-                    <div className="flex items-center gap-2 truncate">
-                      <div className={`p-1 rounded ${
-                        item.direction === 'incoming'
-                          ? 'bg-emerald-500/15 text-emerald-400'
-                          : 'bg-indigo-500/15 text-indigo-300'
-                      }`}>
-                        {item.direction === 'incoming' ? (
-                          <ArrowDownLeft className="w-3 h-3" />
-                        ) : (
-                          <ArrowUpRight className="w-3 h-3" />
-                        )}
+                    {/* Left: File Metadata */}
+                    <div className="flex items-center gap-2.5 min-w-0 pr-3">
+                      {/* Image/File Icon */}
+                      <div className="w-6 h-6 rounded bg-[#20252D] border border-[#2D343F] flex items-center justify-center shrink-0 text-[#8E8E93]">
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" viewBox="0 0 24 24">
+                          <rect height="18" rx="2" ry="2" width="18" x="3" y="3"></rect>
+                          <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                          <polyline points="21 15 16 10 5 21"></polyline>
+                        </svg>
                       </div>
-                      <span className="text-[11px] font-medium text-slate-200 truncate group-hover:text-indigo-300 transition-colors">
-                        {item.filename}
-                      </span>
+                      <div className="truncate">
+                        <div className="text-[12px] font-medium text-[#F2F2F7] leading-tight truncate group-hover:text-[#007AFF] transition-colors">
+                          {item.filename}
+                        </div>
+                        <div className="text-[11px] text-[#8E8E93] leading-tight font-mono">
+                          {formatBytes(item.size)} • {timeAgo(item.timestamp)}
+                        </div>
+                      </div>
                     </div>
 
-                    <div className="flex items-center gap-2 text-[10px] text-slate-400 font-mono shrink-0">
-                      <span>{formatBytes(item.size)}</span>
-                      <span>•</span>
-                      <span>{timeAgo(item.timestamp)}</span>
+                    {/* Center & Right: Completed Status Badge + Action Button */}
+                    <div className="flex items-center gap-4 shrink-0">
+                      <div className="flex items-center gap-1 text-[11px] text-[#34C759] font-medium">
+                        <Check className="w-3.5 h-3.5 stroke-[2]" />
+                        <span>Completed</span>
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenFolder();
+                        }}
+                        className="text-[11px] text-[#8E8E93] hover:text-[#007AFF] flex items-center gap-1 transition-colors cursor-pointer"
+                      >
+                        <Search className="w-3.5 h-3.5" />
+                        <span>Show in Finder</span>
+                      </button>
                     </div>
                   </div>
                 ))
+              ) : null}
+
+              {/* Empty state if nothing to show */}
+              {!hasActiveTransfer && (!showCompletedRows || recentHistory.length === 0) && (
+                <div className="h-full flex items-center justify-center text-[#8E8E93] text-[12px] py-8">
+                  No transfers to display
+                </div>
               )}
             </div>
-          </div>
+          </section>
         </main>
       </div>
     </div>

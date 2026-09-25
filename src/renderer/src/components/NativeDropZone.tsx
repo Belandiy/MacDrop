@@ -44,139 +44,125 @@ export const NativeDropZone: React.FC<NativeDropZoneProps> = ({
 
   const getDeviceSubtitle = (d: PairedDevice) => {
     if (d.connectionMode === 'remote') {
-      return `${d.remoteIp || d.ip || 'Remote'} • Direct Tunnel`;
+      return `${d.remoteIp || d.ip || 'Remote'} • P2P`;
     }
     if (d.connectionMode === 'offline') {
-      return 'Офлайн';
+      return 'Offline';
     }
-    return `${d.ip || '192.168.1.x'} • LAN 0.8ms`;
+    return `${d.ip || '192.168.1.x'} • 0.8ms`;
   };
 
   return (
-    <div className={`w-full flex flex-col items-center select-none ${className}`}>
+    <div className={`w-full flex flex-col justify-center select-none ${className}`}>
       {/* 
-        Target Sending Bar Context:
-        Fixed min-h-[22px] prevents layout shifts when swapping text during dragover
+        Sending To Bar:
+        Fixed min-h-[20px] ensures zero layout jump when dragging begins
       */}
-      <div className="w-full max-w-[520px] min-h-[22px] mb-2 flex items-center justify-between text-[11px] font-sans">
+      <div className="flex items-center justify-between text-[13px] text-[#E5E5EA] min-h-[20px] mb-1">
         {!isDragging ? (
-          /* State 1: Resting context */
-          <>
-            <div className="flex items-center gap-1.5 text-slate-400">
-              <span>Получатель:</span>
-              <span className="font-semibold text-slate-200 flex items-center gap-1.5">
-                {activeTarget ? (activeTarget.customName || activeTarget.originalName) : 'Не выбрано'}
-                {activeTarget && (
-                  <span
-                    className={`w-1.5 h-1.5 rounded-full ${
-                      isTargetRemote
-                        ? 'bg-cyan-400 shadow-[0_0_6px_rgba(6,182,212,0.6)]'
-                        : 'bg-emerald-400 shadow-[0_0_6px_rgba(16,185,129,0.6)]'
-                    }`}
-                  />
-                )}
+          <div className="flex items-center gap-2">
+            <span>
+              Sending to:{' '}
+              <span className="font-medium text-[#F2F2F7]">
+                {activeTarget ? (activeTarget.customName || activeTarget.originalName) : 'No Device Selected'}
               </span>
-            </div>
-            <span className="text-[10px] text-slate-500">Готов к передаче</span>
-          </>
-        ) : (
-          /* State 2: Dragging context */
-          <>
-            <div className="flex items-center gap-1.5 text-indigo-400 font-semibold animate-in fade-in duration-150">
-              <svg
-                width="13"
-                height="13"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="pointer-events-none"
-              >
-                <path d="M12 3v12M7 10l5 5 5-5M20 21H4" />
-              </svg>
-              <span>{isOverZone ? 'Отпустите файл над плиткой' : 'Перетащите файл в зону...'}</span>
-            </div>
-            <span className="text-[10px] text-slate-400">
-              {isOverZone ? 'Зона активна' : 'Наведите на плитку'}
             </span>
-          </>
+            {activeTarget && (
+              <span
+                className={`w-1.5 h-1.5 rounded-full ${
+                  isTargetRemote ? 'bg-[#007AFF]' : 'bg-[#34C759]'
+                }`}
+              />
+            )}
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 text-[#007AFF] font-medium animate-in fade-in duration-100">
+            <svg
+              className="w-3.5 h-3.5 pointer-events-none"
+              fill="none"
+              stroke="currentColor"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2"
+              viewBox="0 0 24 24"
+            >
+              <path d="M12 3v12M7 10l5 5 5-5M20 21H4" />
+            </svg>
+            <span>{isOverZone ? 'Release to send to target' : 'Hover over a destination device...'}</span>
+          </div>
         )}
       </div>
 
       {/* 
-        The 520x190 Fixed Component (Zero Layout Jitter):
-        Both layers remain permanently in the DOM to avoid Chromium DOM-mutation drag resets.
+        Fixed 120px Drop Box Target:
+        Both Layer 1 (Idle) and Layer 2 (Multi-target) remain mounted for Chromium drag stability
       */}
       <div
         ref={containerRef}
-        className={`w-full max-w-[520px] h-[190px] rounded-xl relative select-none overflow-hidden transition-all duration-200 ${
+        className={`h-[120px] mt-1 rounded-[6px] relative select-none overflow-hidden transition-colors duration-150 ${
           isOverZone
-            ? 'border border-indigo-500/80 shadow-[0_0_30px_rgba(99,102,241,0.2)]'
+            ? 'border-[1.5px] border-[#007AFF] bg-[#18181A] shadow-[0_0_16px_rgba(0,122,255,0.15)]'
             : isDragging
-            ? 'border border-indigo-500/40 shadow-[0_0_20px_rgba(99,102,241,0.1)]'
-            : 'border border-dashed border-white/[0.08] hover:border-indigo-500/40'
+            ? 'border border-[#007AFF]/60 bg-[#1A1A1A]'
+            : 'border border-dashed border-[#3A3A3C] hover:border-[#8E8E93] bg-[#1A1A1A]'
         }`}
       >
         {/* ==================== LAYER 1: IDLE / RESTING ==================== */}
         <div
-          className={`absolute inset-0 w-full h-full bg-[#171923]/70 hover:bg-[#171923]/95 flex flex-col items-center justify-center px-6 transition-all duration-150 backdrop-blur-md ${
+          onClick={() => onChooseFiles(activeTarget?.id)}
+          className={`absolute inset-0 w-full h-full flex flex-col items-center justify-center gap-1 transition-opacity duration-150 cursor-pointer group ${
             isDragging ? 'opacity-0 pointer-events-none' : 'opacity-100 pointer-events-auto'
           }`}
         >
-          {/* Tray icon */}
-          <div className="w-10 h-10 rounded-xl bg-white/[0.04] border border-white/[0.08] flex items-center justify-center text-slate-400 mb-2.5 shadow-sm pointer-events-none">
-            <svg
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.75"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M12 3v11M8 10l4 4 4-4" />
-              <path d="M4 14v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4" />
-            </svg>
-          </div>
+          {/* Upload tray icon */}
+          <svg
+            className="w-[18px] h-[18px] text-[#8E8E93] group-hover:text-[#E5E5EA] transition-colors pointer-events-none"
+            fill="none"
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="1.8"
+            viewBox="0 0 24 24"
+          >
+            <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"></path>
+            <polyline points="7 9 12 4 17 9"></polyline>
+            <line x1="12" x2="12" y1="4" y2="16"></line>
+          </svg>
 
-          {/* Primary text */}
-          <div className="text-[13px] font-semibold text-slate-200 leading-tight mb-1 pointer-events-none">
-            Перетащите файлы для отправки
-          </div>
+          {/* Primary Text */}
+          <span className="text-[13px] font-medium text-[#E5E5EA] pointer-events-none">
+            Drop files here to send
+          </span>
 
-          {/* Secondary hint */}
-          <div className="text-[11px] text-slate-400 mb-3 text-center pointer-events-none">
-            Получатель:{' '}
-            <span className="text-indigo-400 font-semibold">
-              {activeTarget ? (activeTarget.customName || activeTarget.originalName) : 'Не выбран'}
-            </span>{' '}
-            • или нажмите для выбора файлов
-          </div>
+          {/* Secondary Hint */}
+          <span className="text-[11px] text-[#8E8E93] pointer-events-none">
+            or click to select files
+          </span>
 
-          {/* Native button */}
+          {/* Native macOS Button */}
           <button
             type="button"
-            onClick={() => onChooseFiles(activeTarget?.id)}
-            className="h-[28px] px-4 rounded-lg bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-[11px] text-white font-medium shadow-md shadow-indigo-600/20 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+            onClick={(e) => {
+              e.stopPropagation();
+              onChooseFiles(activeTarget?.id);
+            }}
+            className="mt-1 px-3.5 py-1 text-[12px] font-medium bg-[#2C2C2E] hover:bg-[#38383A] text-[#F2F2F7] border border-[#3A3A3C] rounded-[5px] shadow-[0_0.5px_1px_rgba(0,0,0,0.4)] transition-colors cursor-pointer"
           >
-            <span>Выбрать файлы...</span>
+            Choose Files...
           </button>
         </div>
 
         {/* ==================== LAYER 2: DRAG-OVER MULTI-TARGET ==================== */}
         <div
-          className={`absolute inset-0 w-full h-full bg-[#141620]/95 p-2.5 flex gap-2.5 transition-all duration-150 ${
+          className={`absolute inset-0 w-full h-full p-2 flex gap-2 transition-opacity duration-150 bg-[#161618] ${
             isDragging ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
           }`}
         >
           {devices.length === 0 ? (
             /* Fallback if no paired devices */
-            <div className="flex-1 h-full rounded-lg bg-white/[0.03] border border-white/[0.08] p-3.5 flex flex-col items-center justify-center text-center pointer-events-none">
-              <span className="text-[13px] font-medium text-slate-200 mb-1">Нет сопряженных устройств</span>
-              <span className="text-[11px] text-slate-400">Сначала подключите устройство через код или QR</span>
+            <div className="flex-1 h-full rounded-[6px] bg-[#202022] border border-[#333333] p-2 flex flex-col items-center justify-center text-center pointer-events-none">
+              <span className="text-[12px] font-medium text-[#F2F2F7]">No paired devices</span>
+              <span className="text-[10px] text-[#8E8E93]">Pair a device from the left sidebar</span>
             </div>
           ) : (
             devices.slice(0, 3).map((device) => {
@@ -189,100 +175,67 @@ export const NativeDropZone: React.FC<NativeDropZoneProps> = ({
                 <div
                   key={device.id}
                   ref={(el) => registerTarget(device.id, el)}
-                  className={`flex-1 h-full rounded-lg p-3.5 flex flex-col justify-between relative overflow-hidden transition-all duration-150 ${
+                  className={`flex-1 h-full rounded-[6px] p-2.5 flex flex-col justify-between relative overflow-hidden transition-all duration-100 ${
                     isHovered
-                      ? 'bg-indigo-950/40 border-[1.5px] border-indigo-400 ring-2 ring-indigo-500/30 shadow-[inset_0_0_16px_rgba(99,102,241,0.2)]'
-                      : 'bg-[#181a26]/70 border border-white/[0.06]'
+                      ? 'bg-[rgba(0,122,255,0.12)] border-[1.5px] border-[#007AFF] shadow-[inset_0_0_12px_rgba(0,122,255,0.1)]'
+                      : 'bg-[#202022] border border-[#333333]'
                   }`}
                 >
-                  {/* All children use pointer-events-none to eliminate bubbling flutter */}
+                  {/* Top row: Device Name & Type */}
                   <div className="flex items-center justify-between pointer-events-none">
-                    <div className="flex items-center gap-2 truncate">
-                      <div className={`p-1 rounded transition-colors ${isHovered ? 'bg-indigo-500/30 text-white' : 'bg-white/[0.05] text-slate-400'}`}>
-                        {isMobile ? (
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-                            <rect x="5" y="2" width="14" height="20" rx="2" />
-                            <line x1="12" y1="18" x2="12.01" y2="18" />
-                          </svg>
-                        ) : isMac ? (
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-                            <rect x="3" y="4" width="18" height="12" rx="2" />
-                            <line x1="2" y1="20" x2="22" y2="20" />
-                          </svg>
-                        ) : (
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-                            <rect x="2" y="3" width="20" height="14" rx="2" />
-                            <line x1="8" y1="21" x2="16" y2="21" />
-                            <line x1="12" y1="17" x2="12" y2="21" />
-                          </svg>
-                        )}
-                      </div>
-                      <span className={`text-[12px] font-semibold truncate transition-colors ${isHovered ? 'text-white' : 'text-slate-200'}`}>
+                    <div className="flex items-center gap-1.5 truncate">
+                      {isMobile ? (
+                        <svg className={`w-3.5 h-3.5 ${isHovered ? 'text-white' : 'text-[#8E8E93]'}`} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                          <rect x="5" y="2" width="14" height="20" rx="2" />
+                          <line x1="12" y1="18" x2="12.01" y2="18" />
+                        </svg>
+                      ) : isMac ? (
+                        <svg className={`w-3.5 h-3.5 ${isHovered ? 'text-white' : 'text-[#8E8E93]'}`} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                          <rect x="3" y="4" width="18" height="12" rx="2" />
+                          <line x1="2" y1="20" x2="22" y2="20" />
+                        </svg>
+                      ) : (
+                        <svg className={`w-3.5 h-3.5 ${isHovered ? 'text-white' : 'text-[#8E8E93]'}`} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                          <rect x="2" y="3" width="20" height="14" rx="2" />
+                          <line x1="8" y1="21" x2="16" y2="21" />
+                          <line x1="12" y1="17" x2="12" y2="21" />
+                        </svg>
+                      )}
+                      <span className={`text-[12px] font-medium truncate ${isHovered ? 'text-white font-semibold' : 'text-[#F2F2F7]'}`}>
                         {device.customName || device.originalName}
                       </span>
                     </div>
 
-                    <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full border shrink-0 transition-colors ${
+                    <div className={`flex items-center gap-1 px-1.5 py-0.2 rounded border text-[9px] shrink-0 ${
                       isHovered
-                        ? 'bg-indigo-500/20 border-indigo-500/40 text-indigo-200'
-                        : 'bg-white/[0.04] border-white/[0.06] text-slate-400'
+                        ? 'bg-[rgba(0,122,255,0.2)] border-[#007AFF]/40 text-[#007AFF]'
+                        : 'bg-[#18181A] border-[#2A2A2D] text-[#8E8E93]'
                     }`}>
                       <span
                         className={`w-1.5 h-1.5 rounded-full ${
-                          isRemote ? 'bg-cyan-400 shadow-[0_0_6px_#06b6d4]' : 'bg-emerald-400 shadow-[0_0_6px_#10b981]'
+                          isRemote ? 'bg-[#007AFF]' : 'bg-[#34C759]'
                         }`}
                       />
-                      <span className="text-[9px] font-medium">
-                        {isRemote ? 'Интернет' : 'Wi-Fi'}
-                      </span>
+                      <span>{isRemote ? 'P2P' : 'LAN'}</span>
                     </div>
                   </div>
 
-                  {/* Center hint callout */}
-                  <div className="flex flex-col items-center justify-center my-auto py-1 pointer-events-none">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white mb-1.5 transition-all ${
-                      isHovered
-                        ? 'bg-indigo-600 shadow-md shadow-indigo-600/40 scale-105'
-                        : 'bg-white/[0.05] text-slate-500'
+                  {/* Center Action Hint */}
+                  <div className="flex flex-col items-center justify-center my-auto pointer-events-none">
+                    <span className={`text-[11px] leading-tight text-center ${
+                      isHovered ? 'text-[#007AFF] font-bold' : 'text-[#8E8E93]'
                     }`}>
-                      <svg
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2.25"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="M12 4v13M6 11l6 6 6-6" />
-                      </svg>
-                    </div>
-                    <span className={`text-[12px] font-bold tracking-tight text-center leading-tight transition-colors ${
-                      isHovered ? 'text-indigo-300' : 'text-slate-400 font-medium'
-                    }`}>
-                      {isHovered ? 'Отпустить для отправки' : 'Бросить сюда'}
+                      {isHovered ? 'Release to send' : 'Drop to send'}
                     </span>
-                    <span className="text-[10px] text-slate-400 mt-0.5 font-medium truncate max-w-[140px]">
-                      {isHovered ? (device.customName || device.originalName) : (isRemote ? 'P2P туннель' : 'Локальная сеть')}
+                    <span className="text-[9px] text-[#636366] font-mono mt-0.5">
+                      {getDeviceSubtitle(device)}
                     </span>
                   </div>
 
-                  {/* Sub-footer info */}
-                  <div className={`text-[9px] text-center font-mono pointer-events-none transition-colors ${
-                    isHovered ? 'text-indigo-300/80' : 'text-slate-500'
-                  }`}>
-                    {getDeviceSubtitle(device)}
-                  </div>
-
-                  {/* Dragged item badge preview */}
+                  {/* Dragged item pill */}
                   {isHovered && draggedFileName && (
-                    <div className="absolute bottom-2 right-2 px-2 py-0.5 rounded-md bg-[#161824] border border-indigo-500/40 text-[10px] text-slate-200 flex items-center gap-1.5 shadow-md pointer-events-none animate-in fade-in duration-100">
-                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                        <polyline points="14 2 14 8 20 8" />
-                      </svg>
-                      <span className="truncate max-w-[100px]">{draggedFileName}</span>
+                    <div className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 rounded bg-[#2C2C2E] border border-[#3A3A3C] text-[9px] text-[#F2F2F7] flex items-center gap-1 shadow-sm pointer-events-none truncate max-w-[110px]">
+                      <span className="truncate">{draggedFileName}</span>
                     </div>
                   )}
                 </div>
