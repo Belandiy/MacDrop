@@ -7,7 +7,12 @@ interface TransferHistoryLogProps {
   onOpenFile: (filename: string) => void;
 }
 
-export const TransferHistoryLog: React.FC<TransferHistoryLogProps> = ({
+// ⚡ Bolt Performance Optimization:
+// Wrapped TransferHistoryLog in React.memo. Prevents this component (which renders
+// a list of history items) from re-rendering on every byte transferred, as `history`
+// reference stays the same during transfer while the parent `DeviceDetailView` re-renders
+// due to `currentProgress` changing.
+export const TransferHistoryLog: React.FC<TransferHistoryLogProps> = React.memo(({
   history,
   onOpenFile
 }) => {
@@ -72,4 +77,4 @@ export const TransferHistoryLog: React.FC<TransferHistoryLogProps> = ({
       )}
     </div>
   );
-};
+});

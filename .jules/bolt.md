@@ -4,3 +4,7 @@
 ## 2024-05-24 - React.memo Pitfall with Inline Functions
 **Learning:** Wrapping a component (like `DeviceList`) in `React.memo` is completely ineffective if the parent component (like `App.tsx`) passes inline arrow functions as props (e.g., `onClick={() => setSomething(true)}`). The inline functions are recreated on every render, causing the shallow comparison of `React.memo` to fail, resulting in full re-renders despite the memoization.
 **Action:** When applying `React.memo` to a component, ensure that all function props passed to it from the parent are either extracted, inherently stable (like state setters `setState`), or wrapped in `useCallback`. Furthermore, if the component itself maps over a list and passes handlers to list items, those inner handlers must also be wrapped in `useCallback` inside the mapped component or the list component itself.
+
+## 2024-05-27 - React.memo for List Components in Progress-Aware Views
+**Learning:** The app's architecture streams high-frequency progress state top-down (e.g., `currentProgress` down to `DeviceDetailView`). This causes the parent view to re-render on every progress tick. If child components that render lists (like `TransferHistoryLog`) are not memoized, they will undergo O(N) re-renders on every single byte transferred, leading to severe layout thrashing and high CPU usage.
+**Action:** Always make `React.memo` mandatory for any list components or heavy UI elements inside progress-aware views to avoid unnecessary re-renders during active transfers.
