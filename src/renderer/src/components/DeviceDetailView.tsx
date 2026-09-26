@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   ArrowLeft,
   Check,
@@ -107,8 +107,12 @@ export const DeviceDetailView: React.FC<DeviceDetailViewProps> = ({
 
   const isMac = device.id.startsWith('MAC') || device.originalName.toLowerCase().includes('mac');
 
+  // ⚡ Bolt Performance Optimization:
+  // Memoized loadHistory and all event handlers with useCallback to prevent recreating
+  // them on every file transfer progress tick, which causes child components to re-render.
+
   // Load device-specific history
-  const loadHistory = async () => {
+  const loadHistory = useCallback(async () => {
     if (window.macdrop?.getDeviceHistory) {
       try {
         const items = await window.macdrop.getDeviceHistory(device.id);
@@ -117,21 +121,21 @@ export const DeviceDetailView: React.FC<DeviceDetailViewProps> = ({
         console.error('Failed to load device history:', err);
       }
     }
-  };
+  }, [device.id]);
 
   useEffect(() => {
     setNameInput(device.customName || device.originalName);
     loadHistory();
-  }, [device.id, device.customName]);
+  }, [device.id, device.customName, loadHistory]);
 
   // Periodically refresh device history or when progress finishes
   useEffect(() => {
     if (!currentProgress) {
       loadHistory();
     }
-  }, [currentProgress]);
+  }, [currentProgress, loadHistory]);
 
-  const handleSaveName = async () => {
+  const handleSaveName = useCallback(async () => {
     const trimmed = nameInput.trim();
     if (!trimmed) return;
     if (window.macdrop?.updateDeviceName) {
@@ -140,9 +144,9 @@ export const DeviceDetailView: React.FC<DeviceDetailViewProps> = ({
       onDeviceUpdated(updated);
       setIsEditingName(false);
     }
-  };
+  }, [device, nameInput, onDeviceUpdated]);
 
-  const handleDeleteDevice = async () => {
+  const handleDeleteDevice = useCallback(async () => {
     if (device.id === 'mobile-web') {
       onBack(); // Just go back, can't delete virtual device
       return;
@@ -152,19 +156,19 @@ export const DeviceDetailView: React.FC<DeviceDetailViewProps> = ({
       onDeviceRemoved(device.id);
       onBack();
     }
-  };
+  }, [device.id, onBack, onDeviceRemoved]);
 
   const isReceiveEnabled = device.receiveEnabled !== false;
 
-  const handleToggleReceive = async (enabled: boolean) => {
+  const handleToggleReceive = useCallback(async (enabled: boolean) => {
     if (window.macdrop?.toggleDeviceReceive) {
       await window.macdrop.toggleDeviceReceive(device.id, enabled);
       const updated = { ...device, receiveEnabled: enabled };
       onDeviceUpdated(updated);
     }
-  };
+  }, [device, onDeviceUpdated]);
 
-  const handlePickAndSend = async () => {
+  const handlePickAndSend = useCallback(async () => {
     if (window.macdrop?.pickAndSendFiles) {
       setIsSending(true);
       setSendNotice(null);
@@ -189,9 +193,9 @@ export const DeviceDetailView: React.FC<DeviceDetailViewProps> = ({
         setIsSending(false);
       }
     }
-  };
+  }, [device.id, loadHistory]);
 
-  const handleDrop = async (e: React.DragEvent) => {
+  const handleDrop = useCallback(async (e: React.DragEvent) => {
     e.preventDefault();
     setIsDraggingOver(false);
 
@@ -264,13 +268,13 @@ export const DeviceDetailView: React.FC<DeviceDetailViewProps> = ({
         }
       }
     }
-  };
+  }, [device.id, loadHistory]);
 
-  const handleCopyId = () => {
+  const handleCopyId = useCallback(() => {
     navigator.clipboard.writeText(device.id);
     setCopiedId(true);
     setTimeout(() => setCopiedId(false), 2000);
-  };
+  }, [device.id]);
 
   return (
     <div
