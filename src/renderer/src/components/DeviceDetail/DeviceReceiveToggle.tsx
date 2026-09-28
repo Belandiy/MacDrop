@@ -6,7 +6,9 @@ interface DeviceReceiveToggleProps {
   handleToggleReceive: (enabled: boolean) => void;
 }
 
-export const DeviceReceiveToggle: React.FC<DeviceReceiveToggleProps> = ({
+// ⚡ Bolt Performance Optimization:
+// Wrapped in React.memo to prevent re-renders on high-frequency progress updates.
+export const DeviceReceiveToggle: React.FC<DeviceReceiveToggleProps> = React.memo(({
   isReceiveEnabled,
   handleToggleReceive
 }) => {
@@ -52,4 +54,4 @@ export const DeviceReceiveToggle: React.FC<DeviceReceiveToggleProps> = ({
       </div>
     </div>
   );
-};
+});

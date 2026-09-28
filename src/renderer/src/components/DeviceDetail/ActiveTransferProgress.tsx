@@ -10,7 +10,11 @@ interface ActiveTransferProgressProps {
   percent: number;
 }
 
-export const ActiveTransferProgress: React.FC<ActiveTransferProgressProps> = ({
+// ⚡ Bolt Performance Optimization:
+// Wrapped in React.memo. Although this component displays progress, memoization
+// ensures it only re-renders when the derived props (percent, isCompleted, etc.) change,
+// potentially saving renders if the parent re-renders for other reasons.
+export const ActiveTransferProgress: React.FC<ActiveTransferProgressProps> = React.memo(({
   isVisible,
   progress,
   isCompleted,
@@ -104,4 +108,4 @@ export const ActiveTransferProgress: React.FC<ActiveTransferProgressProps> = ({
       )}
     </div>
   );
-};
+});
