@@ -31,7 +31,13 @@ export default {
           orange: '#f59e0b',
           blue: '#3b82f6',
           textMuted: '#94a3b8'
-        }
+        },
+        appbg: '#0D0E12',
+        tile: '#161821',
+        tilehover: '#1B1E2A',
+        hairline: '#272B38',
+        amberSignal: '#FF9900',
+        emeraldSignal: '#10B981'
       },
       fontFamily: {
         sans: [
