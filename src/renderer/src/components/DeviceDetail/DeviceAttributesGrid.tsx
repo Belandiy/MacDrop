@@ -9,7 +9,9 @@ interface DeviceAttributesGridProps {
   handleCopyId: () => void;
 }
 
-export const DeviceAttributesGrid: React.FC<DeviceAttributesGridProps> = ({
+// ⚡ Bolt Performance Optimization:
+// Wrapped in React.memo to avoid re-rendering this static grid on every progress tick.
+export const DeviceAttributesGrid: React.FC<DeviceAttributesGridProps> = React.memo(({
   device,
   copiedId,
   handleCopyId
@@ -67,4 +69,4 @@ export const DeviceAttributesGrid: React.FC<DeviceAttributesGridProps> = ({
       </div>
     </div>
   );
-};
+});
