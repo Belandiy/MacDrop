@@ -9,6 +9,13 @@ export function useAppLogic() {
     targetFolder: window.macdrop?.platform === 'darwin' ? '~/MacDrop' : 'MacDrop',
     autoStart: true,
     notifications: true,
+    language: (() => {
+      try {
+        return (localStorage.getItem('macdrop_language') as 'ru' | 'en') || 'ru';
+      } catch {
+        return 'ru';
+      }
+    })(),
     deviceId: 'DEVICE',
     deviceName: 'MacDrop',
     pairedDevices: []
@@ -211,6 +218,18 @@ export function useAppLogic() {
     }
   }, []);
 
+  const handleSetLanguage = useCallback(async (lang: 'ru' | 'en') => {
+    try {
+      localStorage.setItem('macdrop_language', lang);
+    } catch {}
+    if (window.macdrop?.saveConfig) {
+      const updated = await window.macdrop.saveConfig({ language: lang });
+      setConfig(updated);
+    } else {
+      setConfig((prev: any) => ({ ...prev, language: lang }));
+    }
+  }, []);
+
   const handlePairWithCode = useCallback(async (code: string) => {
     if (window.macdrop) {
       const res = await window.macdrop.pairDevice(code);
@@ -329,6 +348,7 @@ export function useAppLogic() {
     handleFilesDropped,
     handleToggleAutoStart,
     handleToggleNotifications,
+    handleSetLanguage,
     handlePairWithCode,
     handleUnpairDevice,
     handleDeviceUpdated,

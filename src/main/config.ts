@@ -23,6 +23,7 @@ export interface AppConfig {
   targetFolder: string;
   autoStart: boolean;
   notifications: boolean;
+  language?: 'ru' | 'en';
   deviceId: string;
   deviceName: string;
   pairedDevices: PairedDevice[];
@@ -93,6 +94,7 @@ export function loadConfig(): AppConfig {
     targetFolder: (parsed && typeof parsed.targetFolder === 'string' && parsed.targetFolder) ? parsed.targetFolder : getDefaultFolder(),
     autoStart: true,
     notifications: true,
+    language: (parsed && (parsed.language === 'en' || parsed.language === 'ru')) ? parsed.language : 'ru',
     deviceId: generateShortDeviceId(),
     deviceName: os.hostname() || (isMac ? "Andrey's Mac" : "Andrey's PC"),
     pairedDevices: [],
