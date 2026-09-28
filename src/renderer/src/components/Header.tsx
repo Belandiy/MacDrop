@@ -4,6 +4,7 @@ import logoImg from '../assets/logo.png';
 import packageJson from '../../../../package.json';
 import { CircularUpdateProgress } from './CircularUpdateProgress';
 import { UpdateStateInfo } from '../vite-env';
+import { useTranslation } from '../i18n';
 
 interface HeaderProps {
   onOpenSettings: (tab?: 'general' | 'updates' | 'logs') => void;
@@ -35,6 +36,8 @@ const MacHeader: React.FC<BaseHeaderProps> = ({
   onOpenSettings,
   onOpenUpdatesSettings
 }) => {
+  const { t } = useTranslation();
+
   return (
     <header
       style={{ WebkitAppRegion: 'drag' } as any}
@@ -44,21 +47,21 @@ const MacHeader: React.FC<BaseHeaderProps> = ({
       <div style={{ WebkitAppRegion: 'no-drag' } as any} className="flex items-center gap-2 group">
         <button
           onClick={handleClose}
-          title="Закрыть в трей"
+          title={t('window.closeToTray')}
           className="w-3 h-3 rounded-full bg-[#ff5f56] hover:brightness-110 active:brightness-90 transition-all flex items-center justify-center shadow-[0_0_8px_rgba(255,95,86,0.4)] cursor-pointer"
         >
           <X className="w-2 h-2 text-black/60 opacity-0 group-hover:opacity-100 transition-opacity" />
         </button>
         <button
           onClick={handleMinimize}
-          title="Свернуть"
+          title={t('window.minimize')}
           className="w-3 h-3 rounded-full bg-[#ffbd2e] hover:brightness-110 active:brightness-90 transition-all flex items-center justify-center shadow-[0_0_8px_rgba(255,189,46,0.4)] cursor-pointer"
         >
           <Minus className="w-2 h-2 text-black/60 opacity-0 group-hover:opacity-100 transition-opacity" />
         </button>
         <button
           onClick={handleMaximize}
-          title="Развернуть"
+          title={t('window.maximize')}
           className="w-3 h-3 rounded-full bg-[#27c93f] hover:brightness-110 active:brightness-90 transition-all flex items-center justify-center shadow-[0_0_8px_rgba(39,201,63,0.4)] cursor-pointer"
         >
           <Plus className="w-2 h-2 text-black/60 opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -87,7 +90,7 @@ const MacHeader: React.FC<BaseHeaderProps> = ({
 
         <button
           onClick={() => onOpenSettings('general')}
-          title="Настройки"
+          title={t('window.settings')}
           className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer"
         >
           <Settings className="w-3.5 h-3.5" />
@@ -107,6 +110,8 @@ const WindowsHeader: React.FC<BaseHeaderProps> = ({
   onOpenPairing,
   onOpenUpdatesSettings
 }) => {
+  const { t } = useTranslation();
+
   return (
     <header
       style={{ WebkitAppRegion: 'drag' } as any}
@@ -140,15 +145,15 @@ const WindowsHeader: React.FC<BaseHeaderProps> = ({
 
         <button
           onClick={onOpenPairing}
-          title="Связать устройства (QR / Код)"
+          title={t('window.pairDevices')}
           className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors flex items-center gap-1 text-xs font-medium cursor-pointer"
         >
           <QrCode className="w-4 h-4" />
-          <span className="hidden sm:inline">Связать</span>
+          <span className="hidden sm:inline">{t('window.pair')}</span>
         </button>
         <button
           onClick={() => onOpenSettings('general')}
-          title="Настройки"
+          title={t('window.settings')}
           className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
         >
           <Settings className="w-4 h-4" />
@@ -158,14 +163,14 @@ const WindowsHeader: React.FC<BaseHeaderProps> = ({
 
         <button
           onClick={handleMinimize}
-          title="Свернуть"
+          title={t('window.minimize')}
           className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
         >
           <Minus className="w-4 h-4" />
         </button>
         <button
           onClick={handleClose}
-          title="Свернуть в трей"
+          title={t('window.closeToTray')}
           className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/15 transition-colors cursor-pointer"
         >
           <X className="w-4 h-4" />

@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { PairedDevice } from './DeviceDetailView';
 import { useSmoothProgress, ProgressData } from '../hooks/useSmoothProgress';
+import { useTranslation } from '../i18n';
 
 interface DeviceListProps {
   devices: PairedDevice[];
@@ -34,10 +35,6 @@ function formatBytes(bytes: number): string {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
 }
 
-function formatSpeed(bps: number): string {
-  return `${formatBytes(bps)}/с`;
-}
-
 interface DeviceListItemProps {
   device: PairedDevice;
   onClick: (device: PairedDevice) => void;
@@ -47,6 +44,7 @@ interface DeviceListItemProps {
 // ⚡ Bolt Performance Optimization:
 // Wrapped DeviceListItem in React.memo to prevent re-renders when parent App updates frequently
 const DeviceListItem: React.FC<DeviceListItemProps> = React.memo(({ device, onClick, onQuickSend }) => {
+  const { t } = useTranslation();
   const isMobile = device.id === 'mobile-web';
   const isMac = device.id.startsWith('MAC') || device.originalName.toLowerCase().includes('mac');
 
@@ -66,13 +64,13 @@ const DeviceListItem: React.FC<DeviceListItemProps> = React.memo(({ device, onCl
             {isMobile ? <Smartphone className="w-4.5 h-4.5" /> : isMac ? <Laptop className="w-4.5 h-4.5" /> : <Monitor className="w-4.5 h-4.5" />}
           </div>
           {device.connectionMode === 'remote' ? (
-            <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-[#171a23] bg-cyan-500 shadow-sm shadow-cyan-500/50 flex items-center justify-center" title="В сети (Удалённо через Интернет)">
+            <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-[#171a23] bg-cyan-500 shadow-sm shadow-cyan-500/50 flex items-center justify-center" title={t('devices.remoteInternet')}>
               <Globe className="w-2 h-2 text-white" />
             </span>
           ) : device.connectionMode === 'offline' ? (
-            <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[#171a23] bg-slate-500 shadow-sm" title="Не в сети" />
+            <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[#171a23] bg-slate-500 shadow-sm" title={t('devices.offline')} />
           ) : (
-            <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[#171a23] bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.7)]" title="В сети (Wi-Fi)" />
+            <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[#171a23] bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.7)]" title={t('devices.wifi')} />
           )}
         </div>
 
@@ -82,7 +80,7 @@ const DeviceListItem: React.FC<DeviceListItemProps> = React.memo(({ device, onCl
             <span>{device.customName || device.originalName}</span>
             {device.receiveEnabled === false && (
               <span className="text-[9px] bg-rose-500/15 text-rose-300 border border-rose-500/30 px-1.5 py-0.5 rounded font-medium shrink-0">
-                Приём выкл
+                {t('devices.receiveDisabled')}
               </span>
             )}
           </div>
@@ -93,7 +91,7 @@ const DeviceListItem: React.FC<DeviceListItemProps> = React.memo(({ device, onCl
             {device.connectionMode === 'remote' && (
               <>
                 <span>•</span>
-                <span className="text-[9px] text-cyan-300 bg-cyan-500/15 px-1.5 py-0.5 rounded border border-cyan-500/25 font-medium">Удалённо</span>
+                <span className="text-[9px] text-cyan-300 bg-cyan-500/15 px-1.5 py-0.5 rounded border border-cyan-500/25 font-medium">{t('devices.remoteShort')}</span>
               </>
             )}
           </div>
@@ -105,14 +103,14 @@ const DeviceListItem: React.FC<DeviceListItemProps> = React.memo(({ device, onCl
         {onQuickSend && (
           <button
             onClick={(e) => onQuickSend(e, device.id)}
-            title="Отправить файл"
-            className="p-1.5 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] text-slate-400 hover:text-white transition-colors"
+            title={t('devices.sendTooltip')}
+            className="p-1.5 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] text-slate-400 hover:text-white transition-colors cursor-pointer"
           >
             <Send className="w-3 h-3" />
           </button>
         )}
         <div className="text-slate-500 group-hover:text-slate-300 transition-colors flex items-center gap-0.5 text-[11px]">
-          <span className="hidden group-hover:inline text-[10px] text-slate-400">Открыть</span>
+          <span className="hidden group-hover:inline text-[10px] text-slate-400">{t('devices.open')}</span>
           <ChevronRight className="w-4 h-4" />
         </div>
       </div>
@@ -125,7 +123,6 @@ interface ActiveTransferProgressProps {
   isVisible: boolean;
   isCompleted: boolean;
   formatBytes: (bytes: number) => string;
-  formatSpeed: (bps: number) => string;
 }
 
 // ⚡ Bolt Performance Optimization:
@@ -134,9 +131,9 @@ const ActiveTransferProgress: React.FC<ActiveTransferProgressProps> = React.memo
   progress,
   isVisible,
   isCompleted,
-  formatBytes,
-  formatSpeed
+  formatBytes
 }) => {
+  const { t } = useTranslation();
   const isBatch = Boolean(progress?.totalCount && progress.totalCount > 1);
   const percent = isCompleted
     ? 100
@@ -167,13 +164,13 @@ const ActiveTransferProgress: React.FC<ActiveTransferProgressProps> = React.memo
               )}
               {isBatch && !isCompleted && (
                 <span className="px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 text-[10px] font-mono font-medium shrink-0">
-                  {progress.currentIndex} из {progress.totalCount}
+                  {progress.currentIndex} / {progress.totalCount}
                 </span>
               )}
               <span className="truncate">{progress.filename}</span>
               {progress.peerName && (
                 <span className="text-[10px] text-slate-400 truncate">
-                  ({progress.direction === 'incoming' ? 'от' : 'для'} {progress.peerName})
+                  ({progress.direction === 'incoming' ? t('transfers.from') : t('transfers.to')} {progress.peerName})
                 </span>
               )}
             </div>
@@ -192,11 +189,11 @@ const ActiveTransferProgress: React.FC<ActiveTransferProgressProps> = React.memo
                       await window.macdrop.cancelTransfer();
                     }
                   }}
-                  title="Отменить передачу"
-                  className="px-1.5 py-0.5 rounded-md bg-rose-500/15 hover:bg-rose-500/25 active:bg-rose-500/40 text-rose-400 hover:text-rose-300 transition-colors flex items-center gap-1 text-[10px] font-medium"
+                  title={t('transfers.cancelTransfer')}
+                  className="px-1.5 py-0.5 rounded-md bg-rose-500/15 hover:bg-rose-500/25 active:bg-rose-500/40 text-rose-400 hover:text-rose-300 transition-colors flex items-center gap-1 text-[10px] font-medium cursor-pointer"
                 >
                   <X className="w-3 h-3" />
-                  <span>Отмена</span>
+                  <span>{t('transfers.cancel')}</span>
                 </button>
               )}
             </div>
@@ -217,19 +214,19 @@ const ActiveTransferProgress: React.FC<ActiveTransferProgressProps> = React.memo
             <span>
               {isCompleted
                 ? isBatch
-                  ? `Все файлы переданы (${progress.totalCount} шт.)`
-                  : 'Передача завершена'
+                  ? t('transfers.allFilesTransferred', { count: progress.totalCount || 0 })
+                  : t('transfers.transferCompleted')
                 : isBatch && progress.batchTotalBytes
-                ? `${formatBytes(progress.batchBytesTransferred || 0)} из ${formatBytes(progress.batchTotalBytes)}`
-                : `${formatBytes(progress.bytesTransferred)} из ${formatBytes(progress.totalBytes)}`}
+                ? `${formatBytes(progress.batchBytesTransferred || 0)} / ${formatBytes(progress.batchTotalBytes)}`
+                : `${formatBytes(progress.bytesTransferred)} / ${formatBytes(progress.totalBytes)}`}
             </span>
             <span className="flex items-center gap-1 text-slate-300">
               {isCompleted ? (
-                <span className="text-emerald-400 text-[10px]">✓ Готово</span>
+                <span className="text-emerald-400 text-[10px]">{t('transfers.readyDone')}</span>
               ) : (
                 <>
                   <RefreshCw className="w-3 h-3 animate-spin text-cyan-400" />
-                  {formatSpeed(progress.speedBps)}
+                  <span>{formatBytes(progress.speedBps)}/s</span>
                 </>
               )}
             </span>
@@ -251,6 +248,7 @@ export const DeviceList: React.FC<DeviceListProps> = React.memo(({
   onQuickSend,
   currentProgress
 }) => {
+  const { t } = useTranslation();
   const [isExpanded, setIsExpanded] = React.useState(false);
 
   // Sort devices by last active interaction / lastSeen / pairedAt
@@ -296,17 +294,17 @@ export const DeviceList: React.FC<DeviceListProps> = React.memo(({
           <div className="w-2 h-2 rounded-full bg-indigo-400 shadow-[0_0_8px_rgba(99,102,241,0.6)]" />
           <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
             {hasMoreDevices && !isExpanded
-              ? `Подключенные устройства (3 из ${devices.length})`
-              : `Подключенные устройства (${devices.length})`}
+              ? t('devices.countWithTotal', { count: 3, total: devices.length })
+              : t('devices.count', { count: devices.length })}
           </h3>
         </div>
 
         <button
           onClick={onOpenPairing}
-          className="flex items-center gap-1 text-xs bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 active:scale-95 text-white font-semibold px-2.5 py-1 rounded-lg shadow-sm shadow-indigo-600/30 transition-all"
+          className="flex items-center gap-1 text-xs bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 active:scale-95 text-white font-semibold px-2.5 py-1 rounded-lg shadow-sm shadow-indigo-600/30 transition-all cursor-pointer"
         >
           <Plus className="w-3.5 h-3.5" />
-          <span>Связать</span>
+          <span>{t('devices.pair')}</span>
         </button>
       </div>
 
@@ -317,9 +315,9 @@ export const DeviceList: React.FC<DeviceListProps> = React.memo(({
             <Wifi className="w-5 h-5" />
           </div>
           <div>
-            <p className="text-xs font-semibold text-slate-200">Нет связанных устройств</p>
+            <p className="text-xs font-semibold text-slate-200">{t('devices.noDevices')}</p>
             <p className="text-[11px] text-slate-400">
-              Нажмите «Связать», чтобы подключить Mac или Windows через код / QR
+              {t('devices.noDevicesDesc')}
             </p>
           </div>
         </div>
@@ -338,12 +336,12 @@ export const DeviceList: React.FC<DeviceListProps> = React.memo(({
             <button
               type="button"
               onClick={() => setIsExpanded((prev) => !prev)}
-              className="w-full py-2 px-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.07] active:scale-[0.99] border border-white/[0.06] hover:border-white/[0.12] text-xs font-semibold text-slate-300 hover:text-white transition-all flex items-center justify-center gap-1.5 shadow-sm group mt-0.5"
+              className="w-full py-2 px-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.07] active:scale-[0.99] border border-white/[0.06] hover:border-white/[0.12] text-xs font-semibold text-slate-300 hover:text-white transition-all flex items-center justify-center gap-1.5 shadow-sm group mt-0.5 cursor-pointer"
             >
               <span>
                 {isExpanded
-                  ? 'Свернуть до недавних'
-                  : `Показать все устройства (ещё ${hiddenCount})`}
+                  ? t('devices.collapse')
+                  : t('devices.showAll', { count: hiddenCount })}
               </span>
               <ChevronDown
                 className={`w-3.5 h-3.5 text-slate-400 group-hover:text-indigo-300 transition-transform duration-200 ${
@@ -361,7 +359,6 @@ export const DeviceList: React.FC<DeviceListProps> = React.memo(({
         isVisible={isVisible}
         isCompleted={isCompleted}
         formatBytes={formatBytes}
-        formatSpeed={formatSpeed}
       />
     </div>
   );

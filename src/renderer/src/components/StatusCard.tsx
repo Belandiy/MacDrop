@@ -1,5 +1,6 @@
 import React from 'react';
 import { Wifi, ArrowDownCircle, ArrowUpCircle, CheckCircle2, RefreshCw } from 'lucide-react';
+import { useTranslation } from '../i18n';
 
 interface StatusCardProps {
   isConnected: boolean;
@@ -26,16 +27,13 @@ function formatBytes(bytes: number): string {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
 }
 
-function formatSpeed(bps: number): string {
-  return `${formatBytes(bps)}/с`;
-}
-
 export const StatusCard: React.FC<StatusCardProps> = ({
   isConnected,
   pairedDevice,
   currentProgress,
   onOpenPairing
 }) => {
+  const { t } = useTranslation();
   const percent = currentProgress && currentProgress.totalBytes > 0
     ? Math.min(100, Math.round((currentProgress.bytesTransferred / currentProgress.totalBytes) * 100))
     : 0;
@@ -62,17 +60,17 @@ export const StatusCard: React.FC<StatusCardProps> = ({
             <div className="text-sm font-medium text-white flex items-center gap-1.5">
               {isConnected ? (
                 <>
-                  <span>{pairedDevice?.name || 'Второе устройство'}</span>
+                  <span>{pairedDevice?.name || t('devices.title')}</span>
                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
                 </>
               ) : (
-                <span className="text-zinc-300">Ожидание подключения...</span>
+                <span className="text-zinc-300">{t('devices.noDevices')}</span>
               )}
             </div>
             <p className="text-xs text-zinc-400">
               {isConnected
-                ? 'Готов к мгновенной передаче'
-                : 'Устройства связываются через QR/Код'}
+                ? t('dropzone.directP2p')
+                : t('devices.noDevicesDesc')}
             </p>
           </div>
         </div>
@@ -80,9 +78,9 @@ export const StatusCard: React.FC<StatusCardProps> = ({
         {!isConnected && (
           <button
             onClick={onOpenPairing}
-            className="text-xs bg-blue-600 hover:bg-blue-500 text-white font-medium px-3 py-1.5 rounded-lg shadow-sm transition-colors"
+            className="text-xs bg-blue-600 hover:bg-blue-500 text-white font-medium px-3 py-1.5 rounded-lg shadow-sm transition-colors cursor-pointer"
           >
-            Связать
+            {t('devices.pair')}
           </button>
         )}
       </div>
@@ -112,11 +110,11 @@ export const StatusCard: React.FC<StatusCardProps> = ({
 
           <div className="flex items-center justify-between text-[11px] text-zinc-400 mt-1.5">
             <span>
-              {formatBytes(currentProgress.bytesTransferred)} из {formatBytes(currentProgress.totalBytes)}
+              {formatBytes(currentProgress.bytesTransferred)} / {formatBytes(currentProgress.totalBytes)}
             </span>
             <span className="flex items-center gap-1 text-zinc-300">
               <RefreshCw className="w-3 h-3 animate-spin text-blue-400" />
-              {formatSpeed(currentProgress.speedBps)}
+              <span>{formatBytes(currentProgress.speedBps)}/s</span>
             </span>
           </div>
         </div>

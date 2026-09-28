@@ -6,6 +6,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { useSmoothProgress } from '../hooks/useSmoothProgress';
+import { useTranslation } from '../i18n';
 
 import {
   DeviceHeader,
@@ -15,7 +16,6 @@ import {
   ActiveTransferProgress,
   TransferHistoryLog
 } from './DeviceDetail';
-
 
 export interface PairedDevice {
   id: string;
@@ -61,16 +61,16 @@ export function formatBytes(bytes: number): string {
 }
 
 export function formatSpeed(bps: number): string {
-  return `${formatBytes(bps)}/с`;
+  return `${formatBytes(bps)}/s`;
 }
 
 export function timeAgo(timestamp: number): string {
   const seconds = Math.floor((Date.now() - timestamp) / 1000);
-  if (seconds < 60) return 'только что';
+  if (seconds < 60) return 'just now';
   const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes} мин назад`;
+  if (minutes < 60) return `${minutes}m ago`;
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours} ч назад`;
+  if (hours < 24) return `${hours}h ago`;
   return new Date(timestamp).toLocaleDateString();
 }
 
@@ -82,6 +82,7 @@ export const DeviceDetailView: React.FC<DeviceDetailViewProps> = ({
   onOpenFile,
   currentProgress
 }) => {
+  const { t } = useTranslation();
   const { progress, isVisible, isCompleted } = useSmoothProgress(currentProgress, 800);
 
   const isBatch = Boolean(progress?.totalCount && progress.totalCount > 1);
@@ -176,12 +177,12 @@ export const DeviceDetailView: React.FC<DeviceDetailViewProps> = ({
         if (msg.includes('отключил приём') || msg.includes('выключен приём') || msg.includes('403')) {
           setSendNotice({
             type: 'warning',
-            message: 'У этого устройства выключен приём файлов'
+            message: t('devices.deviceReceiveDisabled')
           });
         } else {
           setSendNotice({
             type: 'error',
-            message: msg || 'Ошибка отправки файла'
+            message: msg || t('devices.fileSendError')
           });
         }
         setTimeout(() => setSendNotice(null), 4500);
@@ -226,17 +227,17 @@ export const DeviceDetailView: React.FC<DeviceDetailViewProps> = ({
             if (blocked) {
               setSendNotice({
                 type: 'warning',
-                message: 'У этого устройства выключен приём файлов'
+                message: t('devices.deviceReceiveDisabled')
               });
             } else if (failed) {
               setSendNotice({
                 type: 'error',
-                message: failed.error || 'Ошибка отправки файла'
+                message: failed.error || t('devices.fileSendError')
               });
             } else {
               setSendNotice({
                 type: 'success',
-                message: `Файл(ы) успешно отправлены!`
+                message: t('dropzone.filesSentSuccess')
               });
             }
           }
@@ -250,12 +251,12 @@ export const DeviceDetailView: React.FC<DeviceDetailViewProps> = ({
           ) {
             setSendNotice({
               type: 'warning',
-              message: 'У этого устройства выключен приём файлов'
+              message: t('devices.deviceReceiveDisabled')
             });
           } else {
             setSendNotice({
               type: 'error',
-              message: msg || 'Ошибка отправки файла'
+              message: msg || t('devices.fileSendError')
             });
           }
         } finally {
@@ -285,10 +286,10 @@ export const DeviceDetailView: React.FC<DeviceDetailViewProps> = ({
       <div className="flex items-center justify-between">
         <button
           onClick={onBack}
-          className="flex items-center gap-1.5 text-xs text-slate-200 hover:text-white bg-[#171a23] hover:bg-[#1f2330] px-3 py-1.5 rounded-xl border border-white/[0.08] transition-all font-semibold active:scale-95"
+          className="flex items-center gap-1.5 text-xs text-slate-200 hover:text-white bg-[#171a23] hover:bg-[#1f2330] px-3 py-1.5 rounded-xl border border-white/[0.08] transition-all font-semibold active:scale-95 cursor-pointer"
         >
           <ArrowLeft className="w-3.5 h-3.5 text-slate-400" />
-          <span>Все устройства</span>
+          <span>{t('devices.title')}</span>
         </button>
 
         <span className="text-xs text-slate-500 font-mono">ID: {device.id}</span>

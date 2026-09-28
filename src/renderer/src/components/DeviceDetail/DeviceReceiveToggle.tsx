@@ -1,5 +1,6 @@
 import React from 'react';
 import { CheckCircle2, Ban } from 'lucide-react';
+import { useTranslation } from '../../i18n';
 
 interface DeviceReceiveToggleProps {
   isReceiveEnabled: boolean;
@@ -10,6 +11,8 @@ export const DeviceReceiveToggle: React.FC<DeviceReceiveToggleProps> = ({
   isReceiveEnabled,
   handleToggleReceive
 }) => {
+  const { t } = useTranslation();
+
   return (
     <div className="bg-[#171a23] border border-white/[0.06] rounded-xl p-3 flex items-center justify-between">
       <div>
@@ -19,35 +22,35 @@ export const DeviceReceiveToggle: React.FC<DeviceReceiveToggleProps> = ({
           ) : (
             <Ban className="w-3.5 h-3.5 text-amber-400" />
           )}
-          <span>Приём файлов от этого устройства</span>
+          <span>{t('devices.receiveFilesFromDevice')}</span>
         </div>
         <div className="text-[11px] text-slate-400 mt-0.5">
           {isReceiveEnabled
-            ? 'Разрешено: устройство может отправлять вам файлов'
-            : 'Запрещено: приём временно заблокирован без потери связи'}
+            ? t('devices.receiveAllowedDesc')
+            : t('devices.receiveBlockedDesc')}
         </div>
       </div>
 
       <div className="flex items-center bg-[#111319] p-0.5 rounded-xl border border-white/[0.08] shrink-0 ml-3">
         <button
           onClick={() => handleToggleReceive(true)}
-          className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all ${
+          className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
             isReceiveEnabled
               ? 'bg-emerald-600 text-white shadow-sm'
               : 'text-slate-400 hover:text-white'
           }`}
         >
-          Вкл
+          {t('devices.on')}
         </button>
         <button
           onClick={() => handleToggleReceive(false)}
-          className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all ${
+          className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
             !isReceiveEnabled
               ? 'bg-rose-600 text-white shadow-sm'
               : 'text-slate-400 hover:text-white'
           }`}
         >
-          Выкл
+          {t('devices.off')}
         </button>
       </div>
     </div>

@@ -1,6 +1,7 @@
 import React from 'react';
 import { HardDrive, File, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
 import { TransferItem, formatBytes, timeAgo } from '../DeviceDetailView';
+import { useTranslation } from '../../i18n';
 
 interface TransferHistoryLogProps {
   history: TransferItem[];
@@ -11,22 +12,26 @@ export const TransferHistoryLog: React.FC<TransferHistoryLogProps> = ({
   history,
   onOpenFile
 }) => {
+  const { t } = useTranslation();
+
   return (
     <div className="bg-[#111319]/90 border border-white/[0.08] rounded-2xl p-4 shadow-xl backdrop-blur-md flex-1 flex flex-col min-h-[220px]">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
           <HardDrive className="w-3.5 h-3.5 text-indigo-400" />
-          <span>Журнал передач с этим устройством</span>
+          <span>{t('devices.historyWithDevice')}</span>
         </div>
-        <span className="text-[10px] text-slate-500 font-mono">{history.length} файл(ов)</span>
+        <span className="text-[10px] text-slate-500 font-mono">
+          {t('history.filesCount', { count: history.length })}
+        </span>
       </div>
 
       {history.length === 0 ? (
         <div className="flex-1 flex flex-col items-center justify-center p-6 text-center text-slate-500 space-y-2 border border-dashed border-white/[0.08] rounded-xl">
           <File className="w-8 h-8 text-slate-600 stroke-[1.5]" />
-          <p className="text-xs font-semibold text-slate-400">История передач с этим устройством пуста</p>
+          <p className="text-xs font-semibold text-slate-400">{t('devices.emptyHistoryWithDevice')}</p>
           <p className="text-[11px] text-slate-500">
-            Перетащите файлы прямо сюда или нажмите «Отправить файл(ы)»
+            {t('devices.dragFilesHereOrSend')}
           </p>
         </div>
       ) : (
@@ -54,7 +59,7 @@ export const TransferHistoryLog: React.FC<TransferHistoryLogProps> = ({
                     {item.filename}
                   </div>
                   <div className="text-[10px] text-slate-400 flex items-center gap-1.5 font-mono">
-                    <span>{item.direction === 'incoming' ? 'Получен' : 'Отправлен'}</span>
+                    <span>{item.direction === 'incoming' ? t('devices.incoming') : t('devices.outgoing')}</span>
                     <span>•</span>
                     <span>{formatBytes(item.size)}</span>
                     <span>•</span>

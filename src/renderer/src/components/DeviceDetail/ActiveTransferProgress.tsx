@@ -1,6 +1,7 @@
 import React from 'react';
 import { CheckCircle2, ArrowDownCircle, ArrowUpCircle, X, RefreshCw } from 'lucide-react';
-import { formatBytes, formatSpeed } from '../DeviceDetailView';
+import { formatBytes } from '../DeviceDetailView';
+import { useTranslation } from '../../i18n';
 
 interface ActiveTransferProgressProps {
   isVisible: boolean;
@@ -17,6 +18,8 @@ export const ActiveTransferProgress: React.FC<ActiveTransferProgressProps> = ({
   isBatch,
   percent
 }) => {
+  const { t } = useTranslation();
+
   return (
     <div
       className={`transition-all duration-300 ease-out overflow-hidden ${
@@ -38,7 +41,7 @@ export const ActiveTransferProgress: React.FC<ActiveTransferProgressProps> = ({
               )}
               {isBatch && !isCompleted && (
                 <span className="px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 text-[10px] font-mono font-medium shrink-0">
-                  {progress.currentIndex} из {progress.totalCount}
+                  {progress.currentIndex} / {progress.totalCount}
                 </span>
               )}
               <span className="truncate">{progress.filename}</span>
@@ -56,11 +59,11 @@ export const ActiveTransferProgress: React.FC<ActiveTransferProgressProps> = ({
                       await window.macdrop.cancelTransfer();
                     }
                   }}
-                  title="Отменить передачу"
-                  className="px-1.5 py-0.5 rounded-md bg-rose-500/15 hover:bg-rose-500/25 active:bg-rose-500/40 text-rose-400 hover:text-rose-300 transition-colors flex items-center gap-1 text-[10px] font-medium"
+                  title={t('transfers.cancelTransfer')}
+                  className="px-1.5 py-0.5 rounded-md bg-rose-500/15 hover:bg-rose-500/25 active:bg-rose-500/40 text-rose-400 hover:text-rose-300 transition-colors flex items-center gap-1 text-[10px] font-medium cursor-pointer"
                 >
                   <X className="w-3 h-3" />
-                  <span>Отмена</span>
+                  <span>{t('transfers.cancel')}</span>
                 </button>
               )}
             </div>
@@ -81,21 +84,21 @@ export const ActiveTransferProgress: React.FC<ActiveTransferProgressProps> = ({
             <span>
               {isCompleted
                 ? isBatch
-                  ? `Все файлы переданы (${progress.totalCount} шт.)`
-                  : 'Передача завершена'
+                  ? t('transfers.allFilesTransferred', { count: progress.totalCount })
+                  : t('transfers.transferCompleted')
                 : isBatch && progress.batchTotalBytes
-                ? `${formatBytes(progress.batchBytesTransferred || 0)} из ${formatBytes(progress.batchTotalBytes)}`
-                : `${formatBytes(progress.bytesTransferred)} из ${formatBytes(progress.totalBytes)}`}
+                ? `${formatBytes(progress.batchBytesTransferred || 0)} / ${formatBytes(progress.batchTotalBytes)}`
+                : `${formatBytes(progress.bytesTransferred)} / ${formatBytes(progress.totalBytes)}`}
             </span>
             <span className="flex items-center gap-1 text-slate-300">
               {isCompleted ? (
                 <span className="text-emerald-400 font-sans font-medium flex items-center gap-1">
-                  ✓ Завершено
+                  {t('transfers.readyDone')}
                 </span>
               ) : (
                 <>
                   <RefreshCw className="w-3 h-3 animate-spin text-cyan-400" />
-                  {formatSpeed(progress.speedBps)}
+                  <span>{formatBytes(progress.speedBps)}/s</span>
                 </>
               )}
             </span>

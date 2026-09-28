@@ -1,6 +1,7 @@
 import React from 'react';
 import { ArrowDown, RefreshCw } from 'lucide-react';
 import { UpdateStateInfo } from '../vite-env';
+import { useTranslation } from '../i18n';
 
 interface CircularUpdateProgressProps {
   updateState: UpdateStateInfo;
@@ -13,6 +14,7 @@ export const CircularUpdateProgress: React.FC<CircularUpdateProgressProps> = ({
   onOpenUpdatesSettings,
   onInstallUpdate
 }) => {
+  const { t } = useTranslation();
   const isDownloading = updateState.status === 'downloading';
   const isDownloaded = updateState.status === 'downloaded';
 
@@ -41,8 +43,8 @@ export const CircularUpdateProgress: React.FC<CircularUpdateProgressProps> = ({
   };
 
   const title = isDownloaded
-    ? `Обновление v${updateState.version || ''} готово. Нажмите для перезагрузки и установки.`
-    : `Загрузка обновления: ${Math.round(percent)}% (нажмите для подробностей)`;
+    ? t('updates.readyInstallTitle', { version: updateState.version || '' })
+    : t('updates.downloadProgressTitle', { percent: Math.round(percent) });
 
   return (
     <button

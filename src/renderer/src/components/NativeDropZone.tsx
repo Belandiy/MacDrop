@@ -1,6 +1,7 @@
 import React, { useRef } from 'react';
 import { PairedDevice } from './DeviceDetailView';
 import { useStableDropZone } from '../hooks/useStableDropZone';
+import { useTranslation } from '../i18n';
 
 interface NativeDropZoneProps {
   devices: PairedDevice[];
@@ -17,6 +18,7 @@ export const NativeDropZone: React.FC<NativeDropZoneProps> = ({
   onChooseFiles,
   className = ''
 }) => {
+  const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   // Fallback target if none selected
@@ -47,7 +49,7 @@ export const NativeDropZone: React.FC<NativeDropZoneProps> = ({
       return `${d.remoteIp || d.ip || 'Remote'} • P2P`;
     }
     if (d.connectionMode === 'offline') {
-      return 'Offline';
+      return t('devices.offline');
     }
     return `${d.ip || '192.168.1.x'} • 0.8ms`;
   };
@@ -62,9 +64,9 @@ export const NativeDropZone: React.FC<NativeDropZoneProps> = ({
         {!isDragging ? (
           <div className="flex items-center gap-2">
             <span>
-              Sending to:{' '}
+              {t('dropzone.sendingTo')}{' '}
               <span className="font-medium text-[#F2F2F7]">
-                {activeTarget ? (activeTarget.customName || activeTarget.originalName) : 'No Device Selected'}
+                {activeTarget ? (activeTarget.customName || activeTarget.originalName) : t('dropzone.noNodeSelected')}
               </span>
             </span>
             {activeTarget && (
@@ -88,7 +90,7 @@ export const NativeDropZone: React.FC<NativeDropZoneProps> = ({
             >
               <path d="M12 3v12M7 10l5 5 5-5M20 21H4" />
             </svg>
-            <span>{isOverZone ? 'Release to send to target' : 'Hover over a destination device...'}</span>
+            <span>{isOverZone ? t('dropzone.releaseToSendToTarget') : t('dropzone.hoverOverDestination')}</span>
           </div>
         )}
       </div>
@@ -131,12 +133,12 @@ export const NativeDropZone: React.FC<NativeDropZoneProps> = ({
 
           {/* Primary Text */}
           <span className="text-[13px] font-medium text-[#E5E5EA] pointer-events-none">
-            Drop files here to send
+            {t('dropzone.dropFilesHereToSend')}
           </span>
 
           {/* Secondary Hint */}
           <span className="text-[11px] text-[#8E8E93] pointer-events-none">
-            or click to select files
+            {t('dropzone.orClickToSelectFiles')}
           </span>
 
           {/* Native macOS Button */}
@@ -148,7 +150,7 @@ export const NativeDropZone: React.FC<NativeDropZoneProps> = ({
             }}
             className="mt-1 px-3.5 py-1 text-[12px] font-medium bg-[#2C2C2E] hover:bg-[#38383A] text-[#F2F2F7] border border-[#3A3A3C] rounded-[5px] shadow-[0_0.5px_1px_rgba(0,0,0,0.4)] transition-colors cursor-pointer"
           >
-            Choose Files...
+            {t('dropzone.chooseFilesBtn')}
           </button>
         </div>
 
@@ -161,8 +163,8 @@ export const NativeDropZone: React.FC<NativeDropZoneProps> = ({
           {devices.length === 0 ? (
             /* Fallback if no paired devices */
             <div className="flex-1 h-full rounded-[6px] bg-[#202022] border border-[#333333] p-2 flex flex-col items-center justify-center text-center pointer-events-none">
-              <span className="text-[12px] font-medium text-[#F2F2F7]">No paired devices</span>
-              <span className="text-[10px] text-[#8E8E93]">Pair a device from the left sidebar</span>
+              <span className="text-[12px] font-medium text-[#F2F2F7]">{t('devices.noDevices')}</span>
+              <span className="text-[10px] text-[#8E8E93]">{t('devices.noDevicesDesc')}</span>
             </div>
           ) : (
             devices.slice(0, 3).map((device) => {
@@ -225,7 +227,7 @@ export const NativeDropZone: React.FC<NativeDropZoneProps> = ({
                     <span className={`text-[11px] leading-tight text-center ${
                       isHovered ? 'text-[#007AFF] font-bold' : 'text-[#8E8E93]'
                     }`}>
-                      {isHovered ? 'Release to send' : 'Drop to send'}
+                      {isHovered ? t('dropzone.releaseToSend') : t('dropzone.dropToSend')}
                     </span>
                     <span className="text-[9px] text-[#636366] font-mono mt-0.5">
                       {getDeviceSubtitle(device)}

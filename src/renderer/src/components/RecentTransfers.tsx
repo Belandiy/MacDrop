@@ -1,5 +1,6 @@
 import React from 'react';
 import { History, ArrowDownLeft, ArrowUpRight, File } from 'lucide-react';
+import { useTranslation } from '../i18n';
 
 interface TransferItem {
   id: string;
@@ -25,28 +26,30 @@ function formatBytes(bytes: number): string {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
 }
 
-function timeAgo(timestamp: number): string {
-  const seconds = Math.floor((Date.now() - timestamp) / 1000);
-  if (seconds < 60) return 'только что';
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes} мин назад`;
-  const hours = Math.floor(minutes / 60);
-  return `${hours} ч назад`;
-}
-
 // ⚡ Bolt Performance Optimization:
 // Wrapped RecentTransfers in React.memo. Prevents this component (which can contain
 // multiple elements and relatively expensive format calls) from re-rendering on every
 // byte transferred, as `items` reference stays the same during transfer.
 export const RecentTransfers: React.FC<RecentTransfersProps> = React.memo(({ items, onOpenFile }) => {
+  const { t } = useTranslation();
+
+  const timeAgo = (timestamp: number): string => {
+    const seconds = Math.floor((Date.now() - timestamp) / 1000);
+    if (seconds < 60) return t('history.justNow');
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return t('history.minAgo', { min: minutes });
+    const hours = Math.floor(minutes / 60);
+    return t('history.hrAgo', { hr: hours });
+  };
+
   if (items.length === 0) {
     return (
       <div className="bg-[#111319]/60 border border-white/[0.06] rounded-2xl p-4 text-center">
         <div className="flex items-center justify-center gap-1.5 text-slate-400 text-xs mb-1 font-semibold">
           <History className="w-3.5 h-3.5 text-indigo-400" />
-          <span>История передач</span>
+          <span>{t('history.title')}</span>
         </div>
-        <p className="text-[11px] text-slate-500">Переданные файлы будут отображаться здесь</p>
+        <p className="text-[11px] text-slate-500">{t('history.emptyDesc')}</p>
       </div>
     );
   }
@@ -56,9 +59,11 @@ export const RecentTransfers: React.FC<RecentTransfersProps> = React.memo(({ ite
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
           <History className="w-3.5 h-3.5 text-indigo-400" />
-          <span>Последние файлы</span>
+          <span>{t('history.recentFiles')}</span>
         </div>
-        <span className="text-[10px] text-slate-500 font-mono">{items.length} файл(ов)</span>
+        <span className="text-[10px] text-slate-500 font-mono">
+          {t('history.filesCount', { count: items.length })}
+        </span>
       </div>
 
       <div className="flex flex-col gap-2 max-h-40 overflow-y-auto pr-1">

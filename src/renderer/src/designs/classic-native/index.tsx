@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { DesignProps } from '../types';
 import { NativeDropZone } from '../../components/NativeDropZone';
+import { useTranslation } from '../../i18n';
 
 export const name = 'Classic Native (macOS)';
 export const windowSize = { width: 760, height: 480 };
@@ -16,16 +17,6 @@ function formatBytes(bytes: number): string {
   const sizes = ['B', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
-}
-
-function timeAgo(timestamp: number): string {
-  const seconds = Math.floor((Date.now() - timestamp) / 1000);
-  if (seconds < 60) return 'just now';
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes} min ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours} hr ago`;
-  return new Date(timestamp).toLocaleDateString();
 }
 
 export default function ClassicNativeDesign(props: DesignProps) {
@@ -42,6 +33,8 @@ export default function ClassicNativeDesign(props: DesignProps) {
     handleOpenPairing,
     handleChooseFiles
   } = props;
+
+  const { t } = useTranslation();
 
   // Filter state for transfers: All | Active | Completed
   const [transferFilter, setTransferFilter] = useState<'all' | 'active' | 'completed'>('all');
@@ -71,16 +64,26 @@ export default function ClassicNativeDesign(props: DesignProps) {
   const currentProgress = status.currentProgress;
   const recentHistory = status.recentHistory || [];
 
+  const timeAgo = (timestamp: number): string => {
+    const seconds = Math.floor((Date.now() - timestamp) / 1000);
+    if (seconds < 60) return t('history.justNow');
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return t('history.minAgo', { min: minutes });
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return t('history.hrAgo', { hr: hours });
+    return new Date(timestamp).toLocaleDateString();
+  };
+
   // Calculate ETA for active transfer
   const getEtaString = () => {
     if (!currentProgress || !currentProgress.bytesPerSecond || currentProgress.bytesPerSecond === 0) {
       return '';
     }
     const remainingBytes = (currentProgress.total || 0) - (currentProgress.transferred || 0);
-    if (remainingBytes <= 0) return 'finishing...';
+    if (remainingBytes <= 0) return t('transfers.finishing');
     const seconds = Math.ceil(remainingBytes / currentProgress.bytesPerSecond);
-    if (seconds < 60) return `${seconds} sec left`;
-    return `${Math.ceil(seconds / 60)} min left`;
+    if (seconds < 60) return t('transfers.secLeft', { sec: seconds });
+    return t('transfers.minLeft', { min: Math.ceil(seconds / 60) });
   };
 
   const hasActiveTransfer = Boolean(currentProgress);
@@ -100,17 +103,17 @@ export default function ClassicNativeDesign(props: DesignProps) {
         <div style={{ WebkitAppRegion: 'no-drag' } as any} className="flex items-center gap-[7px]">
           <button
             onClick={() => window.macdrop?.closeWindow()}
-            title="Close"
+            title={t('window.close')}
             className="w-3 h-3 rounded-full bg-[#FF5F56] border border-[#E0443E]/60 flex items-center justify-center cursor-pointer transition-transform active:scale-95"
           />
           <button
             onClick={() => window.macdrop?.minimizeWindow()}
-            title="Minimize"
+            title={t('window.minimize')}
             className="w-3 h-3 rounded-full bg-[#FFBD2E] border border-[#DEA123]/60 flex items-center justify-center cursor-pointer transition-transform active:scale-95"
           />
           <button
             onClick={() => window.macdrop?.maximizeWindow?.()}
-            title="Zoom"
+            title={t('window.zoom')}
             className="w-3 h-3 rounded-full bg-[#27C93F] border border-[#1AAB29]/60 flex items-center justify-center cursor-pointer transition-transform active:scale-95"
           />
         </div>
@@ -125,7 +128,7 @@ export default function ClassicNativeDesign(props: DesignProps) {
           style={{ WebkitAppRegion: 'no-drag' } as any}
           onClick={() => handleOpenSettings('general')}
           className="w-6 h-6 flex items-center justify-center rounded text-[#8E8E93] hover:text-[#FFFFFF] hover:bg-[#2C2C2E] transition-colors cursor-pointer"
-          title="Settings"
+          title={t('window.settings')}
         >
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" viewBox="0 0 24 24">
             <circle cx="12" cy="12" r="3"></circle>
@@ -143,12 +146,12 @@ export default function ClassicNativeDesign(props: DesignProps) {
           {/* Top Section: Devices */}
           <div>
             <div className="px-2 py-1 text-[11px] font-semibold text-[#8E8E93] uppercase tracking-wider">
-              DEVICES
+              {t('devices.title')}
             </div>
             <nav className="mt-1 space-y-0.5">
               {devices.length === 0 ? (
                 <div className="px-2 py-2 text-[12px] text-[#8E8E93]">
-                  No devices paired
+                  {t('devices.noDevices')}
                 </div>
               ) : (
                 devices.map((device) => {
@@ -203,20 +206,20 @@ export default function ClassicNativeDesign(props: DesignProps) {
               onClick={handleOpenPairing}
               className="mt-2.5 px-2 py-1 text-[12px] text-[#8E8E93] hover:text-[#007AFF] transition-colors flex items-center gap-1.5 cursor-pointer"
             >
-              + Add Device...
+              {t('devices.addDevice')}
             </button>
           </div>
 
           {/* Bottom Section: Destination Folder */}
           <div className="border-t border-[#2C2C2E] pt-2.5 mt-auto">
             <div className="px-1 mb-1.5 text-[10px] font-semibold text-[#8E8E93] uppercase tracking-wider">
-              DESTINATION FOLDER
+              {t('folder.destinationFolder')}
             </div>
             <div className="flex items-center justify-between gap-1.5 px-1">
               <div
                 onClick={handleOpenFolder}
                 className="flex items-center gap-1.5 min-w-0 cursor-pointer group"
-                title="Open folder in Finder / Explorer"
+                title={t('folder.openFolder')}
               >
                 {/* Native macOS Folder Glyph */}
                 <svg className="w-3.5 h-3.5 text-[#007AFF] shrink-0" fill="currentColor" viewBox="0 0 24 24">
@@ -230,7 +233,7 @@ export default function ClassicNativeDesign(props: DesignProps) {
                 onClick={handleSelectFolder}
                 className="shrink-0 px-[7px] py-[2px] text-[11px] font-medium bg-[#2C2C2E] hover:bg-[#38383A] text-[#D1D1D6] hover:text-white border border-[#3A3A3C] rounded-[4px] shadow-[0_0.5px_1px_rgba(0,0,0,0.4)] transition-colors cursor-pointer"
               >
-                Change...
+                {t('folder.change')}
               </button>
             </div>
           </div>
@@ -252,7 +255,7 @@ export default function ClassicNativeDesign(props: DesignProps) {
           <section className="flex-1 p-[14px_16px] flex flex-col overflow-hidden">
             {/* Section Header Row */}
             <div className="flex items-center justify-between mb-2.5">
-              <span className="text-[13px] font-semibold text-[#F2F2F7]">Transfers</span>
+              <span className="text-[13px] font-semibold text-[#F2F2F7]">{t('transfers.title')}</span>
 
               {/* macOS Segmented Control */}
               <div className="inline-flex p-0.5 rounded-[6px] bg-[#252528] border border-[#333336] text-[11px]">
@@ -264,7 +267,7 @@ export default function ClassicNativeDesign(props: DesignProps) {
                       : 'text-[#8E8E93] hover:text-[#E5E5EA]'
                   }`}
                 >
-                  All
+                  {t('transfers.all')}
                 </button>
                 <button
                   onClick={() => setTransferFilter('active')}
@@ -274,7 +277,7 @@ export default function ClassicNativeDesign(props: DesignProps) {
                       : 'text-[#8E8E93] hover:text-[#E5E5EA]'
                   }`}
                 >
-                  Active
+                  {t('transfers.active')}
                 </button>
                 <button
                   onClick={() => setTransferFilter('completed')}
@@ -284,7 +287,7 @@ export default function ClassicNativeDesign(props: DesignProps) {
                       : 'text-[#8E8E93] hover:text-[#E5E5EA]'
                   }`}
                 >
-                  Completed
+                  {t('transfers.completed')}
                 </button>
               </div>
             </div>
@@ -329,7 +332,7 @@ export default function ClassicNativeDesign(props: DesignProps) {
                     <button
                       onClick={() => window.macdrop?.cancelTransfer?.()}
                       className="w-4 h-4 rounded-full bg-[#2C2C2E] hover:bg-[#3A3A3C] text-[#8E8E93] hover:text-[#F2F2F7] flex items-center justify-center transition-colors cursor-pointer"
-                      title="Cancel"
+                      title={t('transfers.cancel')}
                     >
                       <X className="w-2.5 h-2.5" />
                     </button>
@@ -369,7 +372,7 @@ export default function ClassicNativeDesign(props: DesignProps) {
                     <div className="flex items-center gap-4 shrink-0">
                       <div className="flex items-center gap-1 text-[11px] text-[#34C759] font-medium">
                         <Check className="w-3.5 h-3.5 stroke-[2]" />
-                        <span>Completed</span>
+                        <span>{t('transfers.completed')}</span>
                       </div>
                       <button
                         onClick={(e) => {
@@ -379,7 +382,7 @@ export default function ClassicNativeDesign(props: DesignProps) {
                         className="text-[11px] text-[#8E8E93] hover:text-[#007AFF] flex items-center gap-1 transition-colors cursor-pointer"
                       >
                         <Search className="w-3.5 h-3.5" />
-                        <span>Show in Finder</span>
+                        <span>{t('transfers.showInFinder')}</span>
                       </button>
                     </div>
                   </div>
@@ -389,7 +392,7 @@ export default function ClassicNativeDesign(props: DesignProps) {
               {/* Empty state if nothing to show */}
               {!hasActiveTransfer && (!showCompletedRows || recentHistory.length === 0) && (
                 <div className="h-full flex items-center justify-center text-[#8E8E93] text-[12px] py-8">
-                  No transfers to display
+                  {t('transfers.noTransfers')}
                 </div>
               )}
             </div>

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ShieldAlert, Check, X, Laptop, Monitor, Clock } from 'lucide-react';
+import { useTranslation } from '../i18n';
 
 export interface PairingRequest {
   requestId: string;
@@ -34,56 +35,65 @@ const DeviceIcon: React.FC<{ isMac: boolean }> = ({ isMac }) => (
   </div>
 );
 
-const DeviceInfoCard: React.FC<{ request: PairingRequest }> = ({ request }) => (
-  <div className="w-full bg-[#1C1C1E] border border-[#2C2C2E] rounded-[8px] p-3 mt-3.5 text-left space-y-2">
-    <div className="flex items-center justify-between">
-      <span className="text-[11px] font-medium text-[#8E8E93]">Имя устройства:</span>
-      <span className="text-[12px] font-medium text-[#F2F2F7] truncate max-w-[170px]">
-        {request.deviceName}
-      </span>
+const DeviceInfoCard: React.FC<{ request: PairingRequest }> = ({ request }) => {
+  const { t } = useTranslation();
+
+  return (
+    <div className="w-full bg-[#1C1C1E] border border-[#2C2C2E] rounded-[8px] p-3 mt-3.5 text-left space-y-2">
+      <div className="flex items-center justify-between">
+        <span className="text-[11px] font-medium text-[#8E8E93]">{t('pairing.deviceName')}</span>
+        <span className="text-[12px] font-medium text-[#F2F2F7] truncate max-w-[170px]">
+          {request.deviceName}
+        </span>
+      </div>
+      <div className="flex items-center justify-between">
+        <span className="text-[11px] font-medium text-[#8E8E93]">{t('pairing.ipAddress')}</span>
+        <span className="text-[11px] font-mono text-[#007AFF] font-medium">
+          {request.ip}:{request.port}
+        </span>
+      </div>
+      <div className="flex items-center justify-between">
+        <span className="text-[11px] font-medium text-[#8E8E93]">{t('devices.deviceId')}</span>
+        <span className="text-[11px] font-mono text-[#636366]">
+          {request.deviceId}
+        </span>
+      </div>
     </div>
-    <div className="flex items-center justify-between">
-      <span className="text-[11px] font-medium text-[#8E8E93]">IP адрес:</span>
-      <span className="text-[11px] font-mono text-[#007AFF] font-medium">
-        {request.ip}:{request.port}
-      </span>
-    </div>
-    <div className="flex items-center justify-between">
-      <span className="text-[11px] font-medium text-[#8E8E93]">ID устройства:</span>
-      <span className="text-[11px] font-mono text-[#636366]">
-        {request.deviceId}
-      </span>
-    </div>
-  </div>
-);
+  );
+};
 
 interface ActionButtonsProps {
   onRespond: (approved: boolean) => void;
 }
 
-const ActionButtons: React.FC<ActionButtonsProps> = ({ onRespond }) => (
-  <div className="grid grid-cols-2 gap-2.5 w-full mt-4">
-    <button
-      type="button"
-      onClick={() => onRespond(false)}
-      className="flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-[6px] bg-[#2C2C2E] hover:bg-[#38383A] active:bg-[#252527] text-[#FF453A] border border-[#3A3A3C] font-medium text-[12px] transition-colors"
-    >
-      <X className="w-3.5 h-3.5" />
-      <span>Отклонить</span>
-    </button>
+const ActionButtons: React.FC<ActionButtonsProps> = ({ onRespond }) => {
+  const { t } = useTranslation();
 
-    <button
-      type="button"
-      onClick={() => onRespond(true)}
-      className="flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-[6px] bg-[#007AFF] hover:bg-[#0071E3] active:bg-[#0062C4] text-white font-medium text-[12px] transition-colors shadow-[0_0.5px_1px_rgba(0,0,0,0.4)]"
-    >
-      <Check className="w-3.5 h-3.5" />
-      <span>Разрешить</span>
-    </button>
-  </div>
-);
+  return (
+    <div className="grid grid-cols-2 gap-2.5 w-full mt-4">
+      <button
+        type="button"
+        onClick={() => onRespond(false)}
+        className="flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-[6px] bg-[#2C2C2E] hover:bg-[#38383A] active:bg-[#252527] text-[#FF453A] border border-[#3A3A3C] font-medium text-[12px] transition-colors cursor-pointer"
+      >
+        <X className="w-3.5 h-3.5" />
+        <span>{t('pairing.decline')}</span>
+      </button>
+
+      <button
+        type="button"
+        onClick={() => onRespond(true)}
+        className="flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-[6px] bg-[#007AFF] hover:bg-[#0071E3] active:bg-[#0062C4] text-white font-medium text-[12px] transition-colors shadow-[0_0.5px_1px_rgba(0,0,0,0.4)] cursor-pointer"
+      >
+        <Check className="w-3.5 h-3.5" />
+        <span>{t('pairing.allow')}</span>
+      </button>
+    </div>
+  );
+};
 
 export const PairingRequestModal: React.FC<PairingRequestModalProps> = ({ request, onRespond }) => {
+  const { t } = useTranslation();
   const [timeLeft, setTimeLeft] = useState(30);
 
   useEffect(() => {
@@ -148,11 +158,11 @@ export const PairingRequestModal: React.FC<PairingRequestModalProps> = ({ reques
           <DeviceIcon isMac={isMac} />
 
           <h3 className="text-[14px] font-semibold text-[#F2F2F7] tracking-tight">
-            Запрос на сопряжение
+            {t('pairing.requestTitle')}
           </h3>
 
           <p className="text-[12px] text-[#8E8E93] mt-1 leading-normal">
-            Новое устройство запрашивает доступ для быстрого обмена файлами
+            {t('pairing.requestDesc')}
           </p>
 
           {/* Device Info Card */}
@@ -161,7 +171,7 @@ export const PairingRequestModal: React.FC<PairingRequestModalProps> = ({ reques
           {/* Timeout badge */}
           <div className="flex items-center gap-1.5 text-[11px] text-[#8E8E93] mt-3 font-mono">
             <Clock className="w-3 h-3 text-[#8E8E93]" />
-            <span>Авто-отклонение через {timeLeft} сек.</span>
+            <span>{t('pairing.autoDecline', { seconds: timeLeft })}</span>
           </div>
 
           {/* Action Buttons */}
