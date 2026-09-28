@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Bell, Power, Sliders, Terminal, RefreshCw } from 'lucide-react';
+import { X, Bell, Power, Sliders, Terminal, RefreshCw, Languages } from 'lucide-react';
 import { TargetFolderSetting } from './settings/TargetFolderSetting';
 import { ToggleSetting } from './settings/ToggleSetting';
 import { UpnpStatusSection, UpnpStatus } from './settings/UpnpStatusSection';
@@ -7,6 +7,7 @@ import { ConnectedDevicesSection } from './settings/ConnectedDevicesSection';
 import { LogsSection } from './settings/LogsSection';
 import { UpdatesSection } from './settings/UpdatesSection';
 import { UpdateStateInfo } from '../vite-env';
+import { useTranslation, SupportedLanguage } from '../i18n';
 
 export interface PairedDevice {
   id: string;
@@ -25,6 +26,8 @@ interface SettingsModalProps {
   initialTab?: SettingsTab;
   autoStart: boolean;
   notifications: boolean;
+  language?: 'ru' | 'en';
+  onSetLanguage?: (lang: 'ru' | 'en') => void;
   pairedDevices?: PairedDevice[];
   onToggleAutoStart: (enable: boolean) => void;
   onToggleNotifications: (enable: boolean) => void;
@@ -44,6 +47,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   initialTab = 'general',
   autoStart,
   notifications,
+  language,
+  onSetLanguage,
   pairedDevices = [],
   onToggleAutoStart,
   onToggleNotifications,
@@ -56,6 +61,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   platform = window.macdrop?.platform || 'darwin',
   appVersion = window.macdrop?.version || '2.3.5'
 }) => {
+  const { t, language: ctxLanguage, setLanguage, availableLanguages } = useTranslation();
+  const activeLanguage: SupportedLanguage = language || ctxLanguage;
   const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab);
   const [upnpStatus, setUpnpStatus] = useState<UpnpStatus | null>(null);
   const [errorCount, setErrorCount] = useState<number>(0);
@@ -145,7 +152,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               }`}
             >
               <Sliders className="w-3 h-3 text-[#007AFF]" />
-              <span>Основные</span>
+              <span>{t('settings.general')}</span>
             </button>
 
             {/* Updates Tab */}
@@ -162,7 +169,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <RefreshCw
                 className={`w-3 h-3 text-[#007AFF] ${isChecking || isDownloading ? 'animate-spin' : ''}`}
               />
-              <span>Обновление</span>
+              <span>{t('settings.updates')}</span>
 
               {isDownloaded && (
                 <span className="w-1.5 h-1.5 rounded-full bg-[#34C759] animate-pulse" />
@@ -186,7 +193,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               }`}
             >
               <Terminal className="w-3 h-3 text-[#007AFF]" />
-              <span>Логи</span>
+              <span>{t('settings.logs')}</span>
               {errorCount > 0 && (
                 <span className="px-1.5 py-0.1 bg-[#FF453A]/20 text-[#FF453A] text-[9px] font-bold rounded-full border border-[#FF453A]/30">
                   {errorCount}
@@ -201,7 +208,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             style={{ WebkitAppRegion: 'no-drag' } as any}
             onClick={onClose}
             className="w-6 h-6 flex items-center justify-center rounded text-[#8E8E93] hover:text-[#FFFFFF] hover:bg-[#2C2C2E] transition-colors cursor-pointer"
-            title="Закрыть"
+            title={t('window.close')}
           >
             <X className="w-3.5 h-3.5" />
           </button>
@@ -219,20 +226,56 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <div className="h-px bg-[#2C2C2E]" />
 
               <ToggleSetting
-                title="Автозапуск с системой"
-                description="Запуск в фоновом режиме"
+                title={t('settings.autoStart')}
+                description={t('settings.autoStartDesc')}
                 icon={Power}
                 isActive={autoStart}
                 onToggle={onToggleAutoStart}
               />
 
               <ToggleSetting
-                title="Всплывающие уведомления"
-                description="Системные баннеры о файлах"
+                title={t('settings.notifications')}
+                description={t('settings.notificationsDesc')}
                 icon={Bell}
                 isActive={notifications}
                 onToggle={onToggleNotifications}
               />
+
+              <div className="h-px bg-[#2C2C2E]" />
+
+              {/* Language Selection Setting */}
+              <div className="flex items-center justify-between py-1 select-none">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-7 h-7 rounded-[6px] bg-[#202022] border border-[#2C2C2E] flex items-center justify-center text-[#8E8E93] shrink-0">
+                    <Languages className="w-3.5 h-3.5 text-[#007AFF]" />
+                  </div>
+                  <div>
+                    <div className="text-[12px] font-medium text-[#F2F2F7] leading-tight">
+                      {t('settings.language')}
+                    </div>
+                    <div className="text-[11px] text-[#8E8E93] leading-tight mt-0.5">
+                      {t('settings.languageDesc')}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="inline-flex p-0.5 rounded-[6px] bg-[#202022] border border-[#2C2C2E] text-[11px]">
+                  {availableLanguages.map((item) => (
+                    <button
+                      key={item.code}
+                      type="button"
+                      onClick={() => (onSetLanguage ? onSetLanguage(item.code) : setLanguage(item.code))}
+                      className={`px-2.5 py-0.5 rounded-[4px] font-medium transition-colors cursor-pointer ${
+                        activeLanguage === item.code
+                          ? 'bg-[#007AFF] text-white shadow-sm'
+                          : 'text-[#8E8E93] hover:text-[#E5E5EA]'
+                      }`}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
               <UpnpStatusSection upnpStatus={upnpStatus} />
 

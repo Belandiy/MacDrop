@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Search, Copy, Check, Trash2, FolderOpen, ChevronRight, ChevronDown, ArrowDown, FileText, AlertCircle, AlertTriangle, Info } from 'lucide-react';
 import { LogEntry } from '../../vite-env';
+import { useTranslation } from '../../i18n';
 
 export const LogsSection: React.FC = () => {
+  const { t } = useTranslation();
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [levelFilter, setLevelFilter] = useState<'all' | 'error' | 'warn' | 'info'>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -107,7 +109,7 @@ export const LogsSection: React.FC = () => {
         <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-[#8E8E93] pointer-events-none" />
         <input
           type="text"
-          placeholder="Поиск по событиям и тегам..."
+          placeholder={t('logs.searchPlaceholder')}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="w-full bg-[#1A1A1A] border border-[#2C2C2E] rounded-[5px] pl-7 pr-14 py-1 text-[11px] text-[#F2F2F7] placeholder-[#636366] focus:outline-none focus:border-[#007AFF] transition-colors h-7"
@@ -117,7 +119,7 @@ export const LogsSection: React.FC = () => {
             onClick={() => setSearchQuery('')}
             className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-[#8E8E93] hover:text-white cursor-pointer"
           >
-            Очистить
+            {t('logs.clearSearch')}
           </button>
         )}
       </div>
@@ -132,7 +134,7 @@ export const LogsSection: React.FC = () => {
               : 'text-[#8E8E93] hover:text-[#E5E5EA]'
           }`}
         >
-          <span className="truncate">Все ({counts.all})</span>
+          <span className="truncate">{t('logs.filterAll', { count: counts.all })}</span>
         </button>
         <button
           onClick={() => setLevelFilter('error')}
@@ -143,7 +145,7 @@ export const LogsSection: React.FC = () => {
           }`}
         >
           <AlertCircle className="w-3 h-3 text-[#FF453A] shrink-0" />
-          <span className="truncate">Ошибки ({counts.error})</span>
+          <span className="truncate">{t('logs.filterError', { count: counts.error })}</span>
         </button>
         <button
           onClick={() => setLevelFilter('warn')}
@@ -154,7 +156,7 @@ export const LogsSection: React.FC = () => {
           }`}
         >
           <AlertTriangle className="w-3 h-3 text-[#FFBD2E] shrink-0" />
-          <span className="truncate">Варн ({counts.warn})</span>
+          <span className="truncate">{t('logs.filterWarn', { count: counts.warn })}</span>
         </button>
         <button
           onClick={() => setLevelFilter('info')}
@@ -165,7 +167,7 @@ export const LogsSection: React.FC = () => {
           }`}
         >
           <Info className="w-3 h-3 text-[#007AFF] shrink-0" />
-          <span className="truncate">Инфо ({counts.info})</span>
+          <span className="truncate">{t('logs.filterInfo', { count: counts.info })}</span>
         </button>
       </div>
 
@@ -179,7 +181,7 @@ export const LogsSection: React.FC = () => {
             <FileText className="w-6 h-6 mb-1.5 opacity-30 text-[#007AFF]" />
             <p className="text-[11px] font-sans">
               {logs.length === 0
-                ? 'Журнал пуст. События MacDrop будут появляться здесь в реальном времени.'
+                ? `${t('logs.emptyTitle')}. ${t('logs.emptyDesc')}.`
                 : 'Нет записей, соответствующих выбранному фильтру.'}
             </p>
           </div>
@@ -231,7 +233,7 @@ export const LogsSection: React.FC = () => {
                     <button
                       onClick={() => toggleDetails(entry.id)}
                       className="p-0.5 text-[#8E8E93] hover:text-white transition-colors shrink-0 cursor-pointer"
-                      title={isExpanded ? 'Скрыть детали' : 'Показать детали'}
+                      title={isExpanded ? t('logs.hideDetails') : t('logs.showDetails')}
                     >
                       {isExpanded ? (
                         <ChevronDown className="w-3 h-3" />
@@ -267,7 +269,7 @@ export const LogsSection: React.FC = () => {
           />
           <span className="flex items-center gap-1 text-[11px]">
             <ArrowDown className="w-3 h-3 text-[#8E8E93]" />
-            Автопрокрутка
+            {t('logs.autoScroll')}
           </span>
         </label>
 
@@ -278,7 +280,7 @@ export const LogsSection: React.FC = () => {
             onClick={handleCopyLogs}
             disabled={filteredLogs.length === 0}
             className="w-6 h-6 rounded-[4px] bg-[#2C2C2E] hover:bg-[#38383A] text-[#D1D1D6] hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0 flex items-center justify-center cursor-pointer border border-[#3A3A3C]"
-            title={copied ? 'Скопировано в буфер обмена!' : 'Скопировать журнал'}
+            title={copied ? t('logs.copied') : t('logs.copy')}
           >
             {copied ? (
               <Check className="w-3 h-3 text-[#34C759]" />
@@ -291,10 +293,10 @@ export const LogsSection: React.FC = () => {
           <button
             onClick={handleOpenFolder}
             className="flex items-center gap-1 px-2 h-6 rounded-[4px] bg-[#2C2C2E] hover:bg-[#38383A] text-[11px] text-[#D1D1D6] hover:text-white border border-[#3A3A3C] transition-colors shrink-0 cursor-pointer"
-            title="Открыть папку с логами в проводнике/Finder"
+            title="Folder"
           >
             <FolderOpen className="w-3 h-3 text-[#007AFF]" />
-            <span>Папка</span>
+            <span>{t('logs.openFolder')}</span>
           </button>
 
           {/* Clear Logs */}
@@ -302,10 +304,10 @@ export const LogsSection: React.FC = () => {
             onClick={handleClear}
             disabled={logs.length === 0}
             className="flex items-center gap-1 px-2 h-6 rounded-[4px] bg-[#FF453A]/10 hover:bg-[#FF453A]/20 text-[11px] text-[#FF453A] border border-[#FF453A]/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0 cursor-pointer"
-            title="Очистить текущие логи"
+            title={t('logs.clear')}
           >
             <Trash2 className="w-3 h-3" />
-            <span>Очистить</span>
+            <span>{t('logs.clear')}</span>
           </button>
         </div>
       </div>
