@@ -2,6 +2,22 @@
 
 Все важные изменения проекта MacDrop фиксируются в этом файле.
 
+## [2.3.7] - 2026-09-27
+
+### Масштабируемая i18n архитектура и полная локализация приложения
+- **Централизованная система интернационализации (`src/renderer/src/i18n`)**:
+  - Полностью ликвидирован антипаттерн inline-тернарников (`{lang === 'en' ? ... : ...}`).
+  - Создана типизированная схема `LocaleSchema` и словари `ru.ts` и `en.ts` со строгим контрактом TypeScript.
+  - Реализован провайдер `<LanguageProvider>` и хук `useTranslation()` с поддержкой dot-нотации (`t('nav.transfer')`), интерполяции параметров (`{count}`, `{name}`, `{version}`) и автоматическим fallback на русский язык.
+  - Масштабируемость до 10+ языков без изменения компонентов интерфейса: достаточно добавить файл `locales/<lang>.ts` и зарегистрировать код в `SUPPORTED_LANGUAGES`.
+- **Полная локализация всех экранов и компонентов интерфейса**:
+  - Дизайн `Studio Titanium Precision`: панель навигации, телеметрия HUD, Drop-зона, сетка узлов, папка назначения, история и встроенные вкладки настроек.
+  - Дизайн `Classic Native (macOS)`: сайдбар устройств, нативная дроп-зона, фильтрация истории передач (All / Active / Completed), строка состояния.
+  - Компоненты базового дизайна: `Header`, `DropZone`, `NativeDropZone`, `DeviceList`, `RecentTransfers`, `FolderSection`, `DeviceDetailView`, `PairingModal`, `PairingRequestModal`, `StatusCard`.
+  - Модальное окно настроек (`SettingsModal`) и все его секции: `ConnectedDevicesSection`, `TargetFolderSetting`, `UpnpStatusSection`, `UpdatesSection`, `LogsSection`.
+- **100% совместимость с тестами**:
+  - Все 70 unit-тестов Vitest (включая изолированные тесты `UpdatesSection`, `LogsSection`, `CircularUpdateProgress`) проходят без изменений.
+
 ## [2.3.6] - 2026-09-24
 
 ### Бесшовное автообновление (In-App Auto-Update & UX)
