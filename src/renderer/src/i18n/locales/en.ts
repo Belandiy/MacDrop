@@ -293,10 +293,14 @@ export const en: LocaleSchema = {
     autoScroll: 'Auto-Scroll'
   },
 
-  // Airbridge
-  airbridge: {
-    title: 'AIRBRIDGE',
+  // Web Drop
+  webDrop: {
+    title: 'WEB DROP',
     scanToConnect: 'Scan to Connect Phone',
-    zeroConfig: 'Zero config web client'
+    zeroConfig: 'Zero config web client',
+    localP2p: 'Web Drop',
+    modalDesc: 'Scan using phone camera for fast local file transfer without installing apps.',
+    clickToCopy: 'Click to copy link',
+    copied: '✓ Copied'
   }
 };

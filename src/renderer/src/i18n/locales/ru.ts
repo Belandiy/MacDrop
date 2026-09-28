@@ -291,11 +291,15 @@ export const ru = {
     autoScroll: 'Автопрокрутка'
   },
 
-  // Airbridge
-  airbridge: {
-    title: 'AIRBRIDGE',
+  // Web Drop
+  webDrop: {
+    title: 'WEB DROP',
     scanToConnect: 'Сканируйте для связи',
-    zeroConfig: 'Без установки приложений'
+    zeroConfig: 'Без установки приложений',
+    localP2p: 'Web Drop',
+    modalDesc: 'Наведите камеру смартфона для быстрого обмена файлами в локальной сети.',
+    clickToCopy: 'Нажмите, чтобы скопировать ссылку',
+    copied: '✓ Скопировано'
   }
 };
 

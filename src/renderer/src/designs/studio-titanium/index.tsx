@@ -71,7 +71,7 @@ export default function StudioTitaniumDesign(props: DesignProps) {
   const [activeView, setActiveView] = useState<'transfer' | 'history' | 'settings'>('transfer');
   const [settingsSubTab, setSettingsSubTab] = useState<'general' | 'nodes' | 'updates' | 'logs'>('general');
 
-  // Modals state (only PIN and Airbridge QR)
+  // Modals state (only PIN and Web Drop QR)
   const [isPinModalOpen, setIsPinModalOpen] = useState(false);
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
   const [pinDigits, setPinDigits] = useState(['', '', '', '', '', '']);
@@ -82,7 +82,7 @@ export default function StudioTitaniumDesign(props: DesignProps) {
   const [upnpStatus, setUpnpStatus] = useState<UpnpStatus | null>(null);
   const [errorCount, setErrorCount] = useState<number>(0);
 
-  // Mobile Web Drop Info for Airbridge Tile
+  // Mobile Web Drop Info for Web Drop Tile
   const [mobileInfo, setMobileInfo] = useState<{
     ips: string[];
     port: number;
@@ -95,7 +95,7 @@ export default function StudioTitaniumDesign(props: DesignProps) {
   const dropContainerRef = useRef<HTMLDivElement | null>(null);
   const pinInputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
-  // Fetch Airbridge Mobile Info & UPnP status
+  // Fetch Web Drop Mobile Info & UPnP status
   useEffect(() => {
     if (window.macdrop?.getMobileShareInfo) {
       window.macdrop.getMobileShareInfo().then((info) => {
@@ -873,14 +873,14 @@ export default function StudioTitaniumDesign(props: DesignProps) {
                   </div>
                 </section>
 
-                {/* TILE 5: AIRBRIDGE (160px) */}
+                {/* TILE 5: WEB DROP (160px) */}
                 <section
                   onClick={() => setIsQrModalOpen(true)}
                   className="rounded-xl bg-[#151720] hover:bg-[#181B26] border border-[#252938] hover:border-slate-500/40 p-2.5 flex flex-col items-center justify-between cursor-pointer transition-all group"
                 >
                   <div className="w-full flex items-center justify-between">
                     <span className="text-[9.5px] font-mono uppercase tracking-wider text-slate-400 font-semibold">
-                      {t('airbridge.title')}
+                      {t('webDrop.title')}
                     </span>
                     <span className="w-1.5 h-1.5 rounded-full bg-emeraldSignal" />
                   </div>
@@ -897,10 +897,10 @@ export default function StudioTitaniumDesign(props: DesignProps) {
 
                   <div className="text-center">
                     <div className="text-[10px] font-mono font-bold text-slate-200 group-hover:text-white">
-                      {t('airbridge.scanToConnect')}
+                      {t('webDrop.scanToConnect')}
                     </div>
                     <div className="text-[8.5px] font-mono text-slate-500">
-                      {t('airbridge.zeroConfig')}
+                      {t('webDrop.zeroConfig')}
                     </div>
                   </div>
                 </section>
@@ -1375,14 +1375,14 @@ export default function StudioTitaniumDesign(props: DesignProps) {
         )}
 
         {/* ========================================================
-            AIRBRIDGE QR EXPANDED MODAL
+            WEB DROP QR EXPANDED MODAL
             ======================================================== */}
         {isQrModalOpen && (
           <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-6">
             <div className="w-[330px] rounded-xl bg-[#141620] border border-[#2E3345] p-5 shadow-2xl space-y-3 font-mono text-center">
               <div className="flex items-center justify-between pb-1 border-b border-[#242837]">
                 <span className="text-xs font-bold text-white uppercase tracking-wider">
-                  Airbridge Local P2P
+                  {t('webDrop.localP2p')}
                 </span>
                 <button
                   onClick={() => setIsQrModalOpen(false)}
@@ -1408,23 +1408,23 @@ export default function StudioTitaniumDesign(props: DesignProps) {
                   setTimeout(() => setCopiedUrl(false), 2000);
                 }}
                 className="text-xs text-emeraldSignal font-mono bg-[#0C0E14] border border-[#222838] py-1 px-2 rounded cursor-pointer hover:border-emeraldSignal/50 transition-colors flex items-center justify-center gap-1.5"
-                title="Click to copy link"
+                title={t('webDrop.clickToCopy')}
               >
                 <span>{displayHost}</span>
                 <span className="text-[10px] text-slate-400">
-                  {copiedUrl ? '✓ Copied' : '📋'}
+                  {copiedUrl ? t('webDrop.copied') : '📋'}
                 </span>
               </div>
 
               <p className="text-[10px] text-slate-400 leading-relaxed">
-                Scan using iOS Camera or Android browser. Zero client installation required.
+                {t('webDrop.modalDesc')}
               </p>
 
               <button
                 onClick={() => setIsQrModalOpen(false)}
                 className="w-full py-1.5 rounded bg-[#1E212E] hover:bg-[#25293A] text-xs text-slate-300 border border-[#2E3345] cursor-pointer transition-colors"
               >
-                Close
+                {t('window.close')}
               </button>
             </div>
           </div>
