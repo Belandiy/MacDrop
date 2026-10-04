@@ -179,6 +179,7 @@ app.whenReady().then(() => {
   createWindow();
   tray = createTray(() => mainWindow, engine, config);
   setupIpc(engine, discovery, config, () => mainWindow);
+  setupAutoUpdater(() => mainWindow);
 
   // Relay engine and discovery events to renderer
   engine.on('status-changed', (status) => {
@@ -214,10 +215,8 @@ app.whenReady().then(() => {
     discovery?.start();
   });
 
-  // Delayed startup of UPnP and auto-updater to avoid network & CPU spikes during launch
+  // Delayed startup of UPnP to avoid network & CPU spikes during launch
   setTimeout(() => {
-    setupAutoUpdater(() => mainWindow);
-
     upnp = new UpnpManager(config.apiPort || 8384);
     if (config.upnpEnabled !== false) {
       upnp.start().then((status) => {

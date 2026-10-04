@@ -80,7 +80,7 @@ export async function createZipFromFolder(
 
   const outputStream = fs.createWriteStream(tempZipPath);
   const archive = archiver('zip', {
-    zlib: { level: 6 } // standard Deflate compression level
+    zlib: { level: 1 } // Fast Deflate compression for real-time network transfers
   });
 
   let isCleanedUp = false;
@@ -142,7 +142,7 @@ export async function createZipFromFolder(
     });
 
     archive.on('warning', (err: any) => {
-      if (err.code === 'ENOENT') {
+      if (err.code === 'ENOENT' || err.code === 'EACCES' || err.code === 'EPERM') {
         console.warn('Archiver warning:', err);
       } else {
         handleError(err);

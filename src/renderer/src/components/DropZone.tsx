@@ -444,6 +444,11 @@ export const DropZone: React.FC<DropZoneProps> = React.memo(({
           Promise.resolve(sendFiles(paths, effectiveTargetId))
             .then((res: any) => {
               if (Array.isArray(res) && res.length > 0) {
+                const cancelled = res.find(
+                  (r: any) =>
+                    r.error &&
+                    (r.error.includes('отменена') || r.error.includes('отменен'))
+                );
                 const blocked = res.find(
                   (r: any) =>
                     r.error &&
@@ -453,7 +458,12 @@ export const DropZone: React.FC<DropZoneProps> = React.memo(({
                 );
                 const failed = res.find((r: any) => !r.success);
 
-                if (blocked) {
+                if (cancelled) {
+                  setStatusRef.current({
+                    type: 'warning',
+                    text: 'Передача отменена'
+                  });
+                } else if (blocked) {
                   setStatusRef.current({
                     type: 'warning',
                     text: `${tName || 'Устройство'}: выключен приём файлов`
@@ -482,7 +492,12 @@ export const DropZone: React.FC<DropZoneProps> = React.memo(({
             })
             .catch((err: any) => {
               const msg = err?.message || '';
-              if (
+              if (msg.includes('отменена') || msg.includes('отменен')) {
+                setStatusRef.current({
+                  type: 'warning',
+                  text: 'Передача отменена'
+                });
+              } else if (
                 msg.includes('отключил приём') ||
                 msg.includes('выключен приём') ||
                 msg.includes('403')
@@ -497,9 +512,10 @@ export const DropZone: React.FC<DropZoneProps> = React.memo(({
                   text: msg || 'Ошибка отправки'
                 });
               }
+            })
+            .finally(() => {
+              setTimeout(() => setStatusRef.current(null), 4000);
             });
-
-          setTimeout(() => setStatusRef.current(null), 4000);
         }
       }
     };

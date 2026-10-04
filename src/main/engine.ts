@@ -58,6 +58,7 @@ export interface BatchContext {
   batchCompletedBytes: number;
   batchTotalBytes: number;
   isLastItem: boolean;
+  currentItemSize?: number;
 }
 
 export interface TransferProgress {
@@ -117,6 +118,7 @@ export class SyncEngine extends EventEmitter {
   private pendingOutgoingPairings: Set<string> = new Set();
   private mobileSessionToken: string = crypto.randomBytes(16).toString('hex');
   private isBatchCancelled = false;
+  private sendQueue: Promise<any> = Promise.resolve();
   private batchReceiverTimeout: NodeJS.Timeout | null = null;
   private mobileSessionQueue: Array<{ filename: string; path: string; size: number; mtimeMs: number }> = [];
   private lastMobileSeen: number = 0;
@@ -1712,7 +1714,7 @@ export class SyncEngine extends EventEmitter {
 
     let peer: PairedDevice | undefined;
     if (targetDeviceId) {
-      peer = this.deviceMap.get(targetDeviceId);
+      peer = this.deviceMap.get(targetDeviceId) || this.config.pairedDevices.find(d => d.id === targetDeviceId);
     } else {
       peer = this.config.pairedDevices[0];
     }
@@ -1725,11 +1727,12 @@ export class SyncEngine extends EventEmitter {
     if (stat.isDirectory()) {
       const folderName = path.basename(itemPath);
       const peerName = peer.customName || peer.originalName;
+      const folderEstimatedSize = batchContext?.currentItemSize || 0;
 
       this.currentProgress = {
         filename: `Сжатие папки ${folderName}...`,
         bytesTransferred: 0,
-        totalBytes: 0,
+        totalBytes: folderEstimatedSize,
         speedBps: 0,
         direction: 'outgoing',
         peerDeviceId: peer.id,
@@ -1756,6 +1759,10 @@ export class SyncEngine extends EventEmitter {
           onProgress: (prog) => {
             if (this.currentProgress) {
               this.currentProgress.filename = `Сжатие ${folderName} (${formatFileSize(prog.processedBytes)})...`;
+              this.currentProgress.bytesTransferred = prog.processedBytes;
+              if (batchContext) {
+                this.currentProgress.batchBytesTransferred = batchContext.batchCompletedBytes + prog.processedBytes;
+              }
               this.emit('progress', this.currentProgress);
             }
           }
@@ -1974,6 +1981,19 @@ export class SyncEngine extends EventEmitter {
     targetDeviceId?: string,
     onFileSuccess?: (itemPath: string, filename: string) => void
   ): Promise<{ name: string; success: boolean; error?: string }[]> {
+    const runBatch = this.sendQueue.then(async () => {
+      return this.executeSendBatch(itemPaths, targetDeviceId, onFileSuccess);
+    });
+
+    this.sendQueue = runBatch.catch(() => {});
+    return runBatch;
+  }
+
+  private async executeSendBatch(
+    itemPaths: string[],
+    targetDeviceId?: string,
+    onFileSuccess?: (itemPath: string, filename: string) => void
+  ): Promise<{ name: string; success: boolean; error?: string }[]> {
     this.isBatchCancelled = false;
     const results: { name: string; success: boolean; error?: string }[] = [];
 
@@ -2022,7 +2042,8 @@ export class SyncEngine extends EventEmitter {
         totalCount,
         batchCompletedBytes,
         batchTotalBytes,
-        isLastItem
+        isLastItem,
+        currentItemSize
       };
 
       try {
@@ -2035,8 +2056,20 @@ export class SyncEngine extends EventEmitter {
         results.push({ name: filename, success: true });
       } catch (err: any) {
         batchCompletedBytes += currentItemSize;
-        logger.error('Transfer', `Failed to send item ${filename}:`, err);
-        results.push({ name: filename, success: false, error: err?.message || 'Ошибка передачи' });
+        const isCancelledByUser = this.isBatchCancelled ||
+          err?.message === 'Передача отменена' ||
+          err?.message?.includes('отменена') ||
+          err?.message?.includes('Архивация отменена');
+        if (isCancelledByUser) {
+          logger.info('Transfer', `Передача файла отменена: ${filename}`);
+        } else {
+          logger.error('Transfer', `Failed to send item ${filename}:`, err);
+        }
+        results.push({
+          name: filename,
+          success: false,
+          error: isCancelledByUser ? 'Передача отменена' : (err?.message || 'Ошибка передачи')
+        });
         if (isLastItem || this.isBatchCancelled) {
           this.currentProgress = null;
           this.emit('progress', null);

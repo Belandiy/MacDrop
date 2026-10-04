@@ -185,15 +185,17 @@ export function useAppLogic() {
     }
   }, []);
 
-  const handleFilesDropped = useCallback(async (filePaths: string[]) => {
+  const handleFilesDropped = useCallback(async (filePaths: string[], targetDeviceId?: string) => {
     if (window.macdrop && filePaths.length > 0) {
       try {
-        const targetId = activeTargetDeviceId || (devices.length > 0 ? devices[0].id : undefined);
-        await window.macdrop.sendDroppedFiles(filePaths, targetId);
+        const targetId = targetDeviceId || activeTargetDeviceId || (devices.length > 0 ? devices[0].id : undefined);
+        return await window.macdrop.sendDroppedFiles(filePaths, targetId);
       } catch (err) {
         console.error('Failed to send dropped files:', err);
+        throw err;
       }
     }
+    return [];
   }, [activeTargetDeviceId, devices]);
 
   const handleToggleAutoStart = useCallback(async (enable: boolean) => {

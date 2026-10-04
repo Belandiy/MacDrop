@@ -218,6 +218,11 @@ export const DeviceDetailView: React.FC<DeviceDetailViewProps> = ({
         try {
           const results = await window.macdrop.sendDroppedFiles(paths, device.id);
           if (Array.isArray(results) && results.length > 0) {
+            const cancelled = results.find(
+              (r) =>
+                r.error &&
+                (r.error.includes('отменена') || r.error.includes('отменен'))
+            );
             const blocked = results.find(
               (r) =>
                 r.error &&
@@ -227,7 +232,12 @@ export const DeviceDetailView: React.FC<DeviceDetailViewProps> = ({
             );
             const failed = results.find((r) => !r.success);
 
-            if (blocked) {
+            if (cancelled) {
+              setSendNotice({
+                type: 'warning',
+                message: 'Передача отменена'
+              });
+            } else if (blocked) {
               setSendNotice({
                 type: 'warning',
                 message: 'У этого устройства выключен приём файлов'
@@ -247,7 +257,12 @@ export const DeviceDetailView: React.FC<DeviceDetailViewProps> = ({
           await loadHistory();
         } catch (err: any) {
           const msg = err?.message || '';
-          if (
+          if (msg.includes('отменена') || msg.includes('отменен')) {
+            setSendNotice({
+              type: 'warning',
+              message: 'Передача отменена'
+            });
+          } else if (
             msg.includes('отключил приём') ||
             msg.includes('выключен приём') ||
             msg.includes('403')
