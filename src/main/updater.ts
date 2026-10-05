@@ -124,7 +124,7 @@ export function setupAutoUpdater(getMainWindow: () => BrowserWindow | null) {
 
   autoUpdater.on('error', (err) => {
     console.warn('AutoUpdater warning:', err?.message || err);
-    if (currentState.status === 'checking' || currentState.status === 'downloading') {
+    if (currentState.status !== 'downloaded') {
       currentState = {
         status: 'error',
         error: err?.message || String(err)

@@ -2,6 +2,16 @@
 
 Все важные изменения проекта MacDrop фиксируются в этом файле.
 
+## [2.3.9] - 2026-10-05
+
+### Исправления ошибок (Windows Auto-Update Fixes)
+- **Устранено несовпадение имён файлов обновлений Windows в релизах**:
+  - В [electron-builder.json](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/electron-builder.json) для целевых сборок NSIS и Portable добавлены строгие шаблоны имён артефактов без пробелов (`${productName}-Setup-${version}.${ext}` и `${productName}-${version}.${ext}`). Это предотвращает автоматическую замену пробелов на точки в GitHub Releases API и исключает ошибку 404 Not Found при скачивании установщика по ссылке из `latest.yml`.
+- **Надёжная обработка ошибок скачивания обновлений**:
+  - В [src/main/updater.ts](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/main/updater.ts) снято ограничение, из-за которого ошибки загрузки в статусе `available` не транслировались в интерфейс.
+- **Корректная индикация статуса обновления в настройках**:
+  - В [UpdatesSection.tsx](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/components/settings/UpdatesSection.tsx) статус `available` переведён в ветку загрузки/подготовки, устраняя ложное отображение «У вас установлена последняя версия» во время скачивания.
+
 ## [2.3.8] - 2026-10-05
 
 ### Исправления ошибок (Pairing & Reconnection Reliability)

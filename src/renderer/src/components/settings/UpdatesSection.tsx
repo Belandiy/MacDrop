@@ -43,10 +43,10 @@ export const UpdatesSection: React.FC<UpdatesSectionProps> = ({
   };
 
   const isChecking = updateState.status === 'checking' || isManualChecking;
-  const isDownloading = updateState.status === 'downloading';
+  const isDownloading = updateState.status === 'downloading' || updateState.status === 'available';
   const isDownloaded = updateState.status === 'downloaded';
   const isError = updateState.status === 'error';
-  const isUpToDate = updateState.status === 'not-available' || (!isChecking && !isDownloading && !isDownloaded && !isError);
+  const isUpToDate = updateState.status === 'not-available' || (updateState.status === 'idle' && !isChecking && !isDownloading && !isDownloaded && !isError);
 
   const percent = Math.min(Math.max(Math.round(updateState.percent || 0), 0), 100);
 
@@ -115,7 +115,9 @@ export const UpdatesSection: React.FC<UpdatesSectionProps> = ({
               </div>
               <div>
                 <h4 className="text-xs font-bold text-indigo-200">
-                  Загрузка v{updateState.version || 'обновления'}...
+                  {updateState.status === 'available' && !percent
+                    ? `Найдена версия v${updateState.version || ''}, подготовка...`
+                    : `Загрузка v${updateState.version || 'обновления'}...`}
                 </h4>
                 <p className="text-[10px] text-slate-400">
                   Скачивание в фоновом режиме
