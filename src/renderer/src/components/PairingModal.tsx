@@ -115,24 +115,28 @@ const NearbyDiscoveredSection: React.FC<{
         <span>Найдено рядом:</span>
       </div>
       <div className="space-y-1.5">
-        {discoveredPeers.map((p) => (
-          <div
-            key={p.deviceId}
-            className="flex items-center justify-between bg-[#171a23] px-3 py-2 rounded-lg border border-white/[0.05]"
-          >
-            <div className="truncate pr-2">
-              <div className="text-xs font-semibold text-white truncate">{p.deviceName}</div>
-              <div className="text-[10px] text-slate-400 font-mono">{p.deviceId} • {p.ip}</div>
-            </div>
-            <button
-              onClick={() => handleConnectWith(p.ip)}
-              disabled={isSubmitting}
-              className="bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white text-[11px] font-semibold px-2.5 py-1 rounded-md transition-all shrink-0 flex items-center gap-1 shadow-sm"
+        {discoveredPeers.map((p) => {
+          const cleanIp = (p.ip || '').replace(/^::ffff:/, '');
+          const port = p.port || 8384;
+          return (
+            <div
+              key={p.deviceId}
+              className="flex items-center justify-between bg-[#171a23] px-3 py-2 rounded-lg border border-white/[0.05]"
             >
-              <span>Связать</span>
-            </button>
-          </div>
-        ))}
+              <div className="truncate pr-2">
+                <div className="text-xs font-semibold text-white truncate">{p.deviceName}</div>
+                <div className="text-[10px] text-slate-400 font-mono">{p.deviceId} • {cleanIp}</div>
+              </div>
+              <button
+                onClick={() => handleConnectWith(p.deviceId || `${cleanIp}:${port}`)}
+                disabled={isSubmitting}
+                className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 active:scale-95 text-white text-[11px] font-semibold px-2.5 py-1 rounded-md transition-all shrink-0 flex items-center gap-1 shadow-sm"
+              >
+                <span>{isSubmitting ? '...' : 'Связать'}</span>
+              </button>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

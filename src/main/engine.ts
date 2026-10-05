@@ -414,7 +414,7 @@ export class SyncEngine extends EventEmitter {
     const cleanIp = ip.replace(/^::ffff:/, '').trim();
     if (cleanIp === '127.0.0.1' || cleanIp === '::1') return false;
 
-    const peer = this.deviceMap.get(deviceId);
+    const peer = this.deviceMap.get(deviceId) || this.config.pairedDevices.find(d => d.id.toUpperCase() === deviceId.toUpperCase());
     if (peer) {
       let changed = false;
       const isPrivate = isPrivateIp(cleanIp);
@@ -460,16 +460,18 @@ export class SyncEngine extends EventEmitter {
   }
 
   private checkPeerPing(ip: string, port: number): Promise<boolean> {
+    const cleanIp = ip.replace(/^::ffff:/, '').trim();
     return new Promise((resolve) => {
       const req = http.get({
-        hostname: ip,
+        hostname: cleanIp,
         port,
         path: '/api/ping',
         headers: {
           'x-device-id': this.config.deviceId,
-          'x-device-name': encodeURIComponent(this.config.deviceName)
+          'x-device-name': encodeURIComponent(this.config.deviceName),
+          'x-device-port': String(this.config.apiPort || 8384)
         },
-        timeout: 700
+        timeout: 1500
       }, (res) => {
         if (res.statusCode === 200) {
           let data = '';
@@ -513,12 +515,13 @@ export class SyncEngine extends EventEmitter {
     // 2. Check if discovery recently saw a new IP for this device
     if (this.discovery) {
       const discovered = this.discovery.findPeer(peer.id);
-      if (discovered && discovered.ip && discovered.ip !== peer.ip) {
+      if (discovered && discovered.ip) {
         const dPort = discovered.port || port;
         if (await this.checkPeerPing(discovered.ip, dPort)) {
-          console.log(`Device ${peer.id} found at new IP in discovery cache: ${discovered.ip}`);
+          console.log(`Device ${peer.id} found at IP via discovery cache: ${discovered.ip}:${dPort}`);
           this.updatePeerAddress(peer.id, discovered.ip, dPort);
           peer.connectionMode = 'local';
+          peer.lastSeen = Date.now();
           return { ip: discovered.ip, port: dPort };
         }
       }
@@ -531,9 +534,10 @@ export class SyncEngine extends EventEmitter {
 
       if (match && match.ip && await this.checkPeerPing(match.ip, match.port || port)) {
         const mPort = match.port || port;
-        console.log(`Device ${peer.id} found at new IP via subnet probe: ${match.ip}`);
+        console.log(`Device ${peer.id} found at new IP via subnet probe: ${match.ip}:${mPort}`);
         this.updatePeerAddress(peer.id, match.ip, mPort);
         peer.connectionMode = 'local';
+        peer.lastSeen = Date.now();
         return { ip: match.ip, port: mPort };
       }
     }
@@ -549,12 +553,13 @@ export class SyncEngine extends EventEmitter {
     }
 
     // 5. Asymmetric NAT / Cellular: peer cannot receive incoming connections, but is checking in via reverse poll
-    if (peer.lastSeen > Date.now() - 60000 || peer.connectionMode === 'remote') {
+    if (peer.lastSeen && (Date.now() - peer.lastSeen < 45000)) {
       console.log(`Device ${peer.id} is connected remotely behind cellular NAT. Using reverse transfer queue.`);
       return { ip: 'REVERSE_PULL', port: 0 };
     }
 
     peer.connectionMode = 'offline';
+    this.emit('status-changed', this.getStatus());
     throw new Error(`Устройство «${peer.customName || peer.originalName}» не в сети или недоступно.`);
   }
 
@@ -583,7 +588,8 @@ export class SyncEngine extends EventEmitter {
 
   private startHealthCheck() {
     if (this.healthCheckTimer) clearInterval(this.healthCheckTimer);
-    this.healthCheckTimer = setInterval(async () => {
+
+    const runCheck = async () => {
       await Promise.all(this.config.pairedDevices.map(async (peer) => {
         const localPort = peer.port || 8384;
         const isLocal = peer.ip && await this.checkPeerPing(peer.ip, localPort);
@@ -594,6 +600,22 @@ export class SyncEngine extends EventEmitter {
             this.emit('status-changed', this.getStatus());
           }
           return;
+        }
+
+        // IP didn't respond — check discovery cache for updated address
+        if (this.discovery) {
+          const discovered = this.discovery.findPeer(peer.id);
+          if (discovered && discovered.ip) {
+            const dPort = discovered.port || localPort;
+            if (await this.checkPeerPing(discovered.ip, dPort)) {
+              console.log(`HealthCheck: device ${peer.id} found at IP via discovery: ${discovered.ip}:${dPort}`);
+              this.updatePeerAddress(peer.id, discovered.ip, dPort);
+              peer.connectionMode = 'local';
+              peer.lastSeen = Date.now();
+              this.emit('status-changed', this.getStatus());
+              return;
+            }
+          }
         }
 
         const remoteHost = peer.remoteIp || this.config.customRemoteHost;
@@ -609,7 +631,7 @@ export class SyncEngine extends EventEmitter {
         }
 
         // If not responding to direct ping, check if seen in last 40 seconds (from reverse poll)
-        if (Date.now() - (peer.lastSeen || 0) < 40000) {
+        if (peer.lastSeen && (Date.now() - peer.lastSeen < 40000)) {
           if (peer.connectionMode !== 'remote') {
             peer.connectionMode = 'remote';
             this.emit('status-changed', this.getStatus());
@@ -627,7 +649,11 @@ export class SyncEngine extends EventEmitter {
         this.lastMobileSeen = 0;
         this.emit('status-changed', this.getStatus());
       }
-    }, 12000);
+    };
+
+    // Run immediately on start so UI displays correct device online state right away!
+    runCheck().catch(() => {});
+    this.healthCheckTimer = setInterval(runCheck, 10000);
   }
 
   private startRemotePolling() {
@@ -1094,15 +1120,17 @@ export class SyncEngine extends EventEmitter {
       // Basic ping/status endpoint
       if (url.pathname === '/api/status' && req.method === 'GET') {
         const senderId = req.headers['x-device-id'] as string || '';
+        const senderPort = parseInt(req.headers['x-device-port'] as string, 10);
         if (senderId) {
           const rawIp = req.socket.remoteAddress || '127.0.0.1';
-          this.updatePeerAddress(senderId, rawIp);
+          this.updatePeerAddress(senderId, rawIp, (senderPort && senderPort > 0 && senderPort < 65536) ? senderPort : undefined);
         }
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
           status: 'ok',
           deviceId: this.config.deviceId,
           deviceName: this.config.deviceName,
+          port: this.config.apiPort || 8384,
           platform: process.platform,
           wanIp: this.upnpStatus?.wanIp || this.config.wanIp,
           remotePort: this.upnpStatus?.externalPort || this.config.apiPort || 8384
@@ -1112,15 +1140,17 @@ export class SyncEngine extends EventEmitter {
 
       if (url.pathname === '/api/ping') {
         const senderId = req.headers['x-device-id'] as string;
+        const senderPort = parseInt(req.headers['x-device-port'] as string, 10);
         if (senderId) {
           const rawIp = req.socket.remoteAddress || '127.0.0.1';
-          this.updatePeerAddress(senderId, rawIp);
+          this.updatePeerAddress(senderId, rawIp, (senderPort && senderPort > 0 && senderPort < 65536) ? senderPort : undefined);
         }
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
           status: 'ok',
           deviceId: this.config.deviceId,
           deviceName: this.config.deviceName,
+          port: this.config.apiPort || 8384,
           platform: process.platform,
           wanIp: this.upnpStatus?.wanIp || this.config.wanIp,
           remotePort: this.upnpStatus?.externalPort || this.config.apiPort || 8384
@@ -1244,9 +1274,10 @@ export class SyncEngine extends EventEmitter {
       // Incoming file upload stream
       if (url.pathname === '/api/upload' && req.method === 'POST') {
         const senderId = req.headers['x-device-id'] as string || '';
+        const senderPort = parseInt(req.headers['x-device-port'] as string, 10);
         if (senderId) {
           const rawIp = req.socket.remoteAddress || '127.0.0.1';
-          this.updatePeerAddress(senderId, rawIp);
+          this.updatePeerAddress(senderId, rawIp, (senderPort && senderPort > 0 && senderPort < 65536) ? senderPort : undefined);
         }
         const rawFilename = req.headers['x-filename'] as string || `file_${Date.now()}`;
         const rawRelPath = req.headers['x-relative-path'] as string || '';
@@ -1269,7 +1300,7 @@ export class SyncEngine extends EventEmitter {
         }
 
         // Security: Block unauthorized / unpaired clients from uploading files
-        const peer = this.deviceMap.get(senderId);
+        const peer = this.deviceMap.get(senderId) || this.config.pairedDevices.find(d => d.id.toUpperCase() === senderId.toUpperCase());
         if (!peer) {
           logger.warn('Security', `Blocked unauthorized upload attempt from unpaired device: ${senderId}`);
           console.warn(`Blocked unauthorized upload attempt from unpaired device: ${senderId}`);
@@ -1632,6 +1663,8 @@ export class SyncEngine extends EventEmitter {
       logger.error('Engine', `Server error on port ${port}:`, err);
       if (err.code === 'EADDRINUSE') {
         this.config.apiPort = port + 1;
+        this.discovery?.updateInfo(this.config.deviceId, this.config.deviceName, this.config.apiPort);
+        saveConfig(this.config);
         this.server?.listen(this.config.apiPort, '0.0.0.0');
       }
     });
@@ -1816,6 +1849,7 @@ export class SyncEngine extends EventEmitter {
           'x-relative-path': encodeURIComponent(relPath),
           'x-device-id': this.config.deviceId,
           'x-device-name': encodeURIComponent(this.config.deviceName),
+          'x-device-port': String(this.config.apiPort || 8384),
           'x-auth-token': peer?.authToken || '',
           ...(batchContext ? {
             'x-batch-index': String(batchContext.currentIndex),

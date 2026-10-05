@@ -76,37 +76,47 @@ export function setupIpc(
 
   // Pairing by Device Code OR direct IP
   ipcMain.handle('pair-device', async (_, input: string) => {
-    const clean = input.trim();
-    if (!clean) return { success: false, error: 'Введите код устройства или IP' };
+    const rawClean = input.trim();
+    if (!rawClean) return { success: false, error: 'Введите код устройства или IP' };
+    const clean = rawClean.replace(/^::ffff:/, '');
 
     let targetIp = '';
     let targetPort = 8384;
 
-    // 1. Direct IP, Hostname, or Tailscale address (e.g. 192.168.0.110, 100.x.x.x, or hostname:8384)
-    if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/.test(clean) || clean.includes(':') || clean.includes('.net') || clean.includes('.local') || clean.includes('.')) {
-      const parts = clean.split(':');
-      targetIp = parts[0];
-      if (parts[1]) targetPort = parseInt(parts[1], 10);
-    } else {
-      // 2. Check if device is already in UDP discovery cache
-      let peer = discovery.findPeer(clean);
+    // 1. Direct device ID lookup in discovery first (e.g. PC-5040 or MAC-1234)
+    let peer = discovery.findPeer(clean);
 
-      // 3. If not found in UDP cache, immediately trigger Fast Subnet Probe!
-      if (!peer) {
-        console.log(`Peer "${clean}" not in UDP cache. Scanning local subnet...`);
-        const found = await discovery.probeSubnetForDevice(clean);
-        peer = discovery.findPeer(clean);
-        if (!peer && found && found.length > 0) {
-          peer = found.find(p => {
-            const pId = p.deviceId.toUpperCase();
-            const q = clean.toUpperCase();
-            return pId === q || pId.endsWith(`-${q}`) || pId.replace(/^(MAC|PC)-/, '') === q;
-          }) || found[0];
+    // 2. Direct IP, Hostname, or Tailscale address (e.g. 192.168.0.110, 192.168.0.110:8384, or hostname:8384)
+    if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/.test(clean) || clean.includes(':') || clean.includes('.net') || clean.includes('.local')) {
+      const parts = clean.split(':');
+      targetIp = parts[0].replace(/^::ffff:/, '');
+      if (parts[1]) {
+        targetPort = parseInt(parts[1], 10) || 8384;
+      } else {
+        // Find if this IP is known in discovery to get its accurate port
+        const knownPeer = discovery.getPeers().find(p => p.ip.replace(/^::ffff:/, '') === targetIp);
+        if (knownPeer && knownPeer.port) {
+          targetPort = knownPeer.port;
         }
+      }
+    } else if (peer) {
+      targetIp = peer.ip.replace(/^::ffff:/, '');
+      targetPort = peer.port || 8384;
+    } else {
+      // 3. Not in cache and not IP — probe subnet for device code
+      console.log(`Peer "${clean}" not in UDP cache. Scanning local subnet...`);
+      const found = await discovery.probeSubnetForDevice(clean);
+      peer = discovery.findPeer(clean);
+      if (!peer && found && found.length > 0) {
+        peer = found.find(p => {
+          const pId = p.deviceId.toUpperCase();
+          const q = clean.toUpperCase();
+          return pId === q || pId.endsWith(`-${q}`) || pId.replace(/^(MAC|PC)-/, '') === q;
+        }) || found[0];
       }
 
       if (peer) {
-        targetIp = peer.ip;
+        targetIp = peer.ip.replace(/^::ffff:/, '');
         targetPort = peer.port || 8384;
       }
     }

@@ -93,11 +93,13 @@ export class PeerDiscovery extends EventEmitter {
       try {
         const data = JSON.parse(msg.toString('utf-8'));
         if (data && typeof data.deviceId === 'string' && data.deviceId.length <= 64 && data.deviceId !== this.deviceId) {
+          const rawIp = (rinfo.address || '').replace(/^::ffff:/, '');
+          const peerPort = typeof data.port === 'number' && data.port > 0 && data.port < 65536 ? data.port : 8384;
           const peer: DiscoveredPeer = {
             deviceId: data.deviceId.slice(0, 64),
             deviceName: typeof data.deviceName === 'string' ? data.deviceName.slice(0, 64) : 'Устройство',
-            ip: rinfo.address,
-            port: typeof data.port === 'number' && data.port > 0 && data.port < 65536 ? data.port : 8384,
+            ip: rawIp,
+            port: peerPort,
             lastSeen: Date.now()
           };
 
@@ -107,10 +109,13 @@ export class PeerDiscovery extends EventEmitter {
             if (oldestKey) this.peers.delete(oldestKey);
           }
 
-          const isNew = !this.peers.has(peer.deviceId);
+          const existingPeer = this.peers.get(peer.deviceId);
+          const isNew = !existingPeer;
+          const hasChanged = isNew || existingPeer.ip !== peer.ip || existingPeer.port !== peer.port || existingPeer.deviceName !== peer.deviceName;
+
           this.peers.set(peer.deviceId, peer);
 
-          if (isNew) {
+          if (hasChanged) {
             this.emit('peer-found', peer);
             this.emit('peers-changed', this.getPeers());
           }
@@ -124,7 +129,7 @@ export class PeerDiscovery extends EventEmitter {
               reply: true
             }));
             try {
-              this.socket.send(replyMsg, 0, replyMsg.length, this.broadcastPort, rinfo.address, () => {});
+              this.socket.send(replyMsg, 0, replyMsg.length, this.broadcastPort, rawIp, () => {});
             } catch {}
           }
         }
@@ -255,16 +260,25 @@ export class PeerDiscovery extends EventEmitter {
       let matchFound = false;
 
       const probeAgent = new http.Agent({ keepAlive: false, maxSockets: 50 });
-      const concurrency = 40;
+      const concurrency = 30;
       let currentIndex = 0;
 
       const probeIp = (ip: string): Promise<void> => {
         return new Promise<void>((resolve) => {
           if (matchFound) return resolve();
 
+          const cleanIp = ip.replace(/^::ffff:/, '');
           const req = http.get(
-            `http://${ip}:${this.apiPort}/api/ping`,
-            { timeout: 350, agent: probeAgent },
+            `http://${cleanIp}:${this.apiPort}/api/ping`,
+            {
+              timeout: 750,
+              agent: probeAgent,
+              headers: {
+                'x-device-id': this.deviceId,
+                'x-device-name': encodeURIComponent(this.deviceName),
+                'x-device-port': String(this.apiPort)
+              }
+            },
             (res) => {
               if (res.statusCode === 200) {
                 let data = '';
@@ -273,11 +287,14 @@ export class PeerDiscovery extends EventEmitter {
                   try {
                     const json = JSON.parse(data);
                     if (json.status === 'ok' && json.deviceId && json.deviceId !== this.deviceId) {
+                      const peerPort = typeof json.port === 'number' && json.port > 0
+                        ? json.port
+                        : (typeof json.remotePort === 'number' && json.remotePort > 0 ? json.remotePort : this.apiPort);
                       const peer: DiscoveredPeer = {
                         deviceId: json.deviceId,
                         deviceName: json.deviceName || 'Устройство',
-                        ip: ip,
-                        port: this.apiPort,
+                        ip: cleanIp,
+                        port: peerPort,
                         lastSeen: Date.now()
                       };
                       this.peers.set(peer.deviceId, peer);

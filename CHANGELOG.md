@@ -2,6 +2,23 @@
 
 Все важные изменения проекта MacDrop фиксируются в этом файле.
 
+## [2.3.8] - 2026-10-05
+
+### Исправления ошибок (Pairing & Reconnection Reliability)
+- **Исправлена отправка приглашения на сопряжение с Mac (Pairing Invitation)**:
+  - Устранена потеря порта устройства в UI [PairingModal.tsx](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/components/PairingModal.tsx): при клике «Связать» в блоке обнаруженных пиров теперь передается идентификатор устройства или строка `ip:port`, а не голый IP.
+  - В IPC-обработчике `pair-device` ([ipc.ts](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/main/ipc.ts)) добавлено первичное разрешение через кэш discovery, парсинг портов и автоочистка IPv6-mapped префиксов (`::ffff:`).
+  - В [discovery.ts](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/main/discovery.ts) обеспечена нормализация входящих IP-адресов от `dgram` и сохранение реального порта.
+  - В кнопке «Связать» обнаруженных устройств добавлена визуальная индикация выполнения запроса (`isSubmitting`).
+- **Автоматическое переподключение и синхронизация IP при перезапуске (Reconnect & Dynamic IP Sync)**:
+  - Устранена проблема зависания передачи файлов при смене IP удаленного ПК (например, переход на `192.168.0.112`):
+    - В [discovery.ts](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/main/discovery.ts) событие `peer-found` / `peers-changed` теперь генерируется при любом изменении IP или порта уже известного устройства (`hasChanged`), что мгновенно обновляет адреса в `SyncEngine` без ручного удаления связки.
+    - В [engine.ts](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/main/engine.ts) метод `startHealthCheck()` теперь запускается немедленно при старте приложения (без 12-секундной задержки) и при недоступности старого IP автоматически проверяет кэш discovery и производит обновление адреса.
+    - В `resolvePeerIp` ([engine.ts](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/main/engine.ts)) исправлено ошибочное падение в `REVERSE_PULL`: асинхронная очередь теперь активируется только при наличии реальной недавней активности пира (< 45 сек), исключая 90-секундное зависание отправки файлов.
+    - Увеличен сетевой таймаут `checkPeerPing` с 700 мс до 1500 мс для стабильной работы по Wi-Fi при выходе адаптера из энергосбережения.
+    - В HTTP-заголовки `/api/ping` и `/api/upload` добавлен параметр `x-device-port`, позволяющий обеим сторонам синхронизировать актуальные порты в режиме двусторонней связи.
+    - При конфликтах портов (`EADDRINUSE`) в `engine.ts` новое значение порта немедленно передается в модуль discovery (`discovery.updateInfo`) и сохраняется в конфигурацию.
+
 ## [2.3.7] - 2026-10-04
 
 ### Исправления ошибок (Bug Fixes & Transfer Reliability)
