@@ -12,18 +12,28 @@ def generate():
     os.makedirs('public', exist_ok=True)
     os.makedirs('dist', exist_ok=True)
     
-    logo_path = 'new_logo.jpeg'
-    if not os.path.exists(logo_path):
-        logo_path = 'public/icon.png'
+    logo_candidates = [
+        'Apple_and_Windows_app_icon_2K_20261012112838.jpg',
+        'new_logo.jpeg',
+        'new_logo.png',
+        'public/icon.png'
+    ]
+    logo_path = next((p for p in logo_candidates if os.path.exists(p)), 'public/icon.png')
     
     if os.path.exists(logo_path):
         img = Image.open(logo_path).convert('RGBA')
-        if logo_path.endswith('.jpeg') or logo_path.endswith('.jpg'):
+        if logo_path.lower().endswith(('.jpeg', '.jpg')):
             w, h = img.size
-            ImageDraw.floodfill(img, (0, 0), (0, 0, 0, 0), thresh=20)
-            ImageDraw.floodfill(img, (w - 1, 0), (0, 0, 0, 0), thresh=20)
-            ImageDraw.floodfill(img, (0, h - 1), (0, 0, 0, 0), thresh=20)
-            ImageDraw.floodfill(img, (w - 1, h - 1), (0, 0, 0, 0), thresh=20)
+            for pt in [(0, 0), (w - 1, 0), (0, h - 1), (w - 1, h - 1)]:
+                ImageDraw.floodfill(img, pt, (0, 0, 0, 0), thresh=25)
+            bbox = img.getbbox()
+            if bbox:
+                cropped = img.crop(bbox)
+                bw, bh = cropped.size
+                side = max(bw, bh)
+                square_img = Image.new('RGBA', (side, side), (0, 0, 0, 0))
+                square_img.paste(cropped, ((side - bw) // 2, (side - bh) // 2))
+                img = square_img
     else:
         img = Image.new('RGBA', (1024, 1024), (99, 102, 241, 255))
 
