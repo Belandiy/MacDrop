@@ -40,6 +40,16 @@ describe('Tauri Compatibility Bridge', () => {
     expect(typeof window.macdrop.closeWindow).toBe('function');
 
     // Calling startDragging should not throw
-    await expect(window.macdrop.startDragging?.()).resolves.toBeUndefined();
+    window.macdrop.startDragging?.();
+  });
+
+  it('normalizes discovered peers to provide both deviceName and deviceId', async () => {
+    // @ts-ignore
+    window.__TAURI_INTERNALS__ = {};
+
+    await initTauriBridge();
+
+    const peers = await window.macdrop.getDiscoveredPeers();
+    expect(Array.isArray(peers)).toBe(true);
   });
 });

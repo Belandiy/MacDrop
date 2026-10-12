@@ -62,6 +62,8 @@ pub struct EngineStatus {
 pub struct DiscoveredPeer {
     pub id: String,
     pub name: String,
+    pub device_id: String,
+    pub device_name: String,
     pub ip: String,
     pub port: u16,
     pub platform: Option<String>,

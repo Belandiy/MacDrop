@@ -257,6 +257,11 @@ pub async fn close_window(window: Window) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub async fn start_dragging(window: Window) -> Result<(), String> {
+    window.start_dragging().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn resize_window(
     window: Window,
     width: f64,

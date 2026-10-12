@@ -17,6 +17,8 @@ pub struct DiscoveryMessage {
     pub port: u16,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub platform: Option<String>,
+    #[serde(default)]
+    pub reply: bool,
 }
 
 pub fn guess_platform_from_name(name: &str) -> &'static str {
@@ -39,6 +41,21 @@ pub fn guess_platform_from_name(name: &str) -> &'static str {
     }
 }
 
+pub fn get_broadcast_addrs() -> Vec<SocketAddr> {
+    let mut addrs = vec!["255.255.255.255:8385".parse().unwrap()];
+    if let Ok(ip) = local_ip_address::local_ip() {
+        if let std::net::IpAddr::V4(ipv4) = ip {
+            let octets = ipv4.octets();
+            let bcast_ip = std::net::Ipv4Addr::new(octets[0], octets[1], octets[2], 255);
+            let bcast_sock = SocketAddr::new(std::net::IpAddr::V4(bcast_ip), BROADCAST_PORT);
+            if !addrs.contains(&bcast_sock) {
+                addrs.push(bcast_sock);
+            }
+        }
+    }
+    addrs
+}
+
 pub async fn start_peer_discovery(state: Arc<EngineState>) {
     let bind_addr: SocketAddr = "0.0.0.0:8385".parse().unwrap();
     let socket = match UdpSocket::bind(bind_addr).await {
@@ -58,7 +75,6 @@ pub async fn start_peer_discovery(state: Arc<EngineState>) {
     let broadcast_socket = socket.clone();
     let broadcast_state = state.clone();
     tokio::spawn(async move {
-        let bcast_addr: SocketAddr = "255.255.255.255:8385".parse().unwrap();
         loop {
             let (device_id, device_name, port) = {
                 let cfg = broadcast_state.config.read().await;
@@ -71,10 +87,13 @@ pub async fn start_peer_discovery(state: Arc<EngineState>) {
                 device_name,
                 port,
                 platform: Some(platform_str.to_string()),
+                reply: false,
             };
 
             if let Ok(json) = serde_json::to_string(&msg) {
-                let _ = broadcast_socket.send_to(json.as_bytes(), bcast_addr).await;
+                for bcast in get_broadcast_addrs() {
+                    let _ = broadcast_socket.send_to(json.as_bytes(), bcast).await;
+                }
             }
 
             tokio::time::sleep(Duration::from_millis(2500)).await;
@@ -88,9 +107,9 @@ pub async fn start_peer_discovery(state: Arc<EngineState>) {
             Ok((len, remote_addr)) => {
                 if let Ok(text) = std::str::from_utf8(&buf[..len]) {
                     if let Ok(msg) = serde_json::from_str::<DiscoveryMessage>(text) {
-                        let our_id = {
+                        let (our_id, our_name, our_port) = {
                             let cfg = state.config.read().await;
-                            cfg.device_id.clone()
+                            (cfg.device_id.clone(), cfg.device_name.clone(), cfg.api_port)
                         };
 
                         if msg.device_id == our_id {
@@ -114,13 +133,30 @@ pub async fn start_peer_discovery(state: Arc<EngineState>) {
 
                         let peer = DiscoveredPeer {
                             id: msg.device_id.clone(),
-                            name: msg.device_name,
+                            name: msg.device_name.clone(),
+                            device_id: msg.device_id.clone(),
+                            device_name: msg.device_name.clone(),
                             ip: clean_ip,
                             port: msg.port,
                             platform: Some(platform),
                             last_seen: now,
                             is_paired,
                         };
+
+                        // Send direct unicast reply immediately if it wasn't a reply
+                        if !msg.reply {
+                            let platform_str = if cfg!(target_os = "macos") { "darwin" } else { "win32" };
+                            let reply_msg = DiscoveryMessage {
+                                device_id: our_id,
+                                device_name: our_name,
+                                port: our_port,
+                                platform: Some(platform_str.to_string()),
+                                reply: true,
+                            };
+                            if let Ok(reply_json) = serde_json::to_string(&reply_msg) {
+                                let _ = socket.send_to(reply_json.as_bytes(), remote_addr).await;
+                            }
+                        }
 
                         // Update in-memory peers map
                         {
@@ -154,7 +190,6 @@ pub async fn start_peer_discovery(state: Arc<EngineState>) {
 }
 
 pub async fn trigger_manual_scan(state: &EngineState) {
-    let bcast_addr: SocketAddr = "255.255.255.255:8385".parse().unwrap();
     if let Ok(socket) = UdpSocket::bind("0.0.0.0:0").await {
         let _ = socket.set_broadcast(true);
         let (device_id, device_name, port) = {
@@ -167,9 +202,12 @@ pub async fn trigger_manual_scan(state: &EngineState) {
             device_name,
             port,
             platform: Some(platform_str.to_string()),
+            reply: false,
         };
         if let Ok(json) = serde_json::to_string(&msg) {
-            let _ = socket.send_to(json.as_bytes(), bcast_addr).await;
+            for bcast in get_broadcast_addrs() {
+                let _ = socket.send_to(json.as_bytes(), bcast).await;
+            }
         }
     }
 }
@@ -193,6 +231,7 @@ mod tests {
             device_name: "MacBook Air".to_string(),
             port: 8384,
             platform: Some("darwin".to_string()),
+            reply: false,
         };
         let json = serde_json::to_string(&msg).expect("Serialize");
         assert!(json.contains("deviceId"));

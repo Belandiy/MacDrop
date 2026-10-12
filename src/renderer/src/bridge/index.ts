@@ -162,15 +162,8 @@ export async function initTauriBridge(): Promise<void> {
       invokeTauri('resize_window', { width, height });
     },
 
-    startDragging: async () => {
-      if (isTauri()) {
-        try {
-          const { getCurrentWindow } = await import('@tauri-apps/api/window');
-          await getCurrentWindow().startDragging();
-        } catch (e) {
-          console.warn('[Bridge] startDragging failed:', e);
-        }
-      }
+    startDragging: () => {
+      invokeTauri('start_dragging');
     },
 
     pairDevice: async (input) => {
@@ -182,17 +175,41 @@ export async function initTauriBridge(): Promise<void> {
     },
 
     getDiscoveredPeers: async () => {
-      return (await invokeTauri('get_discovered_peers', undefined, [])) || [];
+      const raw = (await invokeTauri('get_discovered_peers', undefined, [])) || [];
+      return (Array.isArray(raw) ? raw : []).map((p: any) => ({
+        ...p,
+        deviceId: p.deviceId || p.id || '',
+        deviceName: p.deviceName || p.name || 'Устройство',
+        id: p.id || p.deviceId || '',
+        name: p.name || p.deviceName || 'Устройство',
+      }));
     },
 
     scanNearbyPeers: async () => {
-      return (await invokeTauri('scan_nearby_peers', undefined, [])) || [];
+      const raw = (await invokeTauri('scan_nearby_peers', undefined, [])) || [];
+      return (Array.isArray(raw) ? raw : []).map((p: any) => ({
+        ...p,
+        deviceId: p.deviceId || p.id || '',
+        deviceName: p.deviceName || p.name || 'Устройство',
+        id: p.id || p.deviceId || '',
+        name: p.name || p.deviceName || 'Устройство',
+      }));
     },
 
     onPeersUpdate: (callback) => {
       if (tauriEvent?.listen) {
         let unlistenFn: (() => void) | null = null;
-        tauriEvent.listen('peers-update', (event: any) => callback(event.payload)).then((fn: any) => {
+        tauriEvent.listen('peers-update', (event: any) => {
+          const raw = event.payload || [];
+          const normalized = (Array.isArray(raw) ? raw : []).map((p: any) => ({
+            ...p,
+            deviceId: p.deviceId || p.id || '',
+            deviceName: p.deviceName || p.name || 'Устройство',
+            id: p.id || p.deviceId || '',
+            name: p.name || p.deviceName || 'Устройство',
+          }));
+          callback(normalized);
+        }).then((fn: any) => {
           unlistenFn = fn;
         });
         return () => { if (unlistenFn) unlistenFn(); };

@@ -2,22 +2,23 @@
 
 Все важные изменения проекта MacDrop фиксируются в этом файле.
 
-## [feat/tauri-migration - Fix] - 2026-10-12
+## [feat/tauri-migration - Fix 2] - 2026-10-12
 
-### Исправление скругления углов окна и перетаскивания (Window Dragging & Corners)
-- **Устранение черных квадратных углов окна**:
-  - В [index.css](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/index.css) для `html, body` установлен строгий прозрачный фон `background: transparent !important; background-color: transparent !important; background-image: none !important;`. Ранее `body` заливал прямоугольник WKWebView непрозрачным цветом `#090a0f`, из-за чего за скруглением `rounded-[14px]` в углах оставались острые черные прямоугольные выступы.
-  - В [index.html](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/index.html) скелетон-разметка переведена на прозрачный фон со скруглением `border-radius:14px; overflow:hidden;`.
-  - В [tauri.conf.json](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/tauri.conf.json) для главного окна активирована системная тень `"shadow": true` наряду с `"transparent": true` и `"decorations": false`.
-  - В [lib.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/lib.rs) на macOS добавлено явное включение нативной тени окна через `win.set_shadow(true)`.
-- **Восстановление перемещения окна мышью (Window Dragging)**:
-  - В Safari/WebKit и Tauri CSS-свойство `-webkit-app-region: drag` не поддерживается.
-  - В [vite-env.d.ts](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/vite-env.d.ts) и [bridge/index.ts](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/bridge/index.ts) добавлен метод `window.macdrop.startDragging()` с динамическим импортом `@tauri-apps/api/window`.
-  - На панели заголовков в [classic-native/index.tsx](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/designs/classic-native/index.tsx) и [Header.tsx](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/components/Header.tsx) добавлены атрибуты `data-tauri-drag-region`, а также `onMouseDown` обработчик с фильтрацией интерактивных элементов (`button`, `input`, `a`, `[data-no-drag]`).
+### Полное восстановление перетаскивания окна и обнаружения имен устройств в сети
+- **Восстановление перемещения окна (Window Dragging)**:
+  - В [capabilities/default.json](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/capabilities/default.json) добавлено системное разрешение `core:window:allow-start-dragging`, а также `core:window:allow-minimize`, `core:window:allow-maximize`, `core:window:allow-close`. Без `allow-start-dragging` вызов нативного перетаскивания окна блокировался внутренней подсистемой прав Tauri v2.
+  - В [commands.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/commands.rs) и [lib.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/lib.rs) реализована выделенная IPC-команда `start_dragging(window: Window)`.
+  - В [bridge/index.ts](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/bridge/index.ts) убран асинхронный `await import`, приводивший к потере системного тика `mousedown` в macOS Cocoa AppKit. Команда `invokeTauri('start_dragging')` теперь срабатывает синхронно во время нажатия клавиши мыши.
+- **Отображение имен устройств в радаре поиска (Peer Discovery & Names)**:
+  - **Корневая причина:** В структуре `DiscoveredPeer` в Rust поля назывались `id` и `name`, тогда как интерфейс React `DiscoveredPeerItem` ожидал `deviceId` и `deviceName`. В результате имя устройства не выводилось (`undefined`), а устройство не выбиралось по клику.
+  - В [engine.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/engine.rs) модель `DiscoveredPeer` дополнена полями `device_id` и `device_name` (с camelCase сериализацией).
+  - В [bridge/index.ts](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/bridge/index.ts) методы `getDiscoveredPeers`, `scanNearbyPeers` и событие `onPeersUpdate` получили гарантированную нормализацию: дублирование `deviceId`/`id` и `deviceName`/`name`.
+  - В [discovery.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/discovery.rs):
+    - Добавлен расчет широковещательных адресов локальных подсетей через `get_broadcast_addrs()` (например, `192.168.x.255`), что предотвращает фильтрацию широковещательных пакетов роутерами на macOS;
+    - Реализован мгновенный прямой ответ `unicast reply` при первом же получении пакета от другого устройства, обеспечивая немедленное взаимное обнаружение.
 - **Тестирование**:
-  - Добавлены unit-тесты [bridge.test.ts](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/bridge/bridge.test.ts).
-  - Все **72 теста Vitest** и **13 тестов Rust** проходят успешно (85/85 тестов зеленые).
-  - Собрано и проверено готовое приложение [MacDrop.app](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/target/release/bundle/macos/MacDrop.app) (18.45 МБ).
+  - Все **73 теста Vitest** и **13 тестов Rust** проходят успешно (86/86 тестов зеленые).
+  - Собрано обновленное релизное приложение [MacDrop.app](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/target/release/bundle/macos/MacDrop.app) (18.48 МБ).
 
 ## [feat/tauri-migration - Фаза 3] - 2026-10-12
 

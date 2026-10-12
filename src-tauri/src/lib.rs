@@ -73,6 +73,7 @@ pub fn run() {
             commands::minimize_window,
             commands::maximize_window,
             commands::close_window,
+            commands::start_dragging,
             commands::resize_window,
             commands::send_dropped_files,
             commands::pick_and_send_files,
