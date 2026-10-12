@@ -71,8 +71,21 @@ pub fn setup_tray(app: &AppHandle, state: Arc<EngineState>) -> Result<(), Box<dy
             }
         });
 
-    if let Some(icon) = app.default_window_icon() {
+    let tray_icon_bytes = if cfg!(target_os = "macos") {
+        include_bytes!("../icons/tray-mac.png") as &[u8]
+    } else {
+        include_bytes!("../icons/tray-win.png") as &[u8]
+    };
+
+    if let Ok(tray_img) = tauri::image::Image::from_bytes(tray_icon_bytes) {
+        builder = builder.icon(tray_img);
+    } else if let Some(icon) = app.default_window_icon() {
         builder = builder.icon(icon.clone());
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        builder = builder.icon_as_template(true);
     }
 
     builder.build(app)?;
