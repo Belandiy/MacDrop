@@ -2,7 +2,17 @@
 
 Все важные изменения проекта MacDrop фиксируются в этом файле.
 
-## [feat/tauri-migration - Fix 2] - 2026-10-12
+## [feat/tauri-migration - Logo Update] - 2026-10-12
+
+### Обновление логотипа приложения и генерация иконок для всех платформ
+- **Новый минималистичный логотип (3D Matte Glass Apple + Windows)**:
+  - Исходник [Minimalist_app_icon_with_logos_2K_20261012132749.jpg](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/Minimalist_app_icon_with_logos_2K_20261012132749.jpg) обработан: геометрически вырезана матовая эмблема с сохранением мягких рассеянных теней.
+  - Применен эталонный Apple HIG squircle с 4x суперсэмплингом и прозрачным фоном.
+  - Обновлены ключевые ассеты: [public/icon.png](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/public/icon.png) и [src/renderer/src/assets/logo.png](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/assets/logo.png).
+  - Выполнена перегенерация всех иконок Tauri (`icon.icns`, `icon.ico`, `icon.png`, Android/iOS наборы).
+  - Собрано и протестировано обновленное релизное приложение [MacDrop.app](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/target/release/bundle/macos/MacDrop.app) (19.28 МБ).
+  - Сброшен кэш иконок Finder.
+
 
 ### Полное восстановление перетаскивания окна и обнаружения имен устройств в сети
 - **Восстановление перемещения окна (Window Dragging)**:
