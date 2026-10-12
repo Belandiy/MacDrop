@@ -96,15 +96,15 @@ function getAppIcon(): Electron.NativeImage | string {
 function createWindow() {
   const appIcon = getAppIcon();
   mainWindow = new BrowserWindow({
-    width: 440,
-    height: 660,
-    minWidth: 400,
-    minHeight: 550,
+    width: 760,
+    height: 480,
+    minWidth: 640,
+    minHeight: 400,
     resizable: true,
     title: 'MacDrop',
     frame: false,
     autoHideMenuBar: true,
-    backgroundColor: '#090a0f',
+    backgroundColor: '#161616',
     icon: appIcon,
     show: false,
     webPreferences: {
