@@ -309,17 +309,15 @@ export const PairingModal: React.FC<PairingModalProps> = ({
               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[124px] h-[124px] rounded-full border border-[#007AFF]/20 pointer-events-none" />
               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[196px] h-[196px] rounded-full border border-[#007AFF]/15 pointer-events-none shadow-[inset_0_0_20px_rgba(0,122,255,0.08)]" />
 
-              {/* Rotating Radar Sweep Cone (Mirrored: sharp leading line with fading trailing shadow) */}
+              {/* Rotating Radar Sweep Cone: authentic sweeping beam (bright leading edge in front, fading trail behind) */}
               <div className="absolute inset-0 rounded-full animate-radar-sweep pointer-events-none overflow-hidden">
                 <div
                   className="w-full h-full rounded-full"
                   style={{
                     background:
-                      'conic-gradient(from 0deg at 50% 50%, transparent 0deg, transparent 295deg, rgba(0, 122, 255, 0.04) 305deg, rgba(0, 122, 255, 0.12) 335deg, rgba(0, 122, 255, 0.32) 359.5deg, transparent 360deg)'
+                      'conic-gradient(from 0deg at 50% 50%, transparent 0deg, rgba(0, 122, 255, 0.03) 10deg, rgba(0, 122, 255, 0.12) 32deg, rgba(0, 122, 255, 0.32) 48deg, transparent 48.5deg, transparent 360deg)'
                   }}
                 />
-                {/* Luminous Leading Edge Beam Ray */}
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1.5px] h-[102px] bg-gradient-to-b from-[#60A5FA] via-[#007AFF] to-transparent shadow-[0_0_8px_#007AFF]" />
               </div>
 
               {/* Central Origin Dot */}
