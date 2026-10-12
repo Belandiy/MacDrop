@@ -2,6 +2,16 @@
 
 Все важные изменения проекта MacDrop фиксируются в этом файле.
 
+## [private/classic-native] - 2026-10-12
+
+### Изоляция дизайна Classic Native и очистка интерфейса
+- **Выделена отдельная ветка `private/classic-native`**:
+  - Единственным активным интерфейсом оставлен дизайн [Classic Native (macOS)](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/designs/classic-native).
+  - Удалены альтернативные модули дизайнов (`default`, `studio-titanium`, `vision-spatial`).
+  - Полностью убрана верхняя системная панель переключения дизайнов (`DevToolbar`).
+  - Окно приложения `BrowserWindow` перенастроено под нативные пропорции десктопного split-view (`760×480`, `minWidth: 640`, `minHeight: 400`, фоновый цвет `#161616`).
+  - Размер JS-бандла сокращен с ~504 KB до 347 KB.
+
 ## [2.3.8] - 2026-09-28
 
 ### Новый дизайн: VisionOS Frosted Glass & Spatial Minimal
