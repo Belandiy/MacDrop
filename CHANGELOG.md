@@ -2,6 +2,25 @@
 
 Все важные изменения проекта MacDrop фиксируются в этом файле.
 
+## [feat/tauri-migration - Фаза 3] - 2026-10-12
+
+### Нативный системный трей, оконный менеджмент и тестирование
+- **Нативный трей [tray.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/tray.rs)**:
+  - Инициализация статус-бара macOS и системного трея Windows через `tauri::tray::TrayIconBuilder`.
+  - Монохромная иконка `src-tauri/icons/tray.png` с поддержкой Retina.
+  - Клик левой кнопкой мыши по иконке трея мгновенно переключает видимость окна (toggle show/hide + focus).
+  - Нативное контекстное меню:
+    - Заголовок «MacDrop»;
+    - «🖥️ Показать MacDrop»;
+    - «📂 Открыть папку MacDrop» (вызов нативного проводника Finder/Explorer через `open`);
+    - «❌ Выход» (корректное завершение процесса приложения `app.exit(0)`).
+- **Конфигурация окна [tauri.conf.json](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/tauri.conf.json)**:
+  - Явный идентификатор окна `"label": "main"` для надежного связывания с оконным менеджером трея.
+- **Тестирование**:
+  - Написаны и успешно выполнены **13 unit-тестов Rust** (`cargo test`).
+  - **70 фронтенд-тестов Vitest** (`npm test`) выполняются со 100% успехом.
+  - Release-бинарник собирается за 17 секунд, итоговый вес автономного приложения — **16 МБ**.
+
 ## [feat/tauri-migration - Фаза 2] - 2026-10-12
 
 ### Сеть и Передача: UDP Discovery, AirDrop Radar, ZIP Архивация и Unit-тесты

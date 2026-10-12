@@ -4,6 +4,7 @@ pub mod discovery;
 pub mod engine;
 pub mod logger;
 pub mod transfer;
+pub mod tray;
 
 use std::sync::Arc;
 use tauri::Manager;
@@ -35,7 +36,8 @@ pub fn run() {
             let state_for_setup = engine_state.clone();
             move |app| {
                 state_for_setup.set_app_handle(app.handle().clone());
-                app.manage(state_for_setup);
+                app.manage(state_for_setup.clone());
+                let _ = crate::tray::setup_tray(app.handle(), state_for_setup);
                 Ok(())
             }
         })
