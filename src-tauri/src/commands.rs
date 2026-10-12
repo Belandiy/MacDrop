@@ -146,7 +146,7 @@ pub async fn get_discovered_peers(
 pub async fn scan_nearby_peers(
     state: State<'_, Arc<EngineState>>,
 ) -> Result<Vec<DiscoveredPeer>, String> {
-    // Phase 2 will implement active UDP scan; for Phase 1 return current known peers
+    crate::discovery::trigger_manual_scan(&state).await;
     get_discovered_peers(state).await
 }
 
@@ -331,6 +331,14 @@ pub async fn send_dropped_files(
             });
         }
     }
+
+    // Trigger peer network transfer in background task
+    let transfer_state = state.inner().clone();
+    let transfer_paths = file_paths.clone();
+    let transfer_target = target_device_id.clone();
+    tokio::spawn(async move {
+        let _ = crate::transfer::execute_peer_transfer(transfer_state, transfer_paths, transfer_target).await;
+    });
 
     Ok(serde_json::json!({ "success": true, "count": file_paths.len() }))
 }

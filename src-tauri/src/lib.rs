@@ -1,7 +1,9 @@
 pub mod commands;
 pub mod config;
+pub mod discovery;
 pub mod engine;
 pub mod logger;
+pub mod transfer;
 
 use std::sync::Arc;
 use tauri::Manager;
@@ -20,6 +22,12 @@ pub fn run() {
     let server_state = engine_state.clone();
     tauri::async_runtime::spawn(async move {
         start_http_server(server_state).await;
+    });
+
+    // Launch background UDP Peer Discovery (AirDrop radar)
+    let discovery_state = engine_state.clone();
+    tauri::async_runtime::spawn(async move {
+        crate::discovery::start_peer_discovery(discovery_state).await;
     });
 
     tauri::Builder::default()

@@ -196,3 +196,36 @@ impl AppLogger {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_logger_buffer_and_filtering() {
+        let logger = AppLogger::new();
+        logger.clear_logs();
+
+        logger.info("Test", "Message 1", None);
+        logger.warn("Test", "Message 2", Some("detail".to_string()));
+        logger.error("Test", "Message 3", None);
+
+        let logs = logger.get_logs(None);
+        assert!(logs.len() >= 3);
+
+        let limited = logger.get_logs(Some(2));
+        assert_eq!(limited.len(), 2);
+        assert_eq!(limited.last().unwrap().message, "Message 3");
+    }
+
+    #[test]
+    fn test_logger_clear() {
+        let logger = AppLogger::new();
+        logger.info("Test", "Will be cleared", None);
+        assert!(logger.get_logs(None).len() > 0);
+
+        logger.clear_logs();
+        assert_eq!(logger.get_logs(None).len(), 0);
+    }
+}
+

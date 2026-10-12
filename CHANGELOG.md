@@ -2,6 +2,33 @@
 
 Все важные изменения проекта MacDrop фиксируются в этом файле.
 
+## [feat/tauri-migration - Фаза 2] - 2026-10-12
+
+### Сеть и Передача: UDP Discovery, AirDrop Radar, ZIP Архивация и Unit-тесты
+- **Сетевое обнаружение пиров [discovery.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/discovery.rs)**:
+  - Фоновый асинхронный сокет `tokio::net::UdpSocket` на порту `8385`.
+  - Периодический бродкаст присутствия (`DiscoveryMessage`) каждые 2.5 сек на `255.255.255.255:8385`.
+  - Автоматическое определение платформы пира (`darwin` / `win32`) по сигнатуре или имени хоста.
+  - Мгновенная трансляция найденных узлов на фронтенд через `app_handle.emit("peers-update", ...)` для нативного AirDrop Radar.
+  - Поддержка принудительного сканирования через `scan_nearby_peers`.
+- **Модуль передачи данных и архивации [transfer.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/transfer.rs)**:
+  - Прямая отправка файлов целевым пирам через HTTP POST `/api/upload` с валидацией auth-токена.
+  - Архивация каталогов в `.zip` на лету через `zip::ZipWriter` с сохранением структуры вложенных папок.
+  - Обновление прогресса отправки в реальном времени (`progress-update`) и сохранение в историю передач.
+- **Тестирование**:
+  - Написано и успешно пройдено **12 unit-тестов Rust** (`cargo test`):
+    - `test_zip_directory` — рекурсивная архивация папок;
+    - `test_guess_platform` — эвристика распознавания macOS и Windows;
+    - `test_discovery_message_serde` — сериализация сетевых сообщений;
+    - `test_path_traversal_blocked` — блокировка атак выхода из каталога;
+    - `test_valid_path_resolution` — безопасное разрешение путей;
+    - `test_non_conflicting_path` — автоматическое разрешение коллизий имен;
+    - `test_urlencoding_decode` — декодирование URL-имен;
+    - `test_logger_*` — буфер и очистка логов;
+    - `test_config_*` — генерация ключей и roundtrip сериализации настроек.
+  - **70 фронтенд-тестов Vitest** (`npm test`) выполняются со 100% успехом.
+  - Итоговый release-бинарник со всеми сетевыми протоколами весит **16 МБ**.
+
 ## [feat/tauri-migration - Фаза 1] - 2026-10-12
 
 ### Ядро на Rust: Config, Logger, Axum HTTP Server и IPC Commands

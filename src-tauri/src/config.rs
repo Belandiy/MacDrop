@@ -178,3 +178,67 @@ pub fn save_config(config: &AppConfig) {
         let _ = fs::write(file_path, json);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_generate_random_key_length() {
+        let key = generate_random_key(32);
+        assert_eq!(key.len(), 32);
+        let key2 = generate_random_key(32);
+        assert_ne!(key, key2);
+    }
+
+    #[test]
+    fn test_generate_short_device_id_format() {
+        let id = generate_short_device_id();
+        assert!(id.starts_with("MAC-") || id.starts_with("PC-"));
+        let parts: Vec<&str> = id.split('-').collect();
+        assert_eq!(parts.len(), 2);
+        let num: Result<u32, _> = parts[1].parse();
+        assert!(num.is_ok());
+    }
+
+    #[test]
+    fn test_config_json_serialization_roundtrip() {
+        let cfg = AppConfig {
+            target_folder: "/tmp/MacDrop".to_string(),
+            auto_start: false,
+            notifications: true,
+            language: Some("ru".to_string()),
+            device_id: "MAC-9999".to_string(),
+            device_name: "Test Mac".to_string(),
+            paired_devices: vec![PairedDevice {
+                id: "PC-1111".to_string(),
+                original_name: "Desktop".to_string(),
+                custom_name: "My PC".to_string(),
+                ip: "192.168.1.100".to_string(),
+                port: 8384,
+                remote_ip: None,
+                remote_port: None,
+                paired_at: "2026-10-12".to_string(),
+                last_seen: 123456789,
+                receive_enabled: Some(true),
+                connection_mode: Some("local".to_string()),
+                auth_token: Some("secret".to_string()),
+                platform: Some("win32".to_string()),
+            }],
+            api_port: 8384,
+            api_key: "abc123".to_string(),
+            upnp_enabled: Some(true),
+            wan_ip: None,
+            custom_remote_host: None,
+        };
+
+        let json = serde_json::to_string(&cfg).expect("Serialize error");
+        assert!(json.contains("targetFolder"));
+        assert!(json.contains("pairedDevices"));
+        let deserialized: AppConfig = serde_json::from_str(&json).expect("Deserialize error");
+        assert_eq!(deserialized.device_id, "MAC-9999");
+        assert_eq!(deserialized.paired_devices.len(), 1);
+        assert_eq!(deserialized.paired_devices[0].custom_name, "My PC");
+    }
+}
+

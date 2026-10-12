@@ -138,16 +138,34 @@ impl EngineState {
 // -----------------------------------------------------------------------------
 
 pub fn get_safe_resolved_path(target_folder: &str, rel_path: &str, filename: &str) -> Option<PathBuf> {
-    let base = Path::new(target_folder);
+    let raw_name = Path::new(filename)
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or(filename);
+
+    let sanitized_filename: String = raw_name
+        .chars()
+        .map(|c| if ['/', '\\', '?', '%', '*', ':', '|', '"', '<', '>'].contains(&c) { '_' } else { c })
+        .collect::<String>()
+        .trim()
+        .to_string();
+
+    if sanitized_filename.is_empty() || sanitized_filename == "." || sanitized_filename == ".." {
+        return None;
+    }
+
+    let base = PathBuf::from(target_folder);
     let candidate = if !rel_path.is_empty() {
-        base.join(rel_path)
+        let p = Path::new(rel_path);
+        if p.file_name().and_then(|s| s.to_str()) == Some(&sanitized_filename) {
+            base.join(rel_path)
+        } else {
+            base.join(rel_path).join(&sanitized_filename)
+        }
     } else {
-        base.join(filename)
+        base.join(&sanitized_filename)
     };
 
-    // Normalize path to prevent Path Traversal attacks
-    let _canonical_base = base.canonicalize().unwrap_or_else(|_| base.to_path_buf());
-    
     // Check for traversal components like ".."
     for component in candidate.components() {
         if let std::path::Component::ParentDir = component {
@@ -684,3 +702,53 @@ pub async fn start_http_server(state: Arc<EngineState>) {
         }
     });
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_path_traversal_blocked() {
+        let target = "/tmp/MacDrop";
+        // Attempt relative path traversal
+        assert!(get_safe_resolved_path(target, "../../../etc", "passwd").is_none());
+        assert!(get_safe_resolved_path(target, "..", "secret.txt").is_none());
+    }
+
+    #[test]
+    fn test_valid_path_resolution() {
+        let target = "/tmp/MacDrop";
+        let resolved = get_safe_resolved_path(target, "subfolder", "photo.jpg");
+        assert!(resolved.is_some());
+        let path = resolved.unwrap();
+        assert!(path.to_string_lossy().contains("subfolder"));
+        assert!(path.to_string_lossy().ends_with("photo.jpg"));
+    }
+
+    #[test]
+    fn test_non_conflicting_path() {
+        let temp_dir = std::env::temp_dir().join("macdrop_test_conflict");
+        let _ = fs::create_dir_all(&temp_dir);
+        let orig_file = temp_dir.join("document.pdf");
+        let _ = fs::write(&orig_file, b"test");
+
+        // First conflict should become document (1).pdf
+        let conflict1 = get_non_conflicting_path(orig_file.clone());
+        assert_eq!(conflict1.file_name().unwrap(), "document (1).pdf");
+        let _ = fs::write(&conflict1, b"test2");
+
+        // Second conflict should become document (2).pdf
+        let conflict2 = get_non_conflicting_path(orig_file);
+        assert_eq!(conflict2.file_name().unwrap(), "document (2).pdf");
+
+        let _ = fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_urlencoding_decode() {
+        assert_eq!(urlencoding_decode("hello%20world.txt"), "hello world.txt");
+        assert_eq!(urlencoding_decode("file+name.pdf"), "file name.pdf");
+        assert_eq!(urlencoding_decode("normal.png"), "normal.png");
+    }
+}
+
