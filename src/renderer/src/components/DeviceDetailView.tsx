@@ -30,6 +30,7 @@ export interface PairedDevice {
   receiveEnabled?: boolean;
   connectionMode?: 'local' | 'remote' | 'offline';
   authToken?: string;
+  platform?: string;
 }
 
 export interface TransferItem {

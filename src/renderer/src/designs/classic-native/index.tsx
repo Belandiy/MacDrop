@@ -3,9 +3,19 @@ import {
   X,
   Check,
   Search,
+  MoreHorizontal,
+  Ban
 } from 'lucide-react';
 import { DesignProps } from '../types';
+import { PairedDevice } from '../../vite-env';
 import { NativeDropZone } from '../../components/NativeDropZone';
+import { WindowsLogoIcon, MacDesktopIcon, MacLaptopIcon } from '../../components/PairingModal';
+import {
+  DeviceContextMenu,
+  DeviceHistoryModal,
+  DeviceRenameModal,
+  DeviceUnpairModal
+} from '../../components/DeviceMenu';
 import { useTranslation } from '../../i18n';
 
 export const name = 'Classic Native (macOS)';
@@ -31,13 +41,95 @@ export default function ClassicNativeDesign(props: DesignProps) {
     handleFilesDropped,
     handleOpenSettings,
     handleOpenPairing,
-    handleChooseFiles
+    handleChooseFiles,
+    handleUnpairDevice,
+    handleDeviceUpdated,
+    handleDeviceRemoved
   } = props;
 
   const { t } = useTranslation();
 
+  // Device context menu & modals state
+  const [contextMenuDevice, setContextMenuDevice] = useState<PairedDevice | null>(null);
+  const [contextMenuPos, setContextMenuPos] = useState<{ x: number; y: number } | null>(null);
+
+  const [historyModalDevice, setHistoryModalDevice] = useState<PairedDevice | null>(null);
+  const [renameModalDevice, setRenameModalDevice] = useState<PairedDevice | null>(null);
+  const [unpairModalDevice, setUnpairModalDevice] = useState<PairedDevice | null>(null);
+
+  const handleToggleReceive = async (device: PairedDevice) => {
+    const newEnabled = device.receiveEnabled === false ? true : false;
+    if (window.macdrop?.toggleDeviceReceive) {
+      await window.macdrop.toggleDeviceReceive(device.id, newEnabled);
+    }
+    const updated = { ...device, receiveEnabled: newEnabled };
+    handleDeviceUpdated?.(updated);
+  };
+
+  const handleSaveRename = async (device: PairedDevice, newName: string) => {
+    if (window.macdrop?.updateDeviceName) {
+      await window.macdrop.updateDeviceName(device.id, newName);
+    }
+    const updated = { ...device, customName: newName };
+    handleDeviceUpdated?.(updated);
+  };
+
+  const handleConfirmUnpair = async (device: PairedDevice) => {
+    if (handleUnpairDevice) {
+      await handleUnpairDevice(device.id);
+    } else if (window.macdrop?.removeDevice) {
+      await window.macdrop.removeDevice(device.id);
+    }
+    handleDeviceRemoved?.(device.id);
+  };
+
   // Filter state for transfers: All | Active | Completed
   const [transferFilter, setTransferFilter] = useState<'all' | 'active' | 'completed'>('all');
+
+  // Resizable sidebar width (min: 170px, max: 340px, default: 220px)
+  const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('macdrop_sidebar_width');
+      if (saved) {
+        const parsed = Number(saved);
+        if (!isNaN(parsed) && parsed >= 170 && parsed <= 340) {
+          return parsed;
+        }
+      }
+    } catch {}
+    return 220;
+  });
+
+  const [isResizing, setIsResizing] = useState(false);
+
+  const startResizing = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+  };
+
+  React.useEffect(() => {
+    if (!isResizing) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      // Clamp between 170px and 340px
+      const newWidth = Math.max(170, Math.min(340, e.clientX));
+      setSidebarWidth(newWidth);
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+      try {
+        localStorage.setItem('macdrop_sidebar_width', String(sidebarWidth));
+      } catch {}
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isResizing, sidebarWidth]);
 
   // Active target device
   const targetDevice = devices.find((d) => d.id === activeTargetDeviceId) || devices[0];
@@ -141,14 +233,17 @@ export default function ClassicNativeDesign(props: DesignProps) {
           SPLIT-VIEW CONTAINER
           ======================================================== */}
       <div className="flex-1 flex overflow-hidden">
-        {/* ================= LEFT SIDEBAR (220px) ================= */}
-        <aside className="w-[220px] bg-[#1E1E1E] border-r border-[#2C2C2E] p-[12px_10px] flex flex-col justify-between shrink-0 select-none">
+        {/* ================= LEFT SIDEBAR (Resizable) ================= */}
+        <aside
+          style={{ width: `${sidebarWidth}px` }}
+          className="bg-[#1E1E1E] p-[12px_10px] flex flex-col justify-between shrink-0 select-none overflow-hidden"
+        >
           {/* Top Section: Devices */}
-          <div>
-            <div className="px-2 py-1 text-[11px] font-semibold text-[#8E8E93] uppercase tracking-wider">
+          <div className="overflow-hidden">
+            <div className="px-2 py-1 text-[11px] font-semibold text-[#8E8E93] uppercase tracking-wider truncate">
               {t('devices.title')}
             </div>
-            <nav className="mt-1 space-y-0.5">
+            <nav className="mt-1 space-y-0.5 overflow-y-auto max-h-[calc(100vh-220px)]">
               {devices.length === 0 ? (
                 <div className="px-2 py-2 text-[12px] text-[#8E8E93]">
                   {t('devices.noDevices')}
@@ -158,23 +253,70 @@ export default function ClassicNativeDesign(props: DesignProps) {
                   const isSelected = targetDevice && targetDevice.id === device.id;
                   const isRemote = device.connectionMode === 'remote';
                   const isOffline = device.connectionMode === 'offline';
+                  const isReceiveDisabled = device.receiveEnabled === false;
+
+                  const nameLower = (device.customName || device.originalName || '').toLowerCase();
+                  const isWindows =
+                    device.platform === 'win32' ||
+                    nameLower.startsWith('desktop-') ||
+                    nameLower.startsWith('win-') ||
+                    nameLower.startsWith('laptop-') ||
+                    nameLower.includes('pc') ||
+                    nameLower.includes('windows');
+                  const isLaptop =
+                    nameLower.includes('air') ||
+                    nameLower.includes('book') ||
+                    nameLower.includes('laptop') ||
+                    nameLower.includes('notebook');
 
                   return (
-                    <button
+                    <div
                       key={device.id}
                       onClick={() => setActiveTargetDeviceAndSave(device.id)}
+                      onContextMenu={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setContextMenuPos({ x: e.clientX, y: e.clientY });
+                        setContextMenuDevice(device);
+                      }}
                       onDragOver={(e) => {
                         e.preventDefault();
                         e.dataTransfer.dropEffect = 'copy';
                       }}
                       onDrop={(e) => handleFileDropOnTarget(e, device.id)}
-                      className={`w-full h-7 px-2 rounded-[6px] flex items-center justify-between text-[13px] font-normal transition-colors text-left cursor-pointer ${
+                      className={`w-full h-8 px-2 rounded-[6px] flex items-center justify-between text-[13px] font-normal transition-colors text-left cursor-pointer group ${
                         isSelected
                           ? 'bg-[#007AFF] text-white shadow-sm'
                           : 'text-[#E5E5EA] hover:bg-[#282828]'
                       }`}
                     >
-                      <span className="flex items-center gap-2 truncate">
+                      <span className="flex items-center gap-2 truncate min-w-0 pr-1">
+                        {/* Platform Icon */}
+                        <span className="shrink-0 flex items-center justify-center">
+                          {isWindows ? (
+                            <WindowsLogoIcon className="w-3.5 h-3.5" isSelected={isSelected} />
+                          ) : isLaptop ? (
+                            <MacLaptopIcon className="w-4 h-4" isSelected={isSelected} />
+                          ) : (
+                            <MacDesktopIcon className="w-4 h-4" isSelected={isSelected} />
+                          )}
+                        </span>
+
+                        {/* Device Name */}
+                        <span className="truncate">{device.customName || device.originalName}</span>
+                      </span>
+
+                      {/* Right side: Receive disabled warning, Status dot & mode, More Options button */}
+                      <span className="flex items-center gap-1.5 shrink-0 ml-1">
+                        {isReceiveDisabled && (
+                          <span
+                            title={t('devices.receiveDisabled')}
+                            className={`shrink-0 ${isSelected ? 'text-white/90' : 'text-[#FF9500]'}`}
+                          >
+                            <Ban className="w-3 h-3" />
+                          </span>
+                        )}
+
                         <span
                           className={`w-1.5 h-1.5 rounded-full shrink-0 ${
                             isRemote
@@ -186,16 +328,34 @@ export default function ClassicNativeDesign(props: DesignProps) {
                               : 'bg-[#34C759]'
                           }`}
                         />
-                        <span className="truncate">{device.customName || device.originalName}</span>
+                        <span
+                          className={`text-[10px] font-medium ${
+                            isSelected ? 'text-white/80' : 'text-[#8E8E93]'
+                          }`}
+                        >
+                          {isRemote ? 'P2P' : isOffline ? '' : 'LAN'}
+                        </span>
+
+                        {/* More Options (...) Button */}
+                        <button
+                          type="button"
+                          title={t('devices.deviceMenu')}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                            setContextMenuPos({ x: rect.left, y: rect.bottom + 4 });
+                            setContextMenuDevice(device);
+                          }}
+                          className={`w-5 h-5 rounded-[4px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer ${
+                            isSelected
+                              ? 'hover:bg-white/20 text-white'
+                              : 'hover:bg-[#3A3A3C] text-[#8E8E93] hover:text-white'
+                          }`}
+                        >
+                          <MoreHorizontal className="w-3.5 h-3.5" />
+                        </button>
                       </span>
-                      <span
-                        className={`text-[10px] font-medium shrink-0 ml-1.5 ${
-                          isSelected ? 'text-white/80' : 'text-[#8E8E93]'
-                        }`}
-                      >
-                        {isRemote ? 'P2P' : isOffline ? '' : 'LAN'}
-                      </span>
-                    </button>
+                    </div>
                   );
                 })
               )}
@@ -204,7 +364,7 @@ export default function ClassicNativeDesign(props: DesignProps) {
             {/* Add Device Link Button */}
             <button
               onClick={handleOpenPairing}
-              className="mt-2.5 px-2 py-1 text-[12px] text-[#8E8E93] hover:text-[#007AFF] transition-colors flex items-center gap-1.5 cursor-pointer"
+              className="mt-2.5 px-2 py-1 text-[12px] text-[#8E8E93] hover:text-[#007AFF] transition-colors flex items-center gap-1.5 cursor-pointer truncate"
             >
               {t('devices.addDevice')}
             </button>
@@ -212,7 +372,7 @@ export default function ClassicNativeDesign(props: DesignProps) {
 
           {/* Bottom Section: Destination Folder */}
           <div className="border-t border-[#2C2C2E] pt-2.5 mt-auto">
-            <div className="px-1 mb-1.5 text-[10px] font-semibold text-[#8E8E93] uppercase tracking-wider">
+            <div className="px-1 mb-1.5 text-[10px] font-semibold text-[#8E8E93] uppercase tracking-wider truncate">
               {t('folder.destinationFolder')}
             </div>
             <div className="flex items-center justify-between gap-1.5 px-1">
@@ -225,7 +385,7 @@ export default function ClassicNativeDesign(props: DesignProps) {
                 <svg className="w-3.5 h-3.5 text-[#007AFF] shrink-0" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M19.5 21a3 3 0 0 0 3-3v-8a3 3 0 0 0-3-3h-7.66l-1.8-2.4A2.25 2.25 0 0 0 8.24 3.5H4.5A3 3 0 0 0 1.5 6.5v11.5a3 3 0 0 0 3 3h15z"></path>
                 </svg>
-                <span className="text-[11px] text-[#D1D1D6] group-hover:text-white font-mono truncate max-w-[110px]" title={config.targetFolder}>
+                <span className="text-[11px] text-[#D1D1D6] group-hover:text-white font-mono truncate" title={config.targetFolder}>
                   {config.targetFolder ? config.targetFolder.split(/[\\/]/).pop() || config.targetFolder : 'MacDrop'}
                 </span>
               </div>
@@ -239,8 +399,19 @@ export default function ClassicNativeDesign(props: DesignProps) {
           </div>
         </aside>
 
-        {/* ================= RIGHT MAIN AREA (540px) ================= */}
-        <main className="w-[540px] bg-[#161616] flex flex-col flex-1 overflow-hidden select-none">
+        {/* Resizer Splitter Divider */}
+        <div
+          onMouseDown={startResizing}
+          className={`w-[4px] -ml-[2px] relative z-20 cursor-col-resize hover:bg-[#007AFF]/60 active:bg-[#007AFF] transition-colors select-none group flex items-center justify-center ${
+            isResizing ? 'bg-[#007AFF]' : 'bg-transparent'
+          }`}
+          title="Изменить ширину боковой панели"
+        >
+          <div className="w-[1px] h-full bg-[#2C2C2E] pointer-events-none group-hover:bg-[#007AFF]" />
+        </div>
+
+        {/* ================= RIGHT MAIN AREA ================= */}
+        <main className="flex-1 bg-[#161616] flex flex-col min-w-0 overflow-hidden select-none">
           {/* Top Section: Send / Drop Area (180px) */}
           <section className="h-[180px] p-4 border-b border-[#2C2C2E] flex flex-col box-border justify-center">
             <NativeDropZone
@@ -399,6 +570,45 @@ export default function ClassicNativeDesign(props: DesignProps) {
           </section>
         </main>
       </div>
+
+      {/* Device Context Menu */}
+      {contextMenuDevice && contextMenuPos && (
+        <DeviceContextMenu
+          device={contextMenuDevice}
+          position={contextMenuPos}
+          onClose={() => {
+            setContextMenuDevice(null);
+            setContextMenuPos(null);
+          }}
+          onOpenHistory={(dev) => setHistoryModalDevice(dev)}
+          onOpenRename={(dev) => setRenameModalDevice(dev)}
+          onToggleReceive={(dev) => handleToggleReceive(dev)}
+          onOpenUnpair={(dev) => setUnpairModalDevice(dev)}
+        />
+      )}
+
+      {/* Device History Modal */}
+      <DeviceHistoryModal
+        isOpen={Boolean(historyModalDevice)}
+        device={historyModalDevice}
+        onClose={() => setHistoryModalDevice(null)}
+      />
+
+      {/* Device Rename Modal */}
+      <DeviceRenameModal
+        isOpen={Boolean(renameModalDevice)}
+        device={renameModalDevice}
+        onClose={() => setRenameModalDevice(null)}
+        onSave={handleSaveRename}
+      />
+
+      {/* Device Unpair Confirmation Modal */}
+      <DeviceUnpairModal
+        isOpen={Boolean(unpairModalDevice)}
+        device={unpairModalDevice}
+        onClose={() => setUnpairModalDevice(null)}
+        onConfirm={handleConfirmUnpair}
+      />
     </div>
   );
 }

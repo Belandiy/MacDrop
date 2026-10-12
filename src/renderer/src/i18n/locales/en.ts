@@ -25,6 +25,16 @@ export const en: LocaleSchema = {
     pair: 'Pair'
   },
 
+  // Common UI actions
+  common: {
+    close: 'Close',
+    cancel: 'Cancel',
+    save: 'Save',
+    saving: 'Saving...',
+    loading: 'Loading...',
+    deleting: 'Deleting...'
+  },
+
   // Status HUD & Telemetry
   status: {
     online: 'ONLINE',
@@ -153,7 +163,17 @@ export const en: LocaleSchema = {
     fileSendError: 'Failed to send file',
     directTcp: 'Direct TCP Socket',
     udpPunch: 'UDP Hole Punching',
-    authorized: 'Authorized'
+    authorized: 'Authorized',
+    deviceMenu: 'Device Menu',
+    transferLog: 'Transfer History',
+    rename: 'Rename',
+    receiveFiles: 'Receive Files',
+    receiveFilesOn: 'Receive Files: On',
+    receiveFilesOff: 'Receive Files: Off',
+    unpairDeviceConfirmTitle: 'Unpair Device?',
+    unpairDeviceConfirmDesc: 'Are you sure you want to unpair "{name}"? The pairing will be removed and re-pairing will be required to send files.',
+    enterNewDeviceName: 'Enter new device name:',
+    showInFolder: 'Show in Folder'
   },
 
   // History / Recent Transfers

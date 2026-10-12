@@ -3,7 +3,6 @@ import { X, Bell, Power, Sliders, Terminal, RefreshCw, Languages } from 'lucide-
 import { TargetFolderSetting } from './settings/TargetFolderSetting';
 import { ToggleSetting } from './settings/ToggleSetting';
 import { UpnpStatusSection, UpnpStatus } from './settings/UpnpStatusSection';
-import { ConnectedDevicesSection } from './settings/ConnectedDevicesSection';
 import { LogsSection } from './settings/LogsSection';
 import { UpdatesSection } from './settings/UpdatesSection';
 import { UpdateStateInfo } from '../vite-env';
@@ -278,11 +277,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
 
               <UpnpStatusSection upnpStatus={upnpStatus} />
-
-              <ConnectedDevicesSection
-                pairedDevices={pairedDevices}
-                onUnpairDevice={onUnpairDevice}
-              />
             </>
           )}
 

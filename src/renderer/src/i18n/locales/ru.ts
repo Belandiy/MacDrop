@@ -23,6 +23,16 @@ export const ru = {
     pair: 'Связать'
   },
 
+  // Common UI actions
+  common: {
+    close: 'Закрыть',
+    cancel: 'Отмена',
+    save: 'Сохранить',
+    saving: 'Сохранение...',
+    loading: 'Загрузка...',
+    deleting: 'Удаление...'
+  },
+
   // Status HUD & Telemetry
   status: {
     online: 'В СЕТИ',
@@ -151,7 +161,17 @@ export const ru = {
     fileSendError: 'Ошибка отправки файла',
     directTcp: 'Прямой TCP сокет',
     udpPunch: 'UDP Hole Punching',
-    authorized: 'Авторизован'
+    authorized: 'Авторизован',
+    deviceMenu: 'Меню устройства',
+    transferLog: 'Журнал передач',
+    rename: 'Переименовать',
+    receiveFiles: 'Приём файлов',
+    receiveFilesOn: 'Приём файлов: Вкл',
+    receiveFilesOff: 'Приём файлов: Выкл',
+    unpairDeviceConfirmTitle: 'Отвязать устройство?',
+    unpairDeviceConfirmDesc: 'Вы уверены, что хотите отвязать «{name}»? Связь будет разорвана, для передачи потребуется повторное сопряжение.',
+    enterNewDeviceName: 'Введите новое имя устройства:',
+    showInFolder: 'Показать в папке'
   },
 
   // History / Recent Transfers

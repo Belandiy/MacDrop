@@ -13,6 +13,7 @@ export interface PairedDevice {
   receiveEnabled?: boolean;
   connectionMode?: 'local' | 'remote' | 'offline';
   authToken?: string;
+  platform?: string;
 }
 
 export interface MacDropApi {
@@ -20,6 +21,7 @@ export interface MacDropApi {
   saveConfig: (config: any) => Promise<any>;
   selectFolder: () => Promise<string>;
   openFolder: () => Promise<boolean>;
+  openFile?: (filename: string) => Promise<boolean>;
   getStatus: () => Promise<any>;
   getPathForFile: (file: any) => string;
   sendDroppedFiles: (filePaths: string[], targetDeviceId?: string) => Promise<any>;

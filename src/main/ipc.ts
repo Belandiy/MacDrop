@@ -49,6 +49,19 @@ export function setupIpc(
     return false;
   });
 
+  ipcMain.handle('open-file', (_, filename: string) => {
+    const fullPath = path.join(config.targetFolder, filename);
+    if (fs.existsSync(fullPath)) {
+      shell.showItemInFolder(fullPath);
+      return true;
+    }
+    if (fs.existsSync(config.targetFolder)) {
+      shell.openPath(config.targetFolder);
+      return true;
+    }
+    return false;
+  });
+
   ipcMain.handle('get-status', () => {
     return engine.getStatus();
   });

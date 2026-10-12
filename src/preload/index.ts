@@ -6,6 +6,7 @@ export interface MacDropApi {
   saveConfig: (config: any) => Promise<any>;
   selectFolder: () => Promise<string>;
   openFolder: () => Promise<boolean>;
+  openFile?: (filename: string) => Promise<boolean>;
   getStatus: () => Promise<any>;
   getPathForFile: (file: any) => string;
   sendDroppedFiles: (filePaths: string[], targetDeviceId?: string) => Promise<any>;
@@ -80,6 +81,7 @@ const api: MacDropApi = {
   saveConfig: (config) => ipcRenderer.invoke('save-config', config),
   selectFolder: () => ipcRenderer.invoke('select-folder'),
   openFolder: () => ipcRenderer.invoke('open-target-folder'),
+  openFile: (filename) => ipcRenderer.invoke('open-file', filename),
   getStatus: () => ipcRenderer.invoke('get-status'),
   getPathForFile: (file: any) => {
     try {
