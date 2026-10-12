@@ -162,6 +162,17 @@ export async function initTauriBridge(): Promise<void> {
       invokeTauri('resize_window', { width, height });
     },
 
+    startDragging: async () => {
+      if (isTauri()) {
+        try {
+          const { getCurrentWindow } = await import('@tauri-apps/api/window');
+          await getCurrentWindow().startDragging();
+        } catch (e) {
+          console.warn('[Bridge] startDragging failed:', e);
+        }
+      }
+    },
+
     pairDevice: async (input) => {
       return await invokeTauri('pair_device', { input }, { success: false, error: 'Not implemented' });
     },

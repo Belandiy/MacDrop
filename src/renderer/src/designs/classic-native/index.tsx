@@ -188,22 +188,34 @@ export default function ClassicNativeDesign(props: DesignProps) {
           UNIFIED macOS TOOLBAR / TITLEBAR (38px)
           ======================================================== */}
       <header
+        data-tauri-drag-region
         style={{ WebkitAppRegion: 'drag' } as any}
-        className="h-[38px] px-3 bg-[#232326] border-b border-[#2C2C2E] flex items-center justify-between shrink-0 relative select-none"
+        onMouseDown={(e) => {
+          if ((e.target as HTMLElement).closest('button, a, input, select, textarea, [data-no-drag]')) {
+            return;
+          }
+          if (e.button === 0) {
+            window.macdrop?.startDragging?.();
+          }
+        }}
+        className="h-[38px] px-3 bg-[#232326] border-b border-[#2C2C2E] flex items-center justify-between shrink-0 relative select-none cursor-default"
       >
         {/* Genuine macOS Traffic Lights */}
-        <div style={{ WebkitAppRegion: 'no-drag' } as any} className="flex items-center gap-[7px]">
+        <div data-no-drag style={{ WebkitAppRegion: 'no-drag' } as any} className="flex items-center gap-[7px] z-10">
           <button
+            data-no-drag
             onClick={() => window.macdrop?.closeWindow()}
             title={t('window.close')}
             className="w-3 h-3 rounded-full bg-[#FF5F56] border border-[#E0443E]/60 flex items-center justify-center cursor-pointer transition-transform active:scale-95"
           />
           <button
+            data-no-drag
             onClick={() => window.macdrop?.minimizeWindow()}
             title={t('window.minimize')}
             className="w-3 h-3 rounded-full bg-[#FFBD2E] border border-[#DEA123]/60 flex items-center justify-center cursor-pointer transition-transform active:scale-95"
           />
           <button
+            data-no-drag
             onClick={() => window.macdrop?.maximizeWindow?.()}
             title={t('window.zoom')}
             className="w-3 h-3 rounded-full bg-[#27C93F] border border-[#1AAB29]/60 flex items-center justify-center cursor-pointer transition-transform active:scale-95"
@@ -211,15 +223,16 @@ export default function ClassicNativeDesign(props: DesignProps) {
         </div>
 
         {/* Centered Window Title */}
-        <div className="absolute inset-x-0 flex items-center justify-center pointer-events-none">
-          <span className="text-[13px] font-medium text-[#F2F2F7] tracking-tight">MacDrop</span>
+        <div data-tauri-drag-region className="absolute inset-x-0 flex items-center justify-center pointer-events-none">
+          <span data-tauri-drag-region className="text-[13px] font-medium text-[#F2F2F7] tracking-tight">MacDrop</span>
         </div>
 
         {/* Settings Icon Button (Right) */}
         <button
+          data-no-drag
           style={{ WebkitAppRegion: 'no-drag' } as any}
           onClick={() => handleOpenSettings('general')}
-          className="w-6 h-6 flex items-center justify-center rounded text-[#8E8E93] hover:text-[#FFFFFF] hover:bg-[#2C2C2E] transition-colors cursor-pointer"
+          className="w-6 h-6 flex items-center justify-center rounded text-[#8E8E93] hover:text-[#FFFFFF] hover:bg-[#2C2C2E] transition-colors cursor-pointer z-10"
           title={t('window.settings')}
         >
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" viewBox="0 0 24 24">

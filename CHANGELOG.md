@@ -2,6 +2,23 @@
 
 Все важные изменения проекта MacDrop фиксируются в этом файле.
 
+## [feat/tauri-migration - Fix] - 2026-10-12
+
+### Исправление скругления углов окна и перетаскивания (Window Dragging & Corners)
+- **Устранение черных квадратных углов окна**:
+  - В [index.css](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/index.css) для `html, body` установлен строгий прозрачный фон `background: transparent !important; background-color: transparent !important; background-image: none !important;`. Ранее `body` заливал прямоугольник WKWebView непрозрачным цветом `#090a0f`, из-за чего за скруглением `rounded-[14px]` в углах оставались острые черные прямоугольные выступы.
+  - В [index.html](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/index.html) скелетон-разметка переведена на прозрачный фон со скруглением `border-radius:14px; overflow:hidden;`.
+  - В [tauri.conf.json](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/tauri.conf.json) для главного окна активирована системная тень `"shadow": true` наряду с `"transparent": true` и `"decorations": false`.
+  - В [lib.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/lib.rs) на macOS добавлено явное включение нативной тени окна через `win.set_shadow(true)`.
+- **Восстановление перемещения окна мышью (Window Dragging)**:
+  - В Safari/WebKit и Tauri CSS-свойство `-webkit-app-region: drag` не поддерживается.
+  - В [vite-env.d.ts](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/vite-env.d.ts) и [bridge/index.ts](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/bridge/index.ts) добавлен метод `window.macdrop.startDragging()` с динамическим импортом `@tauri-apps/api/window`.
+  - На панели заголовков в [classic-native/index.tsx](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/designs/classic-native/index.tsx) и [Header.tsx](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/components/Header.tsx) добавлены атрибуты `data-tauri-drag-region`, а также `onMouseDown` обработчик с фильтрацией интерактивных элементов (`button`, `input`, `a`, `[data-no-drag]`).
+- **Тестирование**:
+  - Добавлены unit-тесты [bridge.test.ts](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/bridge/bridge.test.ts).
+  - Все **72 теста Vitest** и **13 тестов Rust** проходят успешно (85/85 тестов зеленые).
+  - Собрано и проверено готовое приложение [MacDrop.app](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/target/release/bundle/macos/MacDrop.app) (18.45 МБ).
+
 ## [feat/tauri-migration - Фаза 3] - 2026-10-12
 
 ### Нативный системный трей, оконный менеджмент и тестирование

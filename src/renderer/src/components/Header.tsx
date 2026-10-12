@@ -40,11 +40,20 @@ const MacHeader: React.FC<BaseHeaderProps> = ({
 
   return (
     <header
+      data-tauri-drag-region
       style={{ WebkitAppRegion: 'drag' } as any}
+      onMouseDown={(e) => {
+        if ((e.target as HTMLElement).closest('button, a, input, select, textarea, [data-no-drag]')) {
+          return;
+        }
+        if (e.button === 0) {
+          window.macdrop?.startDragging?.();
+        }
+      }}
       className="flex items-center justify-between px-4 py-3 border-b border-white/[0.08] bg-[#12141c]/95 backdrop-blur-2xl sticky top-0 z-20 select-none cursor-default"
     >
       {/* Left: Traffic Lights (Close, Minimize, Maximize) */}
-      <div style={{ WebkitAppRegion: 'no-drag' } as any} className="flex items-center gap-2 group">
+      <div data-no-drag style={{ WebkitAppRegion: 'no-drag' } as any} className="flex items-center gap-2 group z-10">
         <button
           onClick={handleClose}
           title={t('window.closeToTray')}
@@ -114,7 +123,16 @@ const WindowsHeader: React.FC<BaseHeaderProps> = ({
 
   return (
     <header
+      data-tauri-drag-region
       style={{ WebkitAppRegion: 'drag' } as any}
+      onMouseDown={(e) => {
+        if ((e.target as HTMLElement).closest('button, a, input, select, textarea, [data-no-drag]')) {
+          return;
+        }
+        if (e.button === 0) {
+          window.macdrop?.startDragging?.();
+        }
+      }}
       className="flex items-center justify-between px-4 py-3 border-b border-white/[0.08] bg-[#0e1017]/85 backdrop-blur-2xl sticky top-0 z-20 select-none cursor-default"
     >
       <div className="flex items-center gap-2.5 pointer-events-none">
@@ -135,7 +153,7 @@ const WindowsHeader: React.FC<BaseHeaderProps> = ({
         </div>
       </div>
 
-      <div style={{ WebkitAppRegion: 'no-drag' } as any} className="flex items-center gap-1">
+      <div data-no-drag style={{ WebkitAppRegion: 'no-drag' } as any} className="flex items-center gap-1 z-10">
         {/* Circular progress bar with down arrow */}
         <CircularUpdateProgress
           updateState={updateState}

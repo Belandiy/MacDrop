@@ -42,12 +42,7 @@ pub fn run() {
                 #[cfg(target_os = "macos")]
                 {
                     if let Some(win) = app.get_webview_window("main") {
-                        let _ = window_vibrancy::apply_vibrancy(
-                            &win,
-                            window_vibrancy::NSVisualEffectMaterial::UnderWindowBackground,
-                            None,
-                            Some(14.0),
-                        );
+                        let _ = win.set_shadow(true);
                     }
                 }
 
