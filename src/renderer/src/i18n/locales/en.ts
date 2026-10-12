@@ -74,7 +74,12 @@ export const en: LocaleSchema = {
     releaseToTransmit: 'Release to transmit payload',
     dropToTransmit: 'Drop to transmit',
     releaseToSendToTarget: 'Release to send to target',
-    hoverOverDestination: 'Hover over a destination device...'
+    hoverOverDestination: 'Hover over a destination device...',
+    sendingTo: 'Sending to',
+    dropFilesHereToSend: 'Drop files here to send',
+    orClickToSelectFiles: 'or click to select files',
+    releaseToSend: 'Release to send',
+    dropToSend: 'Drop to send'
   },
 
   // Transfers & Progress

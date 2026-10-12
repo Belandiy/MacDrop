@@ -72,7 +72,12 @@ export const ru = {
     releaseToTransmit: 'Отпустите для отправки',
     dropToTransmit: 'Сбросьте для отправки',
     releaseToSendToTarget: 'Отпустите для отправки на устройство',
-    hoverOverDestination: 'Наведите на устройство-получатель...'
+    hoverOverDestination: 'Наведите на устройство-получатель...',
+    sendingTo: 'Отправка на',
+    dropFilesHereToSend: 'Перетащите файлы для отправки',
+    orClickToSelectFiles: 'или нажмите для выбора файлов',
+    releaseToSend: 'Отпустите для отправки',
+    dropToSend: 'Сбросьте для отправки'
   },
 
   // Transfers & Progress
