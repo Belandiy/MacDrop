@@ -2,6 +2,25 @@
 
 Все важные изменения проекта MacDrop фиксируются в этом файле.
 
+## [feat/tauri-migration - Фаза 0] - 2026-10-12
+
+### Инициализация стека Tauri v2 и Compatibility Bridge
+- **Ветка `feat/tauri-migration`**:
+  - Создана выделенная ветка для постепенной миграции приложения с Electron на Tauri v2.
+- **Инициализация Rust Backend (`src-tauri/`)**:
+  - Установлены зависимости `@tauri-apps/cli@^2` и `@tauri-apps/api@^2`.
+  - Создан крейт `macdrop` (`macdrop_lib`) с таргетом staticlib/cdylib/rlib.
+  - Настроен [tauri.conf.json](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/tauri.conf.json) с размерами окна `760×480` (min `640×400`), бесшовным frameless режимом (`decorations: false`).
+- **Сборка фронтенда**:
+  - Добавлен независимый [vite.config.tauri.ts](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/vite.config.tauri.ts) для чистого SPA без привязки к Electron-плагинам.
+  - Добавлены скрипты `npm run dev:tauri` и `npm run build:tauri`.
+- **Tauri Compatibility Bridge**:
+  - Создан [bridge/index.ts](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/bridge/index.ts): эмулирует интерфейс `window.macdrop`, направляя вызовы в Tauri `invoke()` и слушая события `listen()`. Защищает React UI от ошибок `undefined` при отсутствии бэкенда Electron.
+  - Подключен в точку входа [main.tsx](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/main.tsx).
+- **Результаты проверки**:
+  - React бандл собирается за 0.98с.
+  - Rust ядро собирается за 5.5с.
+
 ## [private/classic-native] - 2026-10-12
 
 ### Изоляция дизайна Classic Native и очистка интерфейса
