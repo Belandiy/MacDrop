@@ -263,7 +263,7 @@ export const PairingModal: React.FC<PairingModalProps> = ({
       className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-black/65 backdrop-blur-md animate-in fade-in duration-200 select-none"
     >
       <div
-        className="relative w-full max-w-[370px] bg-[#1C1C1F] border border-[#2C2C30] rounded-[16px] shadow-[0_20px_50px_rgba(0,0,0,0.85)] overflow-hidden flex flex-col p-4 text-center select-none"
+        className="relative w-full max-w-[390px] bg-[#1C1C1F] border border-[#2C2C30] rounded-[16px] shadow-[0_20px_50px_rgba(0,0,0,0.85)] overflow-hidden flex flex-col p-4 text-center select-none"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Close Button Top-Right */}
@@ -288,36 +288,39 @@ export const PairingModal: React.FC<PairingModalProps> = ({
         {/* ===================== VIEW 1: AIRDROP RADAR ===================== */}
         {!showMobileQr ? (
           <div className="flex flex-col items-center">
-            {/* The AirDrop Radar Canvas (204x204 px, strictly circular) */}
-            <div className="relative w-[204px] h-[204px] my-1 flex items-center justify-center overflow-hidden rounded-full shrink-0">
-              {/* Background Radial Glow */}
-              <div
-                className="absolute inset-0 rounded-full pointer-events-none"
-                style={{
-                  background:
-                    'radial-gradient(circle at 50% 50%, rgba(0, 122, 255, 0.14) 0%, rgba(0, 122, 255, 0.04) 50%, transparent 72%)'
-                }}
-              />
-
-              {/* Concentric Expanding Circular Waves (Strictly centered, equal width & height) */}
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-[#007AFF]/40 pointer-events-none animate-radar-wave-1" />
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-[#007AFF]/35 pointer-events-none animate-radar-wave-2" />
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-[#007AFF]/30 pointer-events-none animate-radar-wave-3" />
-
-              {/* Concentric Static Radar Circles (Centered, perfectly round) */}
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[60px] h-[60px] rounded-full border border-[#007AFF]/25 bg-[#007AFF]/[0.02] pointer-events-none" />
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[124px] h-[124px] rounded-full border border-[#007AFF]/20 pointer-events-none" />
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[196px] h-[196px] rounded-full border border-[#007AFF]/15 pointer-events-none shadow-[inset_0_0_20px_rgba(0,122,255,0.08)]" />
-
-              {/* Rotating Radar Sweep Cone: authentic sweeping beam (bright leading edge in front, fading trail behind) */}
-              <div className="absolute inset-0 rounded-full animate-radar-sweep pointer-events-none overflow-hidden">
+            {/* The AirDrop Radar Canvas Container (204x204 px) */}
+            <div className="relative w-[204px] h-[204px] my-1 flex items-center justify-center shrink-0">
+              {/* Layer 1: Strictly circular radar visual background (clipped to circle) */}
+              <div className="absolute inset-0 rounded-full overflow-hidden pointer-events-none">
+                {/* Background Radial Glow */}
                 <div
-                  className="w-full h-full rounded-full"
+                  className="absolute inset-0 rounded-full pointer-events-none"
                   style={{
                     background:
-                      'conic-gradient(from 0deg at 50% 50%, transparent 0deg, rgba(0, 122, 255, 0.03) 10deg, rgba(0, 122, 255, 0.12) 32deg, rgba(0, 122, 255, 0.32) 48deg, transparent 48.5deg, transparent 360deg)'
+                      'radial-gradient(circle at 50% 50%, rgba(0, 122, 255, 0.14) 0%, rgba(0, 122, 255, 0.04) 50%, transparent 72%)'
                   }}
                 />
+
+                {/* Concentric Expanding Circular Waves (Strictly centered, equal width & height) */}
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-[#007AFF]/40 pointer-events-none animate-radar-wave-1" />
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-[#007AFF]/35 pointer-events-none animate-radar-wave-2" />
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-[#007AFF]/30 pointer-events-none animate-radar-wave-3" />
+
+                {/* Concentric Static Radar Circles (Centered, perfectly round) */}
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[60px] h-[60px] rounded-full border border-[#007AFF]/25 bg-[#007AFF]/[0.02] pointer-events-none" />
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[124px] h-[124px] rounded-full border border-[#007AFF]/20 pointer-events-none" />
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[196px] h-[196px] rounded-full border border-[#007AFF]/15 pointer-events-none shadow-[inset_0_0_20px_rgba(0,122,255,0.08)]" />
+
+                {/* Rotating Radar Sweep Cone: authentic sweeping beam (bright leading edge in front, fading trail behind) */}
+                <div className="absolute inset-0 rounded-full animate-radar-sweep pointer-events-none overflow-hidden">
+                  <div
+                    className="w-full h-full rounded-full"
+                    style={{
+                      background:
+                        'conic-gradient(from 0deg at 50% 50%, transparent 0deg, rgba(0, 122, 255, 0.03) 10deg, rgba(0, 122, 255, 0.12) 32deg, rgba(0, 122, 255, 0.32) 48deg, transparent 48.5deg, transparent 360deg)'
+                    }}
+                  />
+                </div>
               </div>
 
               {/* Central Origin Dot */}
@@ -326,7 +329,7 @@ export const PairingModal: React.FC<PairingModalProps> = ({
                 <div className="w-2.5 h-2.5 rounded-full bg-[#007AFF] shadow-[0_0_10px_#007AFF]" />
               </div>
 
-              {/* Discovered Peers Positioned on the Radar */}
+              {/* Layer 2: Discovered Peers Positioned on the Radar (Unclipped, full text) */}
               {peers.map((peer, idx) => {
                 const slot = predefinedSlots[idx] || {
                   angle: (idx * 360) / Math.max(peers.length, 1),
@@ -379,10 +382,10 @@ export const PairingModal: React.FC<PairingModalProps> = ({
                       )}
                     </div>
 
-                    {/* Device Name Label */}
-                    <div className="mt-0.5 flex flex-col items-center max-w-[85px]">
+                    {/* Device Name Label: Never clipped, never truncated */}
+                    <div className="mt-0.5 flex flex-col items-center pointer-events-none">
                       <span
-                        className={`text-[10px] font-medium truncate max-w-full text-center transition-colors ${
+                        className={`text-[10px] font-medium whitespace-nowrap text-center transition-colors ${
                           isSelected
                             ? 'bg-[#007AFF] text-white px-2 py-0.5 rounded-full shadow-md'
                             : 'text-[#D1D1D6] group-hover:text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] px-1 py-0.5'
