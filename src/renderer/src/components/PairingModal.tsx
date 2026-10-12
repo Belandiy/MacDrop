@@ -384,8 +384,8 @@ export const PairingModal: React.FC<PairingModalProps> = ({
                       <span
                         className={`text-[10px] font-medium truncate max-w-full text-center transition-colors ${
                           isSelected
-                            ? 'bg-[#007AFF] text-white px-1.5 py-0.5 rounded-full shadow-md'
-                            : 'text-[#E5E5EA] group-hover:text-white px-1 py-0.5 rounded bg-black/60 backdrop-blur-sm'
+                            ? 'bg-[#007AFF] text-white px-2 py-0.5 rounded-full shadow-md'
+                            : 'text-[#D1D1D6] group-hover:text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] px-1 py-0.5'
                         }`}
                       >
                         {peer.deviceName}
