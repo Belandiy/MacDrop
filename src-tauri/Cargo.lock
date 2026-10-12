@@ -2524,6 +2524,7 @@ dependencies = [
  "tower-http",
  "urlencoding",
  "uuid",
+ "window-vibrancy",
  "zip",
 ]
 

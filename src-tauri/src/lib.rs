@@ -38,6 +38,19 @@ pub fn run() {
                 state_for_setup.set_app_handle(app.handle().clone());
                 app.manage(state_for_setup.clone());
                 let _ = crate::tray::setup_tray(app.handle(), state_for_setup);
+
+                #[cfg(target_os = "macos")]
+                {
+                    if let Some(win) = app.get_webview_window("main") {
+                        let _ = window_vibrancy::apply_vibrancy(
+                            &win,
+                            window_vibrancy::NSVisualEffectMaterial::UnderWindowBackground,
+                            None,
+                            Some(14.0),
+                        );
+                    }
+                }
+
                 Ok(())
             }
         })
