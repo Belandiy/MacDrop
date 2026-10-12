@@ -10,7 +10,14 @@
   - Удалены альтернативные модули дизайнов (`default`, `studio-titanium`, `vision-spatial`).
   - Полностью убрана верхняя системная панель переключения дизайнов (`DevToolbar`).
   - Окно приложения `BrowserWindow` перенастроено под нативные пропорции десктопного split-view (`760×480`, `minWidth: 640`, `minHeight: 400`, фоновый цвет `#161616`).
-  - Размер JS-бандла сокращен с ~504 KB до 347 KB.
+- **Нативный радар поиска устройств (AirDrop Radar UI)**:
+  - Полностью переработано модальное окно сопряжения [PairingModal.tsx](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/components/PairingModal.tsx) в стиле Apple AirDrop Radar.
+  - Анимированные концентрические круги радара с эффектом расширяющихся волн (`radarWave`) и непрерывным вращающимся лучом сканирования (`radarSweep`).
+  - Распознавание платформ клиентов в локальной сети: для Windows — иконка логотипа Windows (четыре плитки), для Mac — нативные глифы MacBook / iMac.
+  - Поле ручного ввода кода удалено.
+  - Добавлена кнопка «QR-код» рядом со статусом «Готов к подключению» для быстрого подключения мобильного телефона через локальный Web Drop.
+  - В [discovery.ts](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/main/discovery.ts) добавлена передача `platform: process.platform` в UDP-бродкастах и автоматическая эвристика определения ОС.
+
 
 ## [2.3.8] - 2026-09-28
 

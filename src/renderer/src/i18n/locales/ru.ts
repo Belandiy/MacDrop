@@ -250,7 +250,19 @@ export const ru = {
     placeholderMac: 'MAC-1234 или 192.168.0.x',
     placeholderPc: 'PC-5040 или 192.168.0.x',
     otherPlatformWin: 'Windows ПК',
-    otherPlatformMac: 'Mac'
+    otherPlatformMac: 'Mac',
+    radarTitle: 'MacDrop',
+    radarLookingFor: 'Поиск устройств поблизости...',
+    readyToConnect: 'Готов к подключению',
+    searchingLocalNetwork: 'Поиск компьютеров в сети Wi-Fi...',
+    mobileQrBtn: 'QR-код',
+    mobileQrTitle: 'Подключение телефона',
+    mobileQrSubtitle: 'Отсканируйте камерой смартфона для обмена файлами',
+    backToRadar: 'Назад к радару',
+    selectDeviceToPair: 'Выберите устройство на радаре',
+    pairingWith: 'Подключение к {name}...',
+    cancel: 'Отмена',
+    pair: 'Связать'
   },
 
   // Updates

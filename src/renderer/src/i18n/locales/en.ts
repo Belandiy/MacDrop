@@ -252,7 +252,19 @@ export const en: LocaleSchema = {
     placeholderMac: 'MAC-1234 or 192.168.0.x',
     placeholderPc: 'PC-5040 or 192.168.0.x',
     otherPlatformWin: 'Windows PC',
-    otherPlatformMac: 'Mac'
+    otherPlatformMac: 'Mac',
+    radarTitle: 'MacDrop',
+    radarLookingFor: 'Looking for nearby Macs and PCs...',
+    readyToConnect: 'Ready to connect',
+    searchingLocalNetwork: 'Looking for computers on this Wi-Fi...',
+    mobileQrBtn: 'QR Code',
+    mobileQrTitle: 'Connect Phone',
+    mobileQrSubtitle: 'Scan with smartphone camera to transfer files',
+    backToRadar: 'Back to Radar',
+    selectDeviceToPair: 'Select a device on the radar',
+    pairingWith: 'Connecting to {name}...',
+    cancel: 'Cancel',
+    pair: 'Pair'
   },
 
   // Updates

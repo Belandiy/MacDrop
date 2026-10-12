@@ -9,6 +9,7 @@ export interface DiscoveredPeer {
   ip: string;
   port: number;
   lastSeen: number;
+  platform?: string;
 }
 
 export function calculateBroadcast(ip: string, netmask: string): string | null {
@@ -93,12 +94,23 @@ export class PeerDiscovery extends EventEmitter {
       try {
         const data = JSON.parse(msg.toString('utf-8'));
         if (data && typeof data.deviceId === 'string' && data.deviceId.length <= 64 && data.deviceId !== this.deviceId) {
+          let peerPlatform = typeof data.platform === 'string' ? data.platform : undefined;
+          if (!peerPlatform) {
+            const nameLower = (typeof data.deviceName === 'string' ? data.deviceName : '').toLowerCase();
+            if (nameLower.includes('mac') || nameLower.includes('apple') || nameLower.includes('darwin')) {
+              peerPlatform = 'darwin';
+            } else if (nameLower.startsWith('desktop-') || nameLower.startsWith('win-') || nameLower.startsWith('laptop-') || nameLower.includes('pc') || nameLower.includes('windows')) {
+              peerPlatform = 'win32';
+            }
+          }
+
           const peer: DiscoveredPeer = {
             deviceId: data.deviceId.slice(0, 64),
             deviceName: typeof data.deviceName === 'string' ? data.deviceName.slice(0, 64) : 'Устройство',
             ip: rinfo.address,
             port: typeof data.port === 'number' && data.port > 0 && data.port < 65536 ? data.port : 8384,
-            lastSeen: Date.now()
+            lastSeen: Date.now(),
+            platform: peerPlatform
           };
 
           // Prevent DoS memory exhaustion: limit cache to 50 peers
@@ -121,6 +133,7 @@ export class PeerDiscovery extends EventEmitter {
               deviceId: this.deviceId,
               deviceName: this.deviceName,
               port: this.apiPort,
+              platform: process.platform,
               reply: true
             }));
             try {
@@ -158,7 +171,8 @@ export class PeerDiscovery extends EventEmitter {
     const message = Buffer.from(JSON.stringify({
       deviceId: this.deviceId,
       deviceName: this.deviceName,
-      port: this.apiPort
+      port: this.apiPort,
+      platform: process.platform
     }));
 
     const targets = this.getBroadcastTargets();
@@ -273,12 +287,22 @@ export class PeerDiscovery extends EventEmitter {
                   try {
                     const json = JSON.parse(data);
                     if (json.status === 'ok' && json.deviceId && json.deviceId !== this.deviceId) {
+                      let peerPlatform = typeof json.platform === 'string' ? json.platform : undefined;
+                      if (!peerPlatform) {
+                        const nameLower = (typeof json.deviceName === 'string' ? json.deviceName : '').toLowerCase();
+                        if (nameLower.includes('mac') || nameLower.includes('apple') || nameLower.includes('darwin')) {
+                          peerPlatform = 'darwin';
+                        } else if (nameLower.startsWith('desktop-') || nameLower.startsWith('win-') || nameLower.startsWith('laptop-') || nameLower.includes('pc') || nameLower.includes('windows')) {
+                          peerPlatform = 'win32';
+                        }
+                      }
                       const peer: DiscoveredPeer = {
                         deviceId: json.deviceId,
                         deviceName: json.deviceName || 'Устройство',
                         ip: ip,
                         port: this.apiPort,
-                        lastSeen: Date.now()
+                        lastSeen: Date.now(),
+                        platform: peerPlatform
                       };
                       this.peers.set(peer.deviceId, peer);
                       foundPeers.push(peer);
