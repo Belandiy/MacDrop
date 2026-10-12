@@ -33,7 +33,7 @@ interface PairingModalProps {
  * Modern Windows logo (4-quadrant tiles)
  */
 export const WindowsLogoIcon: React.FC<{ className?: string; isSelected?: boolean }> = ({
-  className = 'w-9 h-9',
+  className = 'w-6 h-6',
   isSelected
 }) => (
   <svg viewBox="0 0 24 24" className={className} fill={isSelected ? '#FFFFFF' : '#00ADEF'}>
@@ -45,7 +45,7 @@ export const WindowsLogoIcon: React.FC<{ className?: string; isSelected?: boolea
  * Apple iMac / Desktop monitor icon
  */
 export const MacDesktopIcon: React.FC<{ className?: string; isSelected?: boolean }> = ({
-  className = 'w-10 h-10',
+  className = 'w-7 h-7',
   isSelected
 }) => (
   <svg
@@ -75,7 +75,7 @@ export const MacDesktopIcon: React.FC<{ className?: string; isSelected?: boolean
  * Apple MacBook laptop icon
  */
 export const MacLaptopIcon: React.FC<{ className?: string; isSelected?: boolean }> = ({
-  className = 'w-10 h-10',
+  className = 'w-7 h-7',
   isSelected
 }) => (
   <svg
@@ -245,41 +245,42 @@ export const PairingModal: React.FC<PairingModalProps> = ({
     ? `http://${activeMobileIp}:${mobileInfo.port}/mobile?token=${mobileInfo.token}`
     : '';
 
-  // Predefined orbital slots for discovered peers on radar circles
+  // Compact 204px radar center and slot coordinates
+  const radarCenter = 102;
   const predefinedSlots = [
-    { angle: -25, radius: 96 },   // Top-Right (like iMac in reference)
-    { angle: 165, radius: 104 },  // Mid-Left (like MacBook Air in reference)
-    { angle: 45, radius: 112 },   // Bottom-Right (like Mac mini in reference)
-    { angle: -130, radius: 90 },  // Top-Left
-    { angle: 95, radius: 100 },   // Bottom-Center
-    { angle: -80, radius: 108 }   // Top-Center
+    { angle: -25, radius: 70 },   // Top-Right (like iMac in reference)
+    { angle: 165, radius: 72 },  // Mid-Left (like MacBook Air in reference)
+    { angle: 45, radius: 76 },   // Bottom-Right (like Mac mini in reference)
+    { angle: -130, radius: 66 },  // Top-Left
+    { angle: 95, radius: 72 },   // Bottom-Center
+    { angle: -80, radius: 74 }   // Top-Center
   ];
 
   return (
     <div
       data-modal="true"
       style={{ WebkitAppRegion: 'no-drag' } as any}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/65 backdrop-blur-md animate-in fade-in duration-200 select-none"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-black/65 backdrop-blur-md animate-in fade-in duration-200 select-none"
     >
       <div
-        className="relative w-full max-w-[420px] bg-[#1C1C1F] border border-[#2C2C30] rounded-[18px] shadow-[0_24px_64px_rgba(0,0,0,0.8)] overflow-hidden flex flex-col p-6 text-center select-none"
+        className="relative w-full max-w-[370px] bg-[#1C1C1F] border border-[#2C2C30] rounded-[16px] shadow-[0_20px_50px_rgba(0,0,0,0.85)] overflow-hidden flex flex-col p-4 text-center select-none"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Close Button Top-Right */}
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 w-7 h-7 rounded-full bg-white/[0.06] hover:bg-white/[0.12] text-[#8E8E93] hover:text-white flex items-center justify-center transition-colors cursor-pointer z-20"
+          className="absolute top-3 right-3 w-6 h-6 rounded-full bg-white/[0.06] hover:bg-white/[0.12] text-[#8E8E93] hover:text-white flex items-center justify-center transition-colors cursor-pointer z-30"
           title={t('window.close')}
         >
-          <X className="w-4 h-4" />
+          <X className="w-3.5 h-3.5" />
         </button>
 
         {/* Header: MacDrop Title & Subtitle */}
-        <div className="mb-3">
-          <h2 className="text-[20px] font-semibold text-white tracking-tight">
+        <div className="mb-2">
+          <h2 className="text-[17px] font-semibold text-white tracking-tight">
             {t('pairing.radarTitle')}
           </h2>
-          <p className="text-[12px] text-[#8E8E93] mt-0.5">
+          <p className="text-[11px] text-[#8E8E93] mt-0.5">
             {showMobileQr ? t('pairing.mobileQrSubtitle') : t('pairing.radarLookingFor')}
           </p>
         </div>
@@ -287,57 +288,55 @@ export const PairingModal: React.FC<PairingModalProps> = ({
         {/* ===================== VIEW 1: AIRDROP RADAR ===================== */}
         {!showMobileQr ? (
           <div className="flex flex-col items-center">
-            {/* The AirDrop Radar Canvas */}
-            <div className="relative w-[290px] h-[290px] flex items-center justify-center my-2 overflow-hidden rounded-full">
-              {/* Background Glow */}
+            {/* The AirDrop Radar Canvas (204x204 px, strictly circular) */}
+            <div className="relative w-[204px] h-[204px] my-1 flex items-center justify-center overflow-hidden rounded-full shrink-0">
+              {/* Background Radial Glow */}
               <div
                 className="absolute inset-0 rounded-full pointer-events-none"
                 style={{
                   background:
-                    'radial-gradient(circle at 50% 50%, rgba(0, 122, 255, 0.12) 0%, rgba(0, 122, 255, 0.04) 45%, transparent 70%)'
+                    'radial-gradient(circle at 50% 50%, rgba(0, 122, 255, 0.14) 0%, rgba(0, 122, 255, 0.04) 50%, transparent 72%)'
                 }}
               />
 
-              {/* Expanding Ripple Waves */}
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div className="w-[120px] h-[120px] rounded-full border border-[#007AFF]/35 animate-radar-wave-1" />
-                <div className="w-[120px] h-[120px] rounded-full border border-[#007AFF]/30 animate-radar-wave-2" />
-                <div className="w-[120px] h-[120px] rounded-full border border-[#007AFF]/25 animate-radar-wave-3" />
-              </div>
+              {/* Concentric Expanding Circular Waves (Strictly centered, equal width & height) */}
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-[#007AFF]/40 pointer-events-none animate-radar-wave-1" />
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-[#007AFF]/35 pointer-events-none animate-radar-wave-2" />
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-[#007AFF]/30 pointer-events-none animate-radar-wave-3" />
 
-              {/* Concentric Static Radar Circles */}
-              <div className="absolute w-[80px] h-[80px] rounded-full border border-[#007AFF]/25 bg-[#007AFF]/[0.02] pointer-events-none" />
-              <div className="absolute w-[156px] h-[156px] rounded-full border border-[#007AFF]/20 pointer-events-none" />
-              <div className="absolute w-[228px] h-[228px] rounded-full border border-[#007AFF]/15 pointer-events-none" />
-              <div className="absolute w-[286px] h-[286px] rounded-full border border-[#007AFF]/10 pointer-events-none shadow-[inset_0_0_24px_rgba(0,122,255,0.06)]" />
+              {/* Concentric Static Radar Circles (Centered, perfectly round) */}
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[60px] h-[60px] rounded-full border border-[#007AFF]/25 bg-[#007AFF]/[0.02] pointer-events-none" />
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[124px] h-[124px] rounded-full border border-[#007AFF]/20 pointer-events-none" />
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[196px] h-[196px] rounded-full border border-[#007AFF]/15 pointer-events-none shadow-[inset_0_0_20px_rgba(0,122,255,0.08)]" />
 
-              {/* Rotating Radar Sweep Cone */}
+              {/* Rotating Radar Sweep Cone (Mirrored: sharp leading line with fading trailing shadow) */}
               <div className="absolute inset-0 rounded-full animate-radar-sweep pointer-events-none overflow-hidden">
                 <div
                   className="w-full h-full rounded-full"
                   style={{
                     background:
-                      'conic-gradient(from 0deg at 50% 50%, rgba(0, 122, 255, 0.24) 0deg, rgba(0, 122, 255, 0.07) 35deg, transparent 70deg, transparent 360deg)'
+                      'conic-gradient(from 0deg at 50% 50%, transparent 0deg, transparent 295deg, rgba(0, 122, 255, 0.04) 305deg, rgba(0, 122, 255, 0.12) 335deg, rgba(0, 122, 255, 0.32) 359.5deg, transparent 360deg)'
                   }}
                 />
+                {/* Luminous Leading Edge Beam Ray */}
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1.5px] h-[102px] bg-gradient-to-b from-[#60A5FA] via-[#007AFF] to-transparent shadow-[0_0_8px_#007AFF]" />
               </div>
 
-              {/* Center Pulsing Origin Dot */}
-              <div className="relative z-10 flex items-center justify-center pointer-events-none">
-                <div className="w-5 h-5 rounded-full bg-[#007AFF]/25 animate-ping absolute" />
-                <div className="w-3.5 h-3.5 rounded-full bg-[#007AFF] shadow-[0_0_12px_#007AFF]" />
+              {/* Central Origin Dot */}
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 flex items-center justify-center pointer-events-none">
+                <div className="w-4 h-4 rounded-full bg-[#007AFF]/30 animate-ping absolute" />
+                <div className="w-2.5 h-2.5 rounded-full bg-[#007AFF] shadow-[0_0_10px_#007AFF]" />
               </div>
 
               {/* Discovered Peers Positioned on the Radar */}
               {peers.map((peer, idx) => {
                 const slot = predefinedSlots[idx] || {
                   angle: (idx * 360) / Math.max(peers.length, 1),
-                  radius: idx % 2 === 0 ? 95 : 110
+                  radius: idx % 2 === 0 ? 68 : 76
                 };
                 const rad = (slot.angle * Math.PI) / 180;
-                const centerOffset = 145; // half of 290px
-                const x = centerOffset + slot.radius * Math.cos(rad);
-                const y = centerOffset + slot.radius * Math.sin(rad);
+                const x = radarCenter + slot.radius * Math.cos(rad);
+                const y = radarCenter + slot.radius * Math.sin(rad);
 
                 const isSelected = selectedPeerId === peer.deviceId;
                 const { isWindows, deviceType } = getDevicePlatformAndType(peer);
@@ -358,37 +357,37 @@ export const PairingModal: React.FC<PairingModalProps> = ({
                     }`}
                     title={`${peer.deviceName} (${peer.ip})`}
                   >
-                    {/* Device Icon Container with Glow */}
+                    {/* Device Icon Container */}
                     <div
-                      className={`relative flex items-center justify-center p-1.5 rounded-[12px] transition-all duration-200 ${
+                      className={`relative flex items-center justify-center p-1 rounded-[10px] transition-all duration-200 ${
                         isSelected
-                          ? 'bg-[#007AFF]/25 ring-2 ring-[#007AFF] shadow-[0_0_16px_rgba(0,122,255,0.45)]'
-                          : 'bg-[#232328]/80 hover:bg-[#2A2A30] border border-white/10'
+                          ? 'bg-[#007AFF]/30 ring-2 ring-[#007AFF] shadow-[0_0_12px_rgba(0,122,255,0.5)]'
+                          : 'bg-[#232328]/85 hover:bg-[#2A2A30] border border-white/10'
                       }`}
                     >
                       {isWindows ? (
-                        <WindowsLogoIcon className="w-7 h-7 drop-shadow-sm" isSelected={isSelected} />
+                        <WindowsLogoIcon className="w-5 h-5 drop-shadow-sm" isSelected={isSelected} />
                       ) : deviceType === 'laptop' ? (
-                        <MacLaptopIcon className="w-8 h-8 drop-shadow-sm" isSelected={isSelected} />
+                        <MacLaptopIcon className="w-6 h-6 drop-shadow-sm" isSelected={isSelected} />
                       ) : (
-                        <MacDesktopIcon className="w-8 h-8 drop-shadow-sm" isSelected={isSelected} />
+                        <MacDesktopIcon className="w-6 h-6 drop-shadow-sm" isSelected={isSelected} />
                       )}
 
                       {/* Paired check badge if already linked */}
                       {isAlreadyPaired && (
-                        <div className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-[#34C759] border border-[#1C1C1F] flex items-center justify-center">
-                          <Check className="w-2 h-2 text-white stroke-[3]" />
+                        <div className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-[#34C759] border border-[#1C1C1F] flex items-center justify-center">
+                          <Check className="w-1.5 h-1.5 text-white stroke-[3]" />
                         </div>
                       )}
                     </div>
 
                     {/* Device Name Label */}
-                    <div className="mt-1 flex flex-col items-center max-w-[105px]">
+                    <div className="mt-0.5 flex flex-col items-center max-w-[85px]">
                       <span
-                        className={`text-[11px] font-medium truncate max-w-full text-center transition-colors ${
+                        className={`text-[10px] font-medium truncate max-w-full text-center transition-colors ${
                           isSelected
-                            ? 'bg-[#007AFF] text-white px-2 py-0.5 rounded-full shadow-md'
-                            : 'text-[#E5E5EA] group-hover:text-white px-1.5 py-0.5 rounded bg-black/50 backdrop-blur-sm'
+                            ? 'bg-[#007AFF] text-white px-1.5 py-0.5 rounded-full shadow-md'
+                            : 'text-[#E5E5EA] group-hover:text-white px-1 py-0.5 rounded bg-black/60 backdrop-blur-sm'
                         }`}
                       >
                         {peer.deviceName}
@@ -397,38 +396,38 @@ export const PairingModal: React.FC<PairingModalProps> = ({
                   </div>
                 );
               })}
-
-              {/* Empty State Hint if zero peers */}
-              {peers.length === 0 && (
-                <div className="absolute bottom-4 inset-x-4 pointer-events-none text-center">
-                  <span className="text-[11px] text-[#8E8E93] bg-[#161619]/80 px-2.5 py-1 rounded-full border border-white/5 backdrop-blur-sm">
-                    {t('pairing.searchingLocalNetwork')}
-                  </span>
-                </div>
-              )}
             </div>
+
+            {/* Clean Searching Status Hint Below Radar (Never clipped) */}
+            {peers.length === 0 && (
+              <div className="py-1 text-center animate-in fade-in">
+                <span className="text-[11px] text-[#8E8E93]">
+                  {t('pairing.searchingLocalNetwork')}
+                </span>
+              </div>
+            )}
 
             {/* Error or Success notification banner */}
             {error && (
-              <div className="w-full text-[11px] text-[#FF453A] bg-[#FF453A]/10 border border-[#FF453A]/20 rounded-[8px] p-2 mb-2 leading-relaxed animate-in fade-in">
+              <div className="w-full text-[10px] text-[#FF453A] bg-[#FF453A]/10 border border-[#FF453A]/20 rounded-[6px] p-1.5 my-1 leading-relaxed animate-in fade-in">
                 {error}
               </div>
             )}
             {successNotice && (
-              <div className="w-full text-[11px] text-[#34C759] bg-[#34C759]/10 border border-[#34C759]/20 rounded-[8px] p-2 mb-2 flex items-center justify-center gap-1.5 font-medium animate-in fade-in">
-                <Check className="w-3.5 h-3.5" />
+              <div className="w-full text-[10px] text-[#34C759] bg-[#34C759]/10 border border-[#34C759]/20 rounded-[6px] p-1.5 my-1 flex items-center justify-center gap-1 font-medium animate-in fade-in">
+                <Check className="w-3 h-3" />
                 <span>{successNotice}</span>
               </div>
             )}
 
             {/* Middle Status Row + Phone QR Button */}
-            <div className="w-full flex items-center justify-between mt-2 pt-2 border-t border-[#2C2C30]">
+            <div className="w-full flex items-center justify-between mt-1 pt-2 border-t border-[#2C2C30]">
               {/* Ready to connect status indicator */}
-              <div className="flex items-center gap-2 text-[12px] text-[#8E8E93]">
+              <div className="flex items-center gap-1.5 text-[11px] text-[#8E8E93] truncate mr-2">
                 {isSubmitting ? (
                   <>
-                    <Loader2 className="w-3.5 h-3.5 text-[#007AFF] animate-spin" />
-                    <span className="text-[#007AFF]">
+                    <Loader2 className="w-3 h-3 text-[#007AFF] animate-spin shrink-0" />
+                    <span className="text-[#007AFF] truncate">
                       {selectedPeer
                         ? t('pairing.pairingWith', { name: selectedPeer.deviceName })
                         : t('pairing.connecting')}
@@ -436,11 +435,11 @@ export const PairingModal: React.FC<PairingModalProps> = ({
                   </>
                 ) : (
                   <>
-                    <span className="relative flex h-2 w-2">
+                    <span className="relative flex h-2 w-2 shrink-0">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#007AFF] opacity-75"></span>
                       <span className="relative inline-flex rounded-full h-2 w-2 bg-[#007AFF]"></span>
                     </span>
-                    <span>
+                    <span className="truncate">
                       {selectedPeer
                         ? selectedPeer.deviceName
                         : t('pairing.readyToConnect')}
@@ -449,35 +448,35 @@ export const PairingModal: React.FC<PairingModalProps> = ({
                 )}
               </div>
 
-              {/* QR-код button for Mobile Phone Local Connection */}
-              <div className="flex items-center gap-2">
+              {/* Refresh & QR-код Button for Mobile Phone */}
+              <div className="flex items-center gap-1.5 shrink-0">
                 <button
                   type="button"
                   onClick={handleTriggerScan}
                   title="Обновить радар"
-                  className="p-1 rounded-[6px] text-[#8E8E93] hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
+                  className="p-1 rounded-[5px] text-[#8E8E93] hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
                 >
-                  <RefreshCw className={`w-3.5 h-3.5 ${isScanning ? 'animate-spin text-[#007AFF]' : ''}`} />
+                  <RefreshCw className={`w-3 h-3 ${isScanning ? 'animate-spin text-[#007AFF]' : ''}`} />
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setShowMobileQr(true)}
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-[6px] bg-[#2C2C30] hover:bg-[#38383E] text-[#D1D1D6] hover:text-white border border-[#3A3A3C] text-[11px] font-medium transition-colors shadow-sm cursor-pointer"
+                  className="flex items-center gap-1 px-2 py-1 rounded-[5px] bg-[#2C2C30] hover:bg-[#38383E] text-[#D1D1D6] hover:text-white border border-[#3A3A3C] text-[10px] font-medium transition-colors cursor-pointer"
                   title="Подключить телефон через локальный Web Drop"
                 >
-                  <Smartphone className="w-3.5 h-3.5 text-[#007AFF]" />
+                  <Smartphone className="w-3 h-3 text-[#007AFF]" />
                   <span>{t('pairing.mobileQrBtn')}</span>
                 </button>
               </div>
             </div>
 
             {/* Footer Buttons: Cancel & Pair */}
-            <div className="w-full grid grid-cols-2 gap-2.5 mt-3">
+            <div className="w-full grid grid-cols-2 gap-2 mt-2.5">
               <button
                 type="button"
                 onClick={onClose}
-                className="w-full py-2 rounded-[8px] bg-[#2C2C30] hover:bg-[#38383E] text-[#F2F2F7] text-[12px] font-medium border border-[#3A3A3C] transition-colors cursor-pointer"
+                className="w-full py-1.5 rounded-[7px] bg-[#2C2C30] hover:bg-[#38383E] text-[#F2F2F7] text-[11px] font-medium border border-[#3A3A3C] transition-colors cursor-pointer"
               >
                 {t('pairing.cancel')}
               </button>
@@ -486,10 +485,10 @@ export const PairingModal: React.FC<PairingModalProps> = ({
                 type="button"
                 disabled={!selectedPeer || isSubmitting}
                 onClick={() => selectedPeer && handleConnectWith(selectedPeer)}
-                className="w-full py-2 rounded-[8px] bg-[#007AFF] hover:bg-[#0071E3] active:bg-[#0062C4] disabled:opacity-40 disabled:cursor-not-allowed text-white text-[12px] font-medium transition-all shadow-[0_1px_2px_rgba(0,122,255,0.4)] flex items-center justify-center gap-1.5 cursor-pointer"
+                className="w-full py-1.5 rounded-[7px] bg-[#007AFF] hover:bg-[#0071E3] active:bg-[#0062C4] disabled:opacity-40 disabled:cursor-not-allowed text-white text-[11px] font-medium transition-all shadow-[0_1px_2px_rgba(0,122,255,0.4)] flex items-center justify-center gap-1 cursor-pointer"
               >
                 {isSubmitting ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <Loader2 className="w-3 h-3 animate-spin" />
                 ) : (
                   <span>{t('pairing.pair')}</span>
                 )}
@@ -498,41 +497,41 @@ export const PairingModal: React.FC<PairingModalProps> = ({
           </div>
         ) : (
           /* ===================== VIEW 2: MOBILE WEB DROP QR ===================== */
-          <div className="flex flex-col items-center py-2 animate-in fade-in duration-200">
+          <div className="flex flex-col items-center py-1 animate-in fade-in duration-200">
             {/* White QR Card */}
-            <div className="p-3 bg-white rounded-[14px] shadow-md mb-3">
-              <div className="w-[170px] h-[170px] flex items-center justify-center">
+            <div className="p-2.5 bg-white rounded-[12px] shadow-md mb-2">
+              <div className="w-[140px] h-[140px] flex items-center justify-center">
                 {effectiveMobileUrl ? (
                   <QRCodeSVG
                     value={effectiveMobileUrl}
-                    size={170}
+                    size={140}
                     level="M"
                     style={{ height: 'auto', maxWidth: '100%', width: '100%' }}
                   />
                 ) : (
-                  <div className="text-[11px] text-[#8E8E93] animate-pulse font-mono">
+                  <div className="text-[10px] text-[#8E8E93] animate-pulse font-mono">
                     {t('pairing.generatingQr')}
                   </div>
                 )}
               </div>
             </div>
 
-            <div className="text-[13px] font-medium text-[#F2F2F7] flex items-center gap-1.5 mb-1">
-              <Smartphone className="w-4 h-4 text-[#007AFF]" />
+            <div className="text-[12px] font-medium text-[#F2F2F7] flex items-center gap-1 mb-0.5">
+              <Smartphone className="w-3.5 h-3.5 text-[#007AFF]" />
               <span>{t('pairing.scanQr')}</span>
             </div>
-            <p className="text-[11px] text-[#8E8E93] max-w-[320px] leading-relaxed mb-3">
+            <p className="text-[10px] text-[#8E8E93] max-w-[280px] leading-relaxed mb-2">
               {t('pairing.webDropDesc')}
             </p>
 
             {/* Network Interface selection if multiple IPs */}
             {mobileInfo && mobileInfo.ips && mobileInfo.ips.length > 1 && (
-              <div className="w-full bg-[#161619] border border-[#2C2C30] rounded-[6px] px-3 py-1.5 mb-3 flex items-center justify-between text-[11px] text-[#8E8E93]">
+              <div className="w-full bg-[#161619] border border-[#2C2C30] rounded-[5px] px-2.5 py-1 mb-2 flex items-center justify-between text-[10px] text-[#8E8E93]">
                 <span>IP сети:</span>
                 <select
                   value={activeMobileIp}
                   onChange={(e) => setSelectedMobileIp(e.target.value)}
-                  className="bg-transparent text-white font-mono text-[11px] focus:outline-none cursor-pointer"
+                  className="bg-transparent text-white font-mono text-[10px] focus:outline-none cursor-pointer"
                 >
                   {mobileInfo.ips.map((ip) => (
                     <option key={ip} value={ip} className="bg-[#232328] text-white">
@@ -548,19 +547,19 @@ export const PairingModal: React.FC<PairingModalProps> = ({
               <button
                 type="button"
                 onClick={() => setShowMobileQr(false)}
-                className="flex items-center gap-1 text-[12px] text-[#007AFF] hover:underline cursor-pointer"
+                className="flex items-center gap-1 text-[11px] text-[#007AFF] hover:underline cursor-pointer"
               >
-                <ArrowLeft className="w-3.5 h-3.5" />
+                <ArrowLeft className="w-3 h-3" />
                 <span>{t('pairing.backToRadar')}</span>
               </button>
 
               <button
                 type="button"
                 onClick={handleRegenerateMobileToken}
-                className="text-[11px] text-[#8E8E93] hover:text-white flex items-center gap-1 transition-colors cursor-pointer"
+                className="text-[10px] text-[#8E8E93] hover:text-white flex items-center gap-1 transition-colors cursor-pointer"
                 title={t('pairing.newKeyTitle')}
               >
-                <RefreshCw className="w-3 h-3" />
+                <RefreshCw className="w-2.5 h-2.5" />
                 <span>{t('pairing.refreshKey')}</span>
               </button>
             </div>
