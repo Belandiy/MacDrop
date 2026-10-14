@@ -2,6 +2,62 @@
 
 Все важные изменения проекта MacDrop фиксируются в этом файле.
 
+## [feat/tauri-fixes - Итерация 7 (Фаза 4 + 5.3: Мобильный клиент AirBridge, виртуальное устройство «Телефон», реальный IP и автозапуск)] - 2026-10-14
+
+### Мобильный веб-клиент Web Drop, виртуальный узел `mobile-web`, фильтрация IP и системный автозапуск
+- **4.2. Полноценный мобильный клиент AirBridge (Web Drop) в Rust-бэкенде**:
+  - Создан автономный модуль [src-tauri/src/mobile_web.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/mobile_web.rs) с двухвкладочным мобильным веб-клиентом (чистый HTML/CSS/JS без внешних CDN):
+    - Вкладка «Отправить на ПК»: загрузка любых файлов и медиа с расчетом скорости `formatBytes(speedBytes) + '/с'`, динамическим прогресс-баром и тактильным откликом `navigator.vibrate`.
+    - Вкладка «Скачать с ПК»: автоматический опрос `/api/mobile/files?token=...`, список доступных файлов с форматированным временем и размером, индивидуальное и пакетное скачивание.
+    - Встроенный Heartbeat: периодический пинг `/api/mobile/status?token=...` каждые 15 секунд для поддержания активной сессии.
+    - Эндпоинт логотипа: `/api/mobile/logo`, отдающий стильный векторный SVG-логотип MacDrop.
+  - В [src-tauri/src/engine.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/engine.rs):
+    - Добавлено поле `last_mobile_seen` и методы `is_mobile_session_active()` и `mark_mobile_activity()`.
+    - При активной сессии телефона (<60 сек) или наличии файлов в очереди `mobile_queue`, в `getStatus().pairedDevices` автоматически подставляется виртуальное устройство `mobile-web` («Телефон (Web Drop)», `port: 52520`, `connectionMode: "local"`, `platform: "mobile"`).
+    - Обновление активности мобильного клиента интегрировано во все эндпоинты: `/mobile`, `/api/mobile/status`, `/api/mobile/upload`, `/api/mobile/files`, `/api/mobile/download`.
+  - В [src-tauri/src/discovery.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/discovery.rs):
+    - В цикле фоновой очистки реализован таймаут мобильной сессии: если телефон неактивен более 60 секунд и очередь пуста, сессия сбрасывается с мгновенным эмитом `status-changed` (виртуальное устройство исчезает из сайдбара).
+  - В [src-tauri/src/transfer.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/transfer.rs):
+    - В функции `execute_peer_transfer` реализована отправка на устройство `mobile-web`: директории автоматически архивируются в ZIP через `zip_directory`, файлы помещаются в начало `mobile_queue`, эмитится событие прогресса и запись в историю (`peer_device_id: "mobile-web"`, `status: "completed"`).
+- **4.3. Определение реального IP-адреса сети при смене сети (Wi-Fi ↔ Новая сеть)**:
+  - Создан модуль [src-tauri/src/net_utils.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/net_utils.rs) с функцией `get_local_network_ips()` на базе `local_ip_address::list_afinet_netifas()`:
+    - Интеллектуальный расчет приоритетов интерфейсов: высший приоритет для `en0` (+100) и `en1` (+90) (основной Wi-Fi / Ethernet на macOS).
+    - Полная фильтрация виртуальных и туннельных адаптеров (`utun*` VPN, `bridge*`, `vmnet*`, `vboxnet*`, `p2p*`, `awdl*`, `llw*`, `gif*`, `stf*`), а также loopback `127.*` и APIPA `169.254.*`.
+    - Использование реальных IP в `commands::get_mobile_share_info` (первый адрес берется для формирования QR-кода), в `EngineState::get_status()` и в расчете широковещательных UDP адресов `discovery::get_broadcast_addrs`.
+- **5.3. Системный автозапуск (macOS Login Items через LaunchAgent)**:
+  - Создан модуль [src-tauri/src/autostart.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/autostart.rs), управляющий файлом `~/Library/LaunchAgents/com.macdrop.desktop.plist`.
+  - При включении или выключении автозапуска через `toggle_autostart` или `save_config` состояние мгновенно синхронизируется с операционной системой.
+  - При старте приложения в [lib.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/lib.rs) выполняется верификация и синхронизация системного автозапуска.
+- **Кросс-версионная сетевая совместимость (Dual-Port Engine 52520 + 8384)**:
+  - **Динамический фолбэк портов в `pair_device`**: при прямом вводе IP без указания порта код автоматически проверяет кэш обнаруженных и сопряженных устройств (`discovered_peers` / `paired_devices`). Если узел слушает порт 8384 (например, ПК с Electron или старой сборкой), подключение автоматически идет на 8384. При отказе соединения (`Connection refused`) выполняется автоматическая попытка на альтернативный порт (`52520 <-> 8384`).
+  - **Передача реального порта в `PairingModal.tsx`**: при клике по найденному устройству теперь передается `${peer.ip}:${peer.port}` (ранее передавался чистый `peer.ip` и порт терялся).
+  - **Dual-Port HTTP Server**: в [engine.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/engine.rs) параллельно с основным портом 52520 запущен фоновый compatibility-листенер на порту 8384 для бесшовного приема запросов от любых клиентов.
+  - **Авто-переключение порта при передаче файлов**: в [transfer.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/transfer.rs) при сбое соединения к сопряженному устройству трансфер автоматически повторяется на альтернативный порт с сохранением актуального порта в конфиг.
+- **Тестирование**:
+  - Добавлены юнит-тесты `test_generate_launch_agent_plist` в `autostart.rs`, `test_mobile_web_generation` в `mobile_web.rs`, `test_get_local_network_ips_not_empty` в `net_utils.rs`, `test_mobile_session_and_virtual_device` в `engine.rs` и `test_transfer_to_mobile_web` в `transfer.rs`. Все 18 тестов успешно проходят.
+
+## [feat/tauri-fixes - Итерация 6 (Фаза 3: Сопряжение устройств, радар и унификация портов)] - 2026-10-14
+
+### Сетевое сопряжение (Pairing Handshake), ручной ввод IP, Heartbeat радара и единый порт
+- **3.1. Сетевой Handshake в `pair_device` и взаимная авторизация**:
+  - В [src-tauri/src/commands.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/commands.rs): команда `pair_device` полностью переписана — парсит IP/порт или находит устройство в кэше `discovered_peers`, генерирует локальный токен безопасности и отправляет сетевой HTTP-запрос `POST /api/pair` с таймаутом 35 секунд.
+  - В [src-tauri/src/engine.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/engine.rs):
+    - В обработчике `handle_pair` поддержана проверка уже сопряженных устройств (автоматический ответ 200 OK без повторных модальных окон).
+    - Для новых устройств генерируется `requestId`, регистрируется канал `tokio::sync::oneshot` и эмитится Tauri Event `pairing-request`.
+    - Подключен `ConnectInfo<SocketAddr>` для точного определения IP-адреса входящего узла.
+  - Реализована команда `commands::respond_pairing_request` (зарегистрирована в [src-tauri/src/lib.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/lib.rs)), передающая вердикт пользователя (`approved`) в канал ожидания. При одобрении устройство сохраняется в `cfg.paired_devices` с эмитом `status-changed` в интерфейс. При отклонении возвращается HTTP 403 Forbidden, а при бездействии — HTTP 408 Request Timeout.
+- **3.2. Ручной ввод IP-адреса в UI модального окна сопряжения**:
+  - В [PairingModal.tsx](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/components/PairingModal.tsx) добавлен нативный блок прямого подключения по IP без необходимости вводить PIN-коды.
+  - Реализована строгая валидация формата (IPv4 / IPv6 / хостнейм, поддержка порта вида `192.168.1.50:52520`), обработка клавиши Enter и отображение спиннера ожидания.
+  - Добавлены ключи локализации в [ru.ts](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/i18n/locales/ru.ts) и [en.ts](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/i18n/locales/en.ts).
+- **3.3. Автоматический фоновый опрос и очистка устаревших узлов (Radar Heartbeat)**:
+  - В [src-tauri/src/discovery.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/discovery.rs) запущен фоновый цикл очистки (каждые 2 сек):
+    - Необнаруженные более 6 секунд узлы удаляются из `discovered_peers` с мгновенным эмитом `peers-update`.
+    - Сопряженные устройства получают статус `local` при приеме UDP-пакета и автоматически переводятся в `offline` при отсутствии сигнала более 8 секунд с отправкой события `status-changed`.
+- **4.1. Унификация сетевого порта передачи файлов (8384 -> 52520)**:
+  - В [src-tauri/src/config.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/config.rs), [src-tauri/src/engine.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/engine.rs) и [src-tauri/src/discovery.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/discovery.rs) все дефолтные порты заменены на единый актуальный порт `52520`.
+  - В `load_config` добавлена автоматическая миграция существующих конфигураций на диске с порта `8384` на `52520`.
+
 ## [feat/tauri-fixes - Итерация 5 (Единый нативный пикер файлов и папок с авто-архивацией)] - 2026-10-14
 
 ### Единая кнопка выбора и гибридный мультиселект (файлы + папки)

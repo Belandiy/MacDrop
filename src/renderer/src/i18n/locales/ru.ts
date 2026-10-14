@@ -282,7 +282,10 @@ export const ru = {
     selectDeviceToPair: 'Выберите устройство на радаре',
     pairingWith: 'Подключение к {name}...',
     cancel: 'Отмена',
-    pair: 'Связать'
+    pair: 'Связать',
+    orEnterIp: 'Подключить по IP вручную:',
+    connect: 'Подключить',
+    enterValidIp: 'Введите корректный IP-адрес (например, 192.168.1.50)'
   },
 
   // Updates

@@ -284,7 +284,10 @@ export const en: LocaleSchema = {
     selectDeviceToPair: 'Select a device on the radar',
     pairingWith: 'Connecting to {name}...',
     cancel: 'Cancel',
-    pair: 'Pair'
+    pair: 'Pair',
+    orEnterIp: 'Connect by IP manually:',
+    connect: 'Connect',
+    enterValidIp: 'Enter a valid IP address (e.g. 192.168.1.50)'
   },
 
   // Updates

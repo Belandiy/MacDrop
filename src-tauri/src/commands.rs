@@ -1,10 +1,11 @@
 use serde_json::Value;
 use std::path::PathBuf;
 use std::sync::Arc;
-use tauri::{AppHandle, State, Window};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use tauri::{AppHandle, Emitter, State, Window};
 
-use crate::config::AppConfig;
-use crate::engine::{DiscoveredPeer, EngineState, EngineStatus, HistoryEntry};
+use crate::config::{AppConfig, PairedDevice};
+use crate::engine::{chrono_like_now, DiscoveredPeer, EngineState, EngineStatus, HistoryEntry};
 use crate::logger::LogEntry;
 
 #[tauri::command]
@@ -18,14 +19,21 @@ pub async fn save_config(
     state: State<'_, Arc<EngineState>>,
     config: serde_json::Value,
 ) -> Result<AppConfig, String> {
+    let mut autostart_changed: Option<bool> = None;
     let mut cfg = state.config.write().await;
     if let Ok(incoming) = serde_json::from_value::<AppConfig>(config.clone()) {
+        if cfg.auto_start != incoming.auto_start {
+            autostart_changed = Some(incoming.auto_start);
+        }
         *cfg = incoming;
     } else if let serde_json::Value::Object(map) = config {
         if let Some(val) = map.get("targetFolder").and_then(|v| v.as_str()) {
             cfg.target_folder = val.to_string();
         }
         if let Some(val) = map.get("autoStart").and_then(|v| v.as_bool()) {
+            if cfg.auto_start != val {
+                autostart_changed = Some(val);
+            }
             cfg.auto_start = val;
         }
         if let Some(val) = map.get("notifications").and_then(|v| v.as_bool()) {
@@ -36,6 +44,9 @@ pub async fn save_config(
         }
     }
     crate::config::save_config(&cfg);
+    if let Some(enable) = autostart_changed {
+        let _ = crate::autostart::set_system_autostart(enable);
+    }
     state.logger.info("Config", "Configuration saved", None);
     Ok(cfg.clone())
 }
@@ -147,14 +158,13 @@ pub async fn get_mobile_share_info(
 ) -> Result<Value, String> {
     let cfg = state.config.read().await;
     let token = state.mobile_token.read().await.clone();
-    let local_ip = local_ip_address::local_ip()
-        .map(|ip| ip.to_string())
-        .unwrap_or_else(|_| "127.0.0.1".to_string());
+    let ips = crate::net_utils::get_local_network_ips();
+    let primary_ip = ips.first().cloned().unwrap_or_else(|| "127.0.0.1".to_string());
 
-    let url = format!("http://{}:{}/mobile?token={}", local_ip, cfg.api_port, token);
+    let url = format!("http://{}:{}/mobile?token={}", primary_ip, cfg.api_port, token);
 
     Ok(serde_json::json!({
-        "ips": [local_ip],
+        "ips": ips,
         "port": cfg.api_port,
         "token": token,
         "url": url,
@@ -166,18 +176,7 @@ pub async fn get_mobile_share_info(
 pub async fn regenerate_mobile_token(
     state: State<'_, Arc<EngineState>>,
 ) -> Result<Value, String> {
-    let token_hex = {
-        use rand::Rng;
-        let mut rng = rand::rng();
-        let token_bytes: Vec<u8> = (0..16).map(|_| rng.random()).collect();
-        token_bytes.iter().map(|b| format!("{:02x}", b)).collect::<String>()
-    };
-
-    {
-        let mut t = state.mobile_token.write().await;
-        *t = token_hex;
-    }
-
+    let _ = state.regenerate_mobile_session_token().await;
     get_mobile_share_info(state).await
 }
 
@@ -198,13 +197,256 @@ pub async fn scan_nearby_peers(
 }
 
 #[tauri::command]
+pub async fn respond_pairing_request(
+    state: State<'_, Arc<EngineState>>,
+    request_id: String,
+    approved: bool,
+) -> Result<bool, String> {
+    let tx = {
+        let mut map = state.pending_pairing_requests.lock().await;
+        map.remove(&request_id)
+    };
+    if let Some(sender) = tx {
+        let _ = sender.send(approved);
+        Ok(true)
+    } else {
+        Ok(false)
+    }
+}
+
+#[tauri::command]
 pub async fn pair_device(
     state: State<'_, Arc<EngineState>>,
     input: String,
 ) -> Result<Value, String> {
-    // Attempt to pair with peer by IP:port or ID
-    state.logger.info("Pairing", "Pairing initiated with peer", Some(input.clone()));
-    Ok(serde_json::json!({ "success": true }))
+    let raw = input.trim();
+    if raw.is_empty() {
+        return Ok(serde_json::json!({
+            "success": false,
+            "error": "Введите IP-адрес или имя устройства"
+        }));
+    }
+
+    // Strip http:// or https:// prefix
+    let clean = raw
+        .trim_start_matches("http://")
+        .trim_start_matches("https://")
+        .trim_end_matches('/')
+        .trim();
+
+    let has_explicit_port = clean.contains(':');
+    let mut target_ip = String::new();
+    let mut target_port: u16 = 52520;
+
+    // Check if input is formatted as IP or IP:port
+    if has_explicit_port {
+        let parts: Vec<&str> = clean.split(':').collect();
+        if let Ok(ip) = parts[0].parse::<std::net::IpAddr>() {
+            target_ip = ip.to_string();
+            if parts.len() > 1 {
+                if let Ok(p) = parts[1].parse::<u16>() {
+                    target_port = p;
+                }
+            }
+        }
+    } else if let Ok(ip) = clean.parse::<std::net::IpAddr>() {
+        target_ip = ip.to_string();
+    } else if clean.eq_ignore_ascii_case("localhost") {
+        target_ip = "127.0.0.1".to_string();
+    }
+
+    // If port was NOT explicitly specified, check if this IP is known in discovered_peers or paired_devices!
+    if !has_explicit_port && !target_ip.is_empty() {
+        let peers = state.discovered_peers.read().await;
+        if let Some(p) = peers.values().find(|p| p.ip == target_ip) {
+            target_port = p.port;
+        } else {
+            let cfg = state.config.read().await;
+            if let Some(p) = cfg.paired_devices.iter().find(|d| d.ip == target_ip) {
+                target_port = p.port;
+            }
+        }
+    }
+
+    // If not direct IP, look up peer in discovered_peers
+    if target_ip.is_empty() {
+        let peers = state.discovered_peers.read().await;
+        let matched = peers.values().find(|p| {
+            p.device_id.eq_ignore_ascii_case(clean)
+                || p.id.eq_ignore_ascii_case(clean)
+                || p.device_name.eq_ignore_ascii_case(clean)
+                || p.name.eq_ignore_ascii_case(clean)
+                || p.ip == clean
+        });
+
+        if let Some(p) = matched {
+            target_ip = p.ip.clone();
+            target_port = p.port;
+        } else {
+            let cfg = state.config.read().await;
+            if let Some(p) = cfg.paired_devices.iter().find(|d| {
+                d.id.eq_ignore_ascii_case(clean)
+                    || d.custom_name.eq_ignore_ascii_case(clean)
+                    || d.original_name.eq_ignore_ascii_case(clean)
+                    || d.ip == clean
+            }) {
+                target_ip = p.ip.clone();
+                target_port = p.port;
+            }
+        }
+    }
+
+    if target_ip.is_empty() {
+        return Ok(serde_json::json!({
+            "success": false,
+            "error": format!("Устройство \"{}\" не найдено в сети. Убедитесь, что оба устройства подключены к одной сети, или введите IP-адрес напрямую.", clean)
+        }));
+    }
+
+    let (device_id, device_name, our_port, wan_ip) = {
+        let cfg = state.config.read().await;
+        (cfg.device_id.clone(), cfg.device_name.clone(), cfg.api_port, cfg.wan_ip.clone())
+    };
+
+    let local_token: String = {
+        use rand::Rng;
+        let mut rng = rand::rng();
+        let token_bytes: Vec<u8> = (0..24).map(|_| rng.random()).collect();
+        token_bytes.iter().map(|b| format!("{:02x}", b)).collect()
+    };
+
+    let our_ip = local_ip_address::local_ip().map(|ip| ip.to_string()).unwrap_or_default();
+
+    let payload = serde_json::json!({
+        "deviceId": device_id,
+        "deviceName": device_name,
+        "authToken": local_token,
+        "ip": our_ip,
+        "port": our_port,
+        "wanIp": wan_ip,
+        "remotePort": our_port
+    });
+
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(35))
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    let mut actual_port = target_port;
+    let url = format!("http://{}:{}/api/pair", target_ip, actual_port);
+    state.logger.info("Pairing", &format!("Initiating pairing handshake with {}:{}", target_ip, actual_port), None);
+
+    let mut resp = client.post(&url).json(&payload).send().await;
+
+    // Automatic fallback between standard ports 52520 <-> 8384 if initial connection refused and port was not explicit
+    if resp.is_err() && !has_explicit_port {
+        let fallback_port = if actual_port == 52520 { 8384 } else { 52520 };
+        let fallback_url = format!("http://{}:{}/api/pair", target_ip, fallback_port);
+        state.logger.info("Pairing", &format!("Handshake on port {} failed, attempting fallback port {}:{}", actual_port, target_ip, fallback_port), None);
+        let fb_res = client.post(&fallback_url).json(&payload).send().await;
+        if fb_res.is_ok() {
+            actual_port = fallback_port;
+            resp = fb_res;
+        }
+    }
+
+    let resp = match resp {
+        Ok(r) => r,
+        Err(err) => {
+            let msg = if err.is_timeout() {
+                "Таймаут подключения: удаленное устройство не ответило вовремя или отклонило запрос".to_string()
+            } else {
+                format!("Не удалось подключиться к {}:{}. Проверьте доступность устройства в сети.", target_ip, actual_port)
+            };
+            state.logger.error("Pairing", &msg, None);
+            return Ok(serde_json::json!({
+                "success": false,
+                "error": msg
+            }));
+        }
+    };
+
+    let status = resp.status();
+    if status.is_success() {
+        let body: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
+        let peer_device_id = body.get("deviceId").and_then(|v| v.as_str()).unwrap_or(clean).to_string();
+        let peer_device_name = body.get("deviceName").and_then(|v| v.as_str()).unwrap_or("Устройство").to_string();
+        let shared_token = body.get("authToken").and_then(|v| v.as_str()).map(|s| s.to_string()).unwrap_or(local_token);
+
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis() as i64;
+
+        let mut paired_peer = PairedDevice {
+            id: peer_device_id.clone(),
+            original_name: peer_device_name.clone(),
+            custom_name: peer_device_name.clone(),
+            ip: target_ip.clone(),
+            port: actual_port,
+            remote_ip: None,
+            remote_port: None,
+            paired_at: chrono_like_now(),
+            last_seen: now,
+            receive_enabled: Some(true),
+            connection_mode: Some("local".to_string()),
+            auth_token: Some(shared_token),
+            platform: None,
+        };
+
+        {
+            let mut cfg = state.config.write().await;
+            if let Some(existing) = cfg.paired_devices.iter_mut().find(|d| d.id == peer_device_id) {
+                existing.ip = target_ip.clone();
+                existing.port = target_port;
+                existing.original_name = peer_device_name.clone();
+                existing.auth_token = paired_peer.auth_token.clone();
+                existing.last_seen = now;
+                existing.connection_mode = Some("local".to_string());
+                paired_peer = existing.clone();
+            } else {
+                cfg.paired_devices.push(paired_peer.clone());
+            }
+            crate::config::save_config(&cfg);
+        }
+
+        state.logger.info("Pairing", &format!("Successfully paired with device \"{}\" ({}:{})", peer_device_name, target_ip, target_port), None);
+
+        if let Some(handle) = state.app_handle.read().await.as_ref() {
+            let status = state.get_status().await;
+            let _ = handle.emit("status-changed", &status);
+        }
+
+        Ok(serde_json::json!({
+            "success": true,
+            "peer": paired_peer
+        }))
+    } else if status == reqwest::StatusCode::FORBIDDEN {
+        let mut err_msg = "Сопряжение отклонено пользователем на удаленном устройстве".to_string();
+        if let Ok(body) = resp.json::<serde_json::Value>().await {
+            if let Some(e) = body.get("error").and_then(|v| v.as_str()) {
+                err_msg = e.to_string();
+            }
+        }
+        state.logger.warn("Pairing", &err_msg, None);
+        Ok(serde_json::json!({
+            "success": false,
+            "error": err_msg
+        }))
+    } else if status == reqwest::StatusCode::REQUEST_TIMEOUT {
+        state.logger.warn("Pairing", "Pairing request timed out", None);
+        Ok(serde_json::json!({
+            "success": false,
+            "error": "Время ожидания подтверждения сопряжения истекло"
+        }))
+    } else {
+        let err_msg = format!("Сервер вернул ошибку: HTTP {}", status);
+        state.logger.error("Pairing", &err_msg, None);
+        Ok(serde_json::json!({
+            "success": false,
+            "error": err_msg
+        }))
+    }
 }
 
 #[tauri::command]
@@ -212,11 +454,21 @@ pub async fn unpair_device(
     state: State<'_, Arc<EngineState>>,
     device_id: Option<String>,
 ) -> Result<bool, String> {
-    if let Some(id) = device_id {
+    {
         let mut cfg = state.config.write().await;
-        cfg.paired_devices.retain(|d| d.id != id);
-        crate::config::save_config(&cfg);
-        state.logger.info("Pairing", "Device unpaired", Some(id));
+        if let Some(id) = &device_id {
+            cfg.paired_devices.retain(|d| &d.id != id);
+            crate::config::save_config(&cfg);
+            state.logger.info("Pairing", "Device unpaired", Some(id.clone()));
+        } else {
+            cfg.paired_devices.clear();
+            crate::config::save_config(&cfg);
+            state.logger.info("Pairing", "All devices unpaired", None);
+        }
+    }
+    if let Some(handle) = state.app_handle.read().await.as_ref() {
+        let status = state.get_status().await;
+        let _ = handle.emit("status-changed", &status);
     }
     Ok(true)
 }
@@ -227,10 +479,20 @@ pub async fn update_device_name(
     device_id: String,
     new_name: String,
 ) -> Result<bool, String> {
-    let mut cfg = state.config.write().await;
-    if let Some(device) = cfg.paired_devices.iter_mut().find(|d| d.id == device_id) {
-        device.custom_name = new_name;
-        crate::config::save_config(&cfg);
+    let mut updated = false;
+    {
+        let mut cfg = state.config.write().await;
+        if let Some(device) = cfg.paired_devices.iter_mut().find(|d| d.id == device_id) {
+            device.custom_name = new_name;
+            crate::config::save_config(&cfg);
+            updated = true;
+        }
+    }
+    if updated {
+        if let Some(handle) = state.app_handle.read().await.as_ref() {
+            let status = state.get_status().await;
+            let _ = handle.emit("status-changed", &status);
+        }
         return Ok(true);
     }
     Ok(false)
@@ -250,10 +512,20 @@ pub async fn toggle_device_receive(
     device_id: String,
     enabled: bool,
 ) -> Result<bool, String> {
-    let mut cfg = state.config.write().await;
-    if let Some(device) = cfg.paired_devices.iter_mut().find(|d| d.id == device_id) {
-        device.receive_enabled = Some(enabled);
-        crate::config::save_config(&cfg);
+    let mut updated = false;
+    {
+        let mut cfg = state.config.write().await;
+        if let Some(device) = cfg.paired_devices.iter_mut().find(|d| d.id == device_id) {
+            device.receive_enabled = Some(enabled);
+            crate::config::save_config(&cfg);
+            updated = true;
+        }
+    }
+    if updated {
+        if let Some(handle) = state.app_handle.read().await.as_ref() {
+            let status = state.get_status().await;
+            let _ = handle.emit("status-changed", &status);
+        }
         return Ok(true);
     }
     Ok(false)
@@ -281,6 +553,9 @@ pub async fn toggle_autostart(
     let mut cfg = state.config.write().await;
     cfg.auto_start = enable;
     crate::config::save_config(&cfg);
+    drop(cfg);
+
+    let _ = crate::autostart::set_system_autostart(enable);
     Ok(true)
 }
 

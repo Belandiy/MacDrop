@@ -59,6 +59,92 @@ pub async fn execute_peer_transfer(
     file_paths: Vec<String>,
     target_device_id: Option<String>,
 ) -> Result<bool, String> {
+    if target_device_id.as_deref() == Some("mobile-web") {
+        for path_str in file_paths {
+            let path = PathBuf::from(&path_str);
+            if !path.exists() {
+                continue;
+            }
+
+            let is_dir = path.is_dir();
+            let (send_path, send_filename) = if is_dir {
+                let folder_name = path.file_name().and_then(|s| s.to_str()).unwrap_or("folder");
+                let temp_zip = std::env::temp_dir().join(format!("{}_{}.zip", folder_name, SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_millis()));
+                zip_directory(&path, &temp_zip)?;
+                let zip_name = format!("{}.zip", folder_name);
+                (temp_zip, zip_name)
+            } else {
+                let name = path.file_name().and_then(|s| s.to_str()).unwrap_or("file").to_string();
+                (path.clone(), name)
+            };
+
+            let file_meta = fs::metadata(&send_path).map_err(|e| e.to_string())?;
+            let total_size = file_meta.len();
+
+            let now = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_millis() as i64;
+
+            // Add to mobile queue for immediate download from phone
+            {
+                let mut queue = state.mobile_queue.write().await;
+                queue.insert(0, crate::engine::MobileFileQueueItem {
+                    filename: send_filename.clone(),
+                    path: send_path.to_string_lossy().to_string(),
+                    size: total_size,
+                    mtime_ms: now,
+                });
+            }
+
+            // Simulate progress update for UI feedback
+            {
+                let mut prog = state.current_progress.write().await;
+                *prog = Some(TransferProgress {
+                    filename: send_filename.clone(),
+                    bytes_transferred: total_size,
+                    total_bytes: total_size,
+                    speed_bps: total_size as f64,
+                    direction: "outgoing".to_string(),
+                    peer_device_id: "mobile-web".to_string(),
+                    peer_name: "Телефон (Web Drop)".to_string(),
+                });
+            }
+
+            if let Some(handle) = state.app_handle.read().await.as_ref() {
+                let prog = state.current_progress.read().await.clone();
+                let _ = handle.emit("progress-update", &prog);
+            }
+
+            // Record in history
+            let entry = HistoryEntry {
+                id: format!("{}-{}", now, total_size),
+                filename: send_filename,
+                size: total_size,
+                timestamp: now,
+                direction: "outgoing".to_string(),
+                status: "completed".to_string(),
+                peer_device_id: "mobile-web".to_string(),
+                peer_name: "Телефон (Web Drop)".to_string(),
+            };
+
+            state.history.write().await.push(entry);
+            state.mark_mobile_activity().await;
+
+            // Clear progress after brief feedback
+            tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+            {
+                let mut prog = state.current_progress.write().await;
+                *prog = None;
+            }
+            if let Some(handle) = state.app_handle.read().await.as_ref() {
+                let _ = handle.emit("progress-update", &None::<TransferProgress>);
+            }
+        }
+
+        state.emit_status_changed().await;
+        return Ok(true);
+    }
     let (target_ip, target_port, auth_token, peer_name, peer_id) = {
         let cfg = state.config.read().await;
         if let Some(ref tid) = target_device_id {
@@ -139,13 +225,40 @@ pub async fn execute_peer_transfer(
             .header("x-device-id", &our_device_id)
             .header("x-filename", urlencoding::encode(&send_filename).as_ref())
             .header("content-length", total_size.to_string())
-            .body(buffer);
+            .body(buffer.clone());
 
         if let Some(ref tok) = auth_token {
             req = req.header("x-auth-token", tok);
         }
 
-        let res = req.send().await;
+        let mut res = req.send().await;
+
+        // Fallback between standard ports 52520 and 8384 if initial connection fails
+        if res.is_err() {
+            let alt_port = if target_port == 52520 { 8384 } else { 52520 };
+            let alt_url = format!("http://{}:{}/api/upload", target_ip, alt_port);
+            state.logger.info("Transfer", &format!("Upload to port {} failed, trying alternative port {}:{}", target_port, target_ip, alt_port), None);
+            let mut alt_req = client
+                .post(&alt_url)
+                .header("x-device-id", &our_device_id)
+                .header("x-filename", urlencoding::encode(&send_filename).as_ref())
+                .header("content-length", total_size.to_string())
+                .body(buffer);
+
+            if let Some(ref tok) = auth_token {
+                alt_req = alt_req.header("x-auth-token", tok);
+            }
+
+            let alt_res = alt_req.send().await;
+            if alt_res.is_ok() {
+                res = alt_res;
+                let mut cfg = state.config.write().await;
+                if let Some(p) = cfg.paired_devices.iter_mut().find(|d| d.id == peer_id) {
+                    p.port = alt_port;
+                    crate::config::save_config(&cfg);
+                }
+            }
+        }
 
         if is_temp {
             let _ = fs::remove_file(&send_path);
@@ -219,5 +332,53 @@ mod tests {
         // Clean up
         let _ = fs::remove_dir_all(&temp_base);
         let _ = fs::remove_file(&zip_out);
+    }
+
+    #[tokio::test]
+    async fn test_transfer_to_mobile_web() {
+        let temp_dir = std::env::temp_dir().join("macdrop_test_mobile_transfer");
+        let _ = fs::create_dir_all(&temp_dir);
+        let test_file = temp_dir.join("sample.pdf");
+        fs::write(&test_file, b"Dummy PDF content").expect("write");
+
+        let cfg = crate::config::AppConfig {
+            target_folder: temp_dir.to_string_lossy().to_string(),
+            auto_start: false,
+            notifications: false,
+            language: None,
+            device_id: "MAC-TEST-X".to_string(),
+            device_name: "MacBook Test".to_string(),
+            paired_devices: vec![],
+            api_port: 52520,
+            api_key: "key".to_string(),
+            upnp_enabled: None,
+            wan_ip: None,
+            custom_remote_host: None,
+        };
+        let logger = crate::logger::AppLogger::new();
+        let state = Arc::new(EngineState::new(cfg, logger));
+
+        let res = execute_peer_transfer(
+            state.clone(),
+            vec![test_file.to_string_lossy().to_string()],
+            Some("mobile-web".to_string()),
+        ).await;
+
+        assert!(res.is_ok());
+        assert!(res.unwrap());
+
+        // Check mobile queue item
+        let queue = state.mobile_queue.read().await;
+        assert_eq!(queue.len(), 1);
+        assert_eq!(queue[0].filename, "sample.pdf");
+
+        // Check history
+        let hist = state.history.read().await;
+        assert_eq!(hist.len(), 1);
+        assert_eq!(hist[0].peer_device_id, "mobile-web");
+        assert_eq!(hist[0].status, "completed");
+
+        // Clean up
+        let _ = fs::remove_dir_all(&temp_dir);
     }
 }

@@ -1,6 +1,6 @@
 use axum::{
     body::Body,
-    extract::{Path as AxumPath, Query, State},
+    extract::{ConnectInfo, Path as AxumPath, Query, State},
     http::{header, HeaderMap, StatusCode},
     response::{Html, IntoResponse, Response},
     routing::{get, post},
@@ -15,6 +15,7 @@ use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
+use tauri::Emitter;
 use tokio::sync::RwLock;
 use tower_http::cors::CorsLayer;
 
@@ -55,6 +56,7 @@ pub struct EngineStatus {
     pub port: u16,
     pub device_name: String,
     pub device_id: String,
+    pub paired_devices: Vec<PairedDevice>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -88,7 +90,9 @@ pub struct EngineState {
     pub history: Arc<RwLock<Vec<HistoryEntry>>>,
     pub mobile_token: Arc<RwLock<String>>,
     pub mobile_queue: Arc<RwLock<Vec<MobileFileQueueItem>>>,
+    pub last_mobile_seen: Arc<RwLock<i64>>,
     pub discovered_peers: Arc<RwLock<HashMap<String, DiscoveredPeer>>>,
+    pub pending_pairing_requests: Arc<tokio::sync::Mutex<HashMap<String, tokio::sync::oneshot::Sender<bool>>>>,
     pub app_handle: Arc<RwLock<Option<tauri::AppHandle>>>,
 }
 
@@ -106,7 +110,9 @@ impl EngineState {
             history: Arc::new(RwLock::new(Vec::new())),
             mobile_token: Arc::new(RwLock::new(token_hex)),
             mobile_queue: Arc::new(RwLock::new(Vec::new())),
+            last_mobile_seen: Arc::new(RwLock::new(0)),
             discovered_peers: Arc::new(RwLock::new(HashMap::new())),
+            pending_pairing_requests: Arc::new(tokio::sync::Mutex::new(HashMap::new())),
             app_handle: Arc::new(RwLock::new(None)),
         }
     }
@@ -117,12 +123,98 @@ impl EngineState {
         }
     }
 
+    pub async fn is_mobile_session_active(&self) -> bool {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis() as i64;
+        let last = *self.last_mobile_seen.read().await;
+        let has_files = !self.mobile_queue.read().await.is_empty();
+        (last > 0 && (now - last) < 60_000) || has_files
+    }
+
+    pub async fn mark_mobile_activity(&self) {
+        let was_active = self.is_mobile_session_active().await;
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis() as i64;
+        *self.last_mobile_seen.write().await = now;
+        if !was_active {
+            self.emit_status_changed().await;
+        }
+    }
+
+    pub async fn regenerate_mobile_session_token(&self) -> String {
+        let token_hex = {
+            use rand::Rng;
+            let mut rng = rand::rng();
+            let token_bytes: Vec<u8> = (0..16).map(|_| rng.random()).collect();
+            token_bytes.iter().map(|b| format!("{:02x}", b)).collect::<String>()
+        };
+
+        {
+            let mut t = self.mobile_token.write().await;
+            *t = token_hex.clone();
+        }
+        {
+            let mut q = self.mobile_queue.write().await;
+            q.clear();
+        }
+        {
+            let mut l = self.last_mobile_seen.write().await;
+            *l = 0;
+        }
+
+        self.emit_status_changed().await;
+        token_hex
+    }
+
+    pub async fn emit_status_changed(&self) {
+        if let Some(handle) = self.app_handle.read().await.as_ref() {
+            let status = self.get_status().await;
+            let _ = handle.emit("status-changed", &status);
+        }
+    }
+
     pub async fn get_status(&self) -> EngineStatus {
         let cfg = self.config.read().await;
         let active = if self.current_progress.read().await.is_some() { 1 } else { 0 };
-        let local_ip = local_ip_address::local_ip()
-            .map(|ip| ip.to_string())
-            .unwrap_or_else(|_| "127.0.0.1".to_string());
+        let ips = crate::net_utils::get_local_network_ips();
+        let local_ip = ips.first().cloned().unwrap_or_else(|| "127.0.0.1".to_string());
+
+        let is_mobile_active = self.is_mobile_session_active().await;
+        let mut paired = cfg.paired_devices.clone();
+
+        if is_mobile_active {
+            let last_seen_val = {
+                let l = *self.last_mobile_seen.read().await;
+                if l > 0 {
+                    l
+                } else {
+                    SystemTime::now()
+                        .duration_since(UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_millis() as i64
+                }
+            };
+
+            paired.push(PairedDevice {
+                id: "mobile-web".to_string(),
+                original_name: "Телефон (Web Drop)".to_string(),
+                custom_name: "Телефон (Web Drop)".to_string(),
+                ip: "127.0.0.1".to_string(),
+                port: cfg.api_port,
+                remote_ip: None,
+                remote_port: None,
+                paired_at: "2026-10-14T00:00:00.000Z".to_string(),
+                last_seen: last_seen_val,
+                receive_enabled: Some(true),
+                connection_mode: Some("local".to_string()),
+                auth_token: None,
+                platform: Some("mobile".to_string()),
+            });
+        }
 
         EngineStatus {
             is_discoverable: true,
@@ -131,6 +223,7 @@ impl EngineState {
             port: cfg.api_port,
             device_name: cfg.device_name.clone(),
             device_id: cfg.device_id.clone(),
+            paired_devices: paired,
         }
     }
 }
@@ -218,20 +311,14 @@ struct PairingPayload {
     device_id: String,
     #[serde(rename = "deviceName")]
     device_name: String,
+    ip: Option<String>,
     port: Option<u16>,
     #[serde(rename = "authToken")]
     auth_token: Option<String>,
-}
-
-#[derive(Serialize)]
-struct PairingResponse {
-    success: bool,
-    #[serde(rename = "deviceId")]
-    device_id: String,
-    #[serde(rename = "deviceName")]
-    device_name: String,
-    #[serde(rename = "authToken")]
-    auth_token: String,
+    #[serde(rename = "wanIp")]
+    wan_ip: Option<String>,
+    #[serde(rename = "remotePort")]
+    remote_port: Option<u16>,
 }
 
 async fn handle_status(State(state): State<Arc<EngineState>>) -> impl IntoResponse {
@@ -249,57 +336,169 @@ async fn handle_status(State(state): State<Arc<EngineState>>) -> impl IntoRespon
 }
 
 async fn handle_pair(
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
     State(state): State<Arc<EngineState>>,
     Json(payload): Json<PairingPayload>,
 ) -> impl IntoResponse {
-    let mut cfg = state.config.write().await;
-    let token = payload.auth_token.clone().unwrap_or_else(|| {
-        use rand::Rng;
-        let mut rng = rand::rng();
-        let bytes: Vec<u8> = (0..24).map(|_| rng.random()).collect();
-        bytes.iter().map(|b| format!("{:02x}", b)).collect()
-    });
-
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_millis() as i64;
-
-    // Check if peer is already paired
-    if let Some(existing) = cfg.paired_devices.iter_mut().find(|d| d.id == payload.device_id) {
-        existing.original_name = payload.device_name.clone();
-        existing.port = payload.port.unwrap_or(8384);
-        existing.auth_token = Some(token.clone());
-        existing.last_seen = now;
+    let clean_ip = match addr.ip() {
+        std::net::IpAddr::V4(v4) => v4.to_string(),
+        std::net::IpAddr::V6(v6) => {
+            if let Some(v4) = v6.to_ipv4_mapped() {
+                v4.to_string()
+            } else {
+                v6.to_string()
+            }
+        }
+    };
+    let effective_ip = if (clean_ip == "127.0.0.1" || clean_ip == "::1") && payload.ip.is_some() {
+        payload.ip.clone().unwrap()
     } else {
-        cfg.paired_devices.push(PairedDevice {
-            id: payload.device_id.clone(),
-            original_name: payload.device_name.clone(),
-            custom_name: payload.device_name.clone(),
-            ip: "127.0.0.1".to_string(), // Will be updated on actual socket ping
-            port: payload.port.unwrap_or(8384),
-            remote_ip: None,
-            remote_port: None,
-            paired_at: chrono_like_now(),
-            last_seen: now,
-            receive_enabled: Some(true),
-            connection_mode: Some("local".to_string()),
-            auth_token: Some(token.clone()),
-            platform: None,
+        clean_ip
+    };
+
+    let is_already_paired = {
+        let cfg = state.config.read().await;
+        cfg.paired_devices.iter().any(|d| d.id == payload.device_id)
+    };
+
+    if is_already_paired {
+        let mut cfg = state.config.write().await;
+        let token = payload.auth_token.clone().unwrap_or_else(|| {
+            use rand::Rng;
+            let mut rng = rand::rng();
+            let bytes: Vec<u8> = (0..24).map(|_| rng.random()).collect();
+            bytes.iter().map(|b| format!("{:02x}", b)).collect()
         });
+
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis() as i64;
+
+        if let Some(existing) = cfg.paired_devices.iter_mut().find(|d| d.id == payload.device_id) {
+            existing.original_name = payload.device_name.clone();
+            existing.ip = effective_ip.clone();
+            existing.port = payload.port.unwrap_or(52520);
+            existing.auth_token = Some(token.clone());
+            existing.last_seen = now;
+            existing.connection_mode = Some("local".to_string());
+        }
+
+        save_config(&cfg);
+        state.logger.info("Pairing", &format!("Re-paired with existing device \"{}\" ({})", payload.device_name, effective_ip), None);
+
+        if let Some(handle) = state.app_handle.read().await.as_ref() {
+            let status = state.get_status().await;
+            let _ = handle.emit("status-changed", &status);
+        }
+
+        return (StatusCode::OK, Json(serde_json::json!({
+            "success": true,
+            "deviceId": cfg.device_id.clone(),
+            "deviceName": cfg.device_name.clone(),
+            "authToken": token,
+        }))).into_response();
     }
 
-    save_config(&cfg);
+    // New device: request user approval in UI
+    let request_id = uuid::Uuid::new_v4().to_string();
+    let (tx, rx) = tokio::sync::oneshot::channel::<bool>();
 
-    Json(PairingResponse {
-        success: true,
-        device_id: cfg.device_id.clone(),
-        device_name: cfg.device_name.clone(),
-        auth_token: token,
-    })
+    {
+        let mut map = state.pending_pairing_requests.lock().await;
+        map.insert(request_id.clone(), tx);
+    }
+
+    let peer_port = payload.port.unwrap_or(52520);
+    state.logger.info(
+        "Security",
+        &format!("Incoming pairing request [{}] from \"{}\" ({}:{}). Awaiting user approval...",
+            request_id, payload.device_name, effective_ip, peer_port
+        ),
+        None
+    );
+
+    if let Some(handle) = state.app_handle.read().await.as_ref() {
+        let event = serde_json::json!({
+            "requestId": request_id.clone(),
+            "deviceId": payload.device_id.clone(),
+            "deviceName": payload.device_name.clone(),
+            "ip": effective_ip.clone(),
+            "port": peer_port,
+        });
+        let _ = handle.emit("pairing-request", &event);
+    }
+
+    let device_id = payload.device_id.clone();
+    let device_name = payload.device_name.clone();
+    let auth_token = payload.auth_token.clone();
+
+    match tokio::time::timeout(std::time::Duration::from_secs(30), rx).await {
+        Ok(Ok(true)) => {
+            let mut cfg = state.config.write().await;
+            let token = auth_token.unwrap_or_else(|| {
+                use rand::Rng;
+                let mut rng = rand::rng();
+                let bytes: Vec<u8> = (0..24).map(|_| rng.random()).collect();
+                bytes.iter().map(|b| format!("{:02x}", b)).collect()
+            });
+            let now = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_millis() as i64;
+
+            let paired = PairedDevice {
+                id: device_id.clone(),
+                original_name: device_name.clone(),
+                custom_name: device_name.clone(),
+                ip: effective_ip.clone(),
+                port: peer_port,
+                remote_ip: payload.wan_ip,
+                remote_port: payload.remote_port,
+                paired_at: chrono_like_now(),
+                last_seen: now,
+                receive_enabled: Some(true),
+                connection_mode: Some("local".to_string()),
+                auth_token: Some(token.clone()),
+                platform: None,
+            };
+
+            cfg.paired_devices.retain(|d| d.id != device_id);
+            cfg.paired_devices.push(paired);
+            save_config(&cfg);
+
+            state.logger.info("Pairing", &format!("Device \"{}\" successfully paired and saved", device_name), None);
+
+            if let Some(handle) = state.app_handle.read().await.as_ref() {
+                let status = state.get_status().await;
+                let _ = handle.emit("status-changed", &status);
+            }
+
+            (StatusCode::OK, Json(serde_json::json!({
+                "success": true,
+                "deviceId": cfg.device_id.clone(),
+                "deviceName": cfg.device_name.clone(),
+                "authToken": token,
+            }))).into_response()
+        }
+        Ok(Ok(false)) => {
+            state.logger.warn("Security", &format!("Pairing request [{}] rejected by user", request_id), None);
+            (StatusCode::FORBIDDEN, Json(serde_json::json!({
+                "error": "Сопряжение отклонено пользователем"
+            }))).into_response()
+        }
+        _ => {
+            state.logger.warn("Security", &format!("Pairing request [{}] timed out waiting for approval", request_id), None);
+            let mut map = state.pending_pairing_requests.lock().await;
+            map.remove(&request_id);
+            (StatusCode::REQUEST_TIMEOUT, Json(serde_json::json!({
+                "error": "Время ожидания подтверждения сопряжения истекло"
+            }))).into_response()
+        }
+    }
 }
 
-fn chrono_like_now() -> String {
+pub fn chrono_like_now() -> String {
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
@@ -458,27 +657,66 @@ async fn handle_mobile_page(
         ).into_response();
     }
 
+    state.mark_mobile_activity().await;
+
     let cfg = state.config.read().await;
-    let html = get_mobile_html(&cfg.device_name, &current_token);
+    let html = crate::mobile_web::get_mobile_web_html(&cfg.device_name, &current_token);
     Html(html).into_response()
+}
+
+async fn handle_mobile_logo() -> impl IntoResponse {
+    let svg = r##"<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3b82f6"/>
+      <stop offset="100%" stop-color="#1d4ed8"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="16" fill="url(#g)"/>
+  <path d="M18 42 L24 22 L32 34 L40 22 L46 42" fill="none" stroke="#ffffff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>"##;
+    ([(header::CONTENT_TYPE, "image/svg+xml")], svg)
 }
 
 async fn handle_mobile_status(
     State(state): State<Arc<EngineState>>,
-) -> impl IntoResponse {
+    headers: HeaderMap,
+    Query(query): Query<MobileQuery>,
+) -> Response {
+    let current_token = state.mobile_token.read().await.clone();
+    let token_header = headers.get("x-mobile-token").and_then(|v| v.to_str().ok());
+    let is_authorized = query.token.as_deref() == Some(&current_token)
+        || token_header == Some(&current_token);
+
+    if !is_authorized {
+        return (StatusCode::UNAUTHORIZED, "Unauthorized").into_response();
+    }
+
+    state.mark_mobile_activity().await;
+
     let cfg = state.config.read().await;
     Json(serde_json::json!({
         "status": "ok",
         "computerName": cfg.device_name,
         "deviceId": cfg.device_id
-    }))
+    })).into_response()
 }
 
 async fn handle_mobile_upload(
     State(state): State<Arc<EngineState>>,
     headers: HeaderMap,
+    Query(query): Query<MobileQuery>,
     body: Body,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
+    let current_token = state.mobile_token.read().await.clone();
+    let token_header = headers.get("x-mobile-token").and_then(|v| v.to_str().ok());
+    let is_authorized = query.token.as_deref() == Some(&current_token)
+        || token_header == Some(&current_token);
+
+    if !is_authorized {
+        return Err((StatusCode::UNAUTHORIZED, "Unauthorized".to_string()));
+    }
+
     let raw_filename = headers
         .get("x-filename")
         .and_then(|v| v.to_str().ok())
@@ -537,6 +775,8 @@ async fn handle_mobile_upload(
 
     state.history.write().await.push(history_entry);
     state.logger.info("Engine", &format!("Mobile uploaded file: {}", actual_name), None);
+    state.mark_mobile_activity().await;
+    state.emit_status_changed().await;
 
     Ok(Json(serde_json::json!({
         "success": true,
@@ -546,24 +786,53 @@ async fn handle_mobile_upload(
 
 async fn handle_mobile_files(
     State(state): State<Arc<EngineState>>,
-) -> impl IntoResponse {
+    headers: HeaderMap,
+    Query(query): Query<MobileQuery>,
+) -> Response {
+    let current_token = state.mobile_token.read().await.clone();
+    let token_header = headers.get("x-mobile-token").and_then(|v| v.to_str().ok());
+    let is_authorized = query.token.as_deref() == Some(&current_token)
+        || token_header == Some(&current_token);
+
+    if !is_authorized {
+        return (StatusCode::UNAUTHORIZED, "Unauthorized").into_response();
+    }
+
+    state.mark_mobile_activity().await;
+
     let queue = state.mobile_queue.read().await;
     let files: Vec<serde_json::Value> = queue.iter().map(|item| {
+        let secs = (item.mtime_ms / 1000) % 86400;
+        let hours = (secs / 3600) % 24;
+        let mins = (secs / 60) % 60;
         serde_json::json!({
             "name": item.filename,
             "size": item.size,
             "mtime": item.mtime_ms,
-            "time": format!("{}:{:02}", (item.mtime_ms / 3600000) % 24, (item.mtime_ms / 60000) % 60)
+            "time": format!("{:02}:{:02}", hours, mins)
         })
     }).collect();
 
-    Json(serde_json::json!({ "files": files }))
+    Json(serde_json::json!({ "files": files })).into_response()
 }
 
 async fn handle_mobile_download(
     State(state): State<Arc<EngineState>>,
+    headers: HeaderMap,
+    Query(query): Query<MobileQuery>,
     AxumPath(filename): AxumPath<String>,
 ) -> Result<Response, (StatusCode, String)> {
+    let current_token = state.mobile_token.read().await.clone();
+    let token_header = headers.get("x-mobile-token").and_then(|v| v.to_str().ok());
+    let is_authorized = query.token.as_deref() == Some(&current_token)
+        || token_header == Some(&current_token);
+
+    if !is_authorized {
+        return Err((StatusCode::UNAUTHORIZED, "Unauthorized".to_string()));
+    }
+
+    state.mark_mobile_activity().await;
+
     let decoded = urlencoding_decode(&filename);
     let queue = state.mobile_queue.read().await;
     let item = queue.iter().find(|i| i.filename == decoded);
@@ -605,63 +874,6 @@ async fn handle_mobile_download(
     }
 }
 
-fn get_mobile_html(device_name: &str, token: &str) -> String {
-    format!(
-        r#"<!DOCTYPE html>
-<html lang="ru">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>MacDrop Mobile - {device_name}</title>
-  <style>
-    body {{ background:#0e1017; color:#f8fafc; font-family:-apple-system,BlinkMacSystemFont,sans-serif; margin:0; padding:20px; }}
-    .card {{ background:#161922; border:1px solid rgba(255,255,255,0.08); border-radius:16px; padding:20px; text-align:center; }}
-    .btn {{ background:linear-gradient(135deg,#6366f1,#3b82f6); color:#fff; border:none; padding:14px 24px; border-radius:12px; font-weight:600; font-size:16px; cursor:pointer; width:100%; box-sizing:border-box; margin-top:16px; }}
-    h1 {{ font-size:20px; margin:0 0 8px 0; }}
-    p {{ color:#94a3b8; font-size:14px; margin:0 0 20px 0; }}
-  </style>
-</head>
-<body>
-  <div class="card">
-    <h1>MacDrop Web Drop</h1>
-    <p>Подключено к: <strong>{device_name}</strong></p>
-    <input type="file" id="fileInput" multiple style="display:none;" onchange="uploadFiles(this.files)">
-    <button class="btn" onclick="document.getElementById('fileInput').click()">Отправить файлы на Mac</button>
-    <div id="status" style="margin-top:15px; font-size:14px; color:#60a5fa;"></div>
-  </div>
-  <script>
-    async function uploadFiles(files) {{
-      if (!files || files.length === 0) return;
-      const statusDiv = document.getElementById('status');
-      for (const file of files) {{
-        statusDiv.innerText = 'Отправка ' + file.name + '...';
-        try {{
-          const res = await fetch('/api/mobile/upload', {{
-            method: 'POST',
-            headers: {{
-              'x-filename': encodeURIComponent(file.name),
-              'x-mobile-token': '{token}'
-            }},
-            body: file
-          }});
-          if (res.ok) {{
-            statusDiv.innerText = '✓ ' + file.name + ' отправлен!';
-          }} else {{
-            statusDiv.innerText = 'Ошибка отправки: ' + res.statusText;
-          }}
-        }} catch (err) {{
-          statusDiv.innerText = 'Сбой сети: ' + err.message;
-        }}
-      }}
-    }}
-  </script>
-</body>
-</html>"#,
-        device_name = device_name,
-        token = token
-    )
-}
-
 // -----------------------------------------------------------------------------
 // HTTP Server Starter
 // -----------------------------------------------------------------------------
@@ -678,6 +890,7 @@ pub async fn start_http_server(state: Arc<EngineState>) {
         .route("/api/pair", post(handle_pair))
         .route("/api/upload", post(handle_upload))
         .route("/mobile", get(handle_mobile_page))
+        .route("/api/mobile/logo", get(handle_mobile_logo))
         .route("/api/mobile/status", get(handle_mobile_status))
         .route("/api/mobile/upload", post(handle_mobile_upload))
         .route("/api/mobile/files", get(handle_mobile_files))
@@ -688,19 +901,41 @@ pub async fn start_http_server(state: Arc<EngineState>) {
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
     state.logger.info("Engine", &format!("Starting HTTP engine on port {}", port), None);
 
+    let main_app = app.clone();
+    let main_state = state.clone();
     tokio::spawn(async move {
         match tokio::net::TcpListener::bind(addr).await {
             Ok(listener) => {
-                state.logger.info("Engine", &format!("HTTP engine listening on http://0.0.0.0:{}", port), None);
-                if let Err(err) = axum::serve(listener, app).await {
-                    state.logger.error("Engine", &format!("HTTP server stopped with error: {}", err), None);
+                main_state.logger.info("Engine", &format!("HTTP engine listening on http://0.0.0.0:{}", port), None);
+                let make_service = main_app.into_make_service_with_connect_info::<SocketAddr>();
+                if let Err(err) = axum::serve(listener, make_service).await {
+                    main_state.logger.error("Engine", &format!("HTTP server stopped with error: {}", err), None);
                 }
             }
             Err(err) => {
-                state.logger.error("Engine", &format!("Failed to bind TCP port {}: {}", port, err), None);
+                main_state.logger.error("Engine", &format!("Failed to bind TCP port {}: {}", port, err), None);
             }
         }
     });
+
+    // Dual-port listening: if main port is not 8384, also listen on legacy port 8384 for backward compatibility
+    if port != 8384 {
+        let legacy_addr = SocketAddr::from(([0, 0, 0, 0], 8384));
+        let legacy_app = app.clone();
+        let legacy_state = state.clone();
+        tokio::spawn(async move {
+            match tokio::net::TcpListener::bind(legacy_addr).await {
+                Ok(listener) => {
+                    legacy_state.logger.info("Engine", "Legacy HTTP compatibility engine listening on http://0.0.0.0:8384", None);
+                    let make_service = legacy_app.into_make_service_with_connect_info::<SocketAddr>();
+                    let _ = axum::serve(listener, make_service).await;
+                }
+                Err(_) => {
+                    // Port 8384 might already be in use by another instance or service; silently ignore
+                }
+            }
+        });
+    }
 }
 
 #[cfg(test)]
@@ -753,6 +988,46 @@ mod tests {
         let cyrillic_raw = "Документ [версия 2.0] & правки.docx";
         let encoded = urlencoding::encode(cyrillic_raw);
         assert_eq!(urlencoding_decode(&encoded), cyrillic_raw);
+    }
+
+    #[tokio::test]
+    async fn test_mobile_session_and_virtual_device() {
+        let cfg = AppConfig {
+            target_folder: "/tmp/MacDrop".to_string(),
+            auto_start: false,
+            notifications: true,
+            language: Some("ru".to_string()),
+            device_id: "MAC-TEST1".to_string(),
+            device_name: "Test Mac".to_string(),
+            paired_devices: vec![],
+            api_port: 52520,
+            api_key: "test_key".to_string(),
+            upnp_enabled: Some(false),
+            wan_ip: None,
+            custom_remote_host: None,
+        };
+        let logger = AppLogger::new();
+        let state = EngineState::new(cfg, logger);
+
+        // Initially inactive
+        assert!(!state.is_mobile_session_active().await);
+        let status = state.get_status().await;
+        assert!(status.paired_devices.iter().all(|d| d.id != "mobile-web"));
+
+        // Activity marked
+        state.mark_mobile_activity().await;
+        assert!(state.is_mobile_session_active().await);
+        let status_active = state.get_status().await;
+        let mobile_dev = status_active.paired_devices.iter().find(|d| d.id == "mobile-web");
+        assert!(mobile_dev.is_some());
+        assert_eq!(mobile_dev.unwrap().custom_name, "Телефон (Web Drop)");
+        assert_eq!(mobile_dev.unwrap().port, 52520);
+
+        // Regenerate token resets activity
+        state.regenerate_mobile_session_token().await;
+        assert!(!state.is_mobile_session_active().await);
+        let status_reset = state.get_status().await;
+        assert!(status_reset.paired_devices.iter().all(|d| d.id != "mobile-web"));
     }
 }
 

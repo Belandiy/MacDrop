@@ -68,24 +68,27 @@
 
 ### Задачи:
 
-- [ ] **3.1. Реализация сетевого Handshake в `pair_device`**
+- [X] **3.1. Реализация сетевого Handshake в `pair_device`**
   - *Связанные пункты чеклиста:* `4.1, 5.3 – 5.5`
-  - *Файлы:* [src-tauri/src/commands.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/commands.rs), [src-tauri/src/engine.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/engine.rs)
+  - *Файлы:* [src-tauri/src/commands.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/commands.rs), [src-tauri/src/engine.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/engine.rs), [src-tauri/src/lib.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/lib.rs)
   - *Root Cause:* Команда `commands::pair_device` в Rust была заглушкой и не отправляла HTTP-запрос `POST /api/pair` целевому узлу. В результате получатель никогда не открывал `PairingRequestModal`.
   - *Решение:*
-    - Отправлять HTTP `POST http://<peer_ip>:<port>/api/pair` с информацией о текущем устройстве.
-    - В обработчике `handle_pair` эмитить Tauri Event `pairing-request`.
-    - По нажатию «Принять» генерировать взаимный токен и сохранять узел в `config.pairedDevices`.
-- [ ] **3.2. Добавление поля ручного ввода IP / PIN-кода в UI**
+    - В `commands.rs` реализован сетевой HTTP-запрос `POST /api/pair` с взаимной передачей токена и метаданных.
+    - В `engine.rs` `handle_pair` поддержана проверка уже сопряженных устройств (авто-ответ 200 OK) и генерация интерактивного запроса сопряжения через `tokio::sync::oneshot` с таймаутом 30 секунд.
+    - Реализована команда `commands::respond_pairing_request`, эмитящая событие `status-changed` и разрешающая или отклоняющая соединение.
+- [X] **3.2. Добавление поля ручного ввода IP в UI**
   - *Связанные пункты чеклиста:* `5.1, 5.2`
-  - *Файлы:* [PairingModal.tsx](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/components/PairingModal.tsx)
+  - *Файлы:* [PairingModal.tsx](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/components/PairingModal.tsx), [ru.ts](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/i18n/locales/ru.ts), [en.ts](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/i18n/locales/en.ts)
   - *Root Cause:* В интерфейсе модального окна физически отсутствует текстовое поле для ручного ввода адреса узла.
-  - *Решение:* Добавить инпут ввода IP/PIN с валидацией формата и кнопкой прямого вызова `onPairWithCode`.
-- [ ] **3.3. Автоматический фоновый опрос и очистка устаревших узлов (Radar Heartbeat)**
+  - *Решение:* Добавлен инпут ручного ввода IP/хоста с валидацией формата, обработкой клавиши Enter, спиннером отправки и кнопкой «Подключить» без использования лишних PIN-кодов.
+- [X] **3.3. Автоматический фоновый опрос и очистка устаревших узлов (Radar Heartbeat)**
   - *Связанные пункты чеклиста:* `4.3, 4.4`
   - *Файлы:* [src-tauri/src/discovery.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/discovery.rs)
-  - *Root Cause:* Радар полагался на ручной триггер сканирования.
-  - *Решение:* Настроить регулярную рассылку UDP-анонсов каждые 2–3 сек и удаление узлов, не подававших сигнал более 6 сек.
+  - *Root Cause:* Радар полагался на ручной триггер сканирования, а статус сопряженных устройств не обновлялся при выходе из сети.
+  - *Решение:*
+    - Рассылка UDP-анонсов каждые 2.5 сек.
+    - Фоновый таймер (каждые 2 сек) автоматически удаляет необнаруженные более 6 сек узлы из `discovered_peers` с событием `peers-update`.
+    - Для сопряженных устройств выставляется статус `local` при приеме пакета и `offline` при отсутствии сигнала более 8 сек с эмитом `status-changed`.
 
 ---
 
@@ -95,25 +98,27 @@
 
 ### Задачи:
 
-- [ ] **4.1. Унификация сетевого порта передачи файлов (Фикс 8384 -> 52520)**
+- [X] **4.1. Унификация сетевого порта передачи файлов (Фикс 8384 -> 52520)**
   - *Связанный пункт чеклиста:* `3.1`
-  - *Файлы:* [src-tauri/src/config.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/config.rs), [src-tauri/src/engine.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/engine.rs), [src-tauri/src/transfer.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/transfer.rs)
+  - *Файлы:* [src-tauri/src/config.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/config.rs), [src-tauri/src/engine.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/engine.rs), [src-tauri/src/discovery.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/discovery.rs)
   - *Root Cause:* Ошибка `error sending request for url (http://192.168.0.102:8384/api/upload)` возникала из-за устаревшего порта `8384` в fallback-логике конфига.
-  - *Решение:* Заменить все дефолтные порты на единый актуальный порт `52520`.
-- [ ] **4.2. Полноценный мобильный клиент AirBridge и виртуальное устройство «Телефон»**
+  - *Решение:* Заменены все дефолтные порты на единый актуальный порт `52520`, добавлена автоматическая миграция старых конфигураций в `load_config`.
+- [X] **4.2. Полноценный мобильный клиент AirBridge и виртуальное устройство «Телефон»**
   - *Связанные пункты чеклиста:* `7.3, 7.4`
-  - *Файлы:* [src-tauri/src/engine.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/engine.rs), [src/main/mobileWeb.ts](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/main/mobileWeb.ts)
+  - *Файлы:* [src-tauri/src/mobile_web.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/mobile_web.rs), [src-tauri/src/engine.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/engine.rs), [src-tauri/src/transfer.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/transfer.rs), [src-tauri/src/discovery.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/discovery.rs)
   - *Root Cause:*
-    - В сгенерированном Rust HTML отсутствует интерфейс для скачивания файлов из `mobile_queue` и вкладка истории.
-    - В `getStatus().pairedDevices` не подставляется виртуальный узел `mobile-web` при активной сессии телефона.
+    - В Rust HTML-заглушке отсутствовал полноценный мобильный веб-интерфейс (скачивание с ПК, прогресс-бар, таймер, расчет скорости, переключение табов).
+    - В `getStatus().pairedDevices` не подставлялся виртуальный узел `mobile-web` при активной сессии телефона, а отправка файлов с Mac на телефон возвращала ошибку поиска целевого устройства.
   - *Решение:*
-    - Перенести верстку мобильного клиента из `src/main/mobileWeb.ts` в `engine.rs` (скачивание файлов, очередь, история).
-    - При активной сессии (heartbeat < 30 сек) динамически добавлять узел `mobile-web` в сайдбар Mac, позволяя сбрасывать файлы прямо на телефон.
-- [ ] **4.3. Определение реального IP-адреса при смене сети (Wi-Fi ↔ Новая сеть)**
+    - Создан автономный модуль [mobile_web.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/mobile_web.rs) с двухвкладочным мобильным веб-клиентом (отправка с расчетом скорости `B/s` / `KB/s` / `MB/s`, скачивание файлов из `mobile_queue`, heartbeat каждые 15 сек, логотип `/api/mobile/logo`).
+    - В [engine.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/engine.rs) добавлено отслеживание `last_mobile_seen` и динамическая инжекция виртуального устройства `mobile-web` («Телефон (Web Drop)») в `paired_devices` при активности телефона (<60 сек) или наличии файлов в очереди.
+    - В фоновом цикле [discovery.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/discovery.rs) реализовано автоматическое удаление `mobile-web` при таймауте с эмитом события `status-changed`.
+    - В [transfer.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/transfer.rs) добавлена обработка передачи файлов и папок на целевое устройство `mobile-web` (архивация директорий в ZIP, помещение в `mobile_queue`, эмит прогресса и запись в историю).
+- [X] **4.3. Определение реального IP-адреса при смене сети (Wi-Fi ↔ Новая сеть)**
   - *Связанный пункт чеклиста:* `10.2`
-  - *Файлы:* [src-tauri/src/commands.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/commands.rs)
-  - *Root Cause:* Функция `local_ip_address::local_ip()` возвращает кэшированный или первый попавшийся адаптер.
-  - *Решение:* Фильтровать системные интерфейсы (`en0`, `en1`), исключая loopback (`127.0.0.1`) и виртуальные мосты, гарантируя актуальный IP для QR-кода.
+  - *Файлы:* [src-tauri/src/net_utils.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/net_utils.rs), [src-tauri/src/commands.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/commands.rs), [src-tauri/src/discovery.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/discovery.rs)
+  - *Root Cause:* Функция `local_ip_address::local_ip()` возвращала первый попавшийся или виртуальный интерфейс (loopback `127.0.0.1`, `utun*`, `bridge*`, `vmnet*`), что приводило к неработающим QR-кодам и ссылкам.
+  - *Решение:* Создан модуль [net_utils.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/net_utils.rs) с интеллектуальной фильтрацией сетевых адаптеров через `list_afinet_netifas()`. Приоритет отдается физическим Wi-Fi/Ethernet интерфейсам (`en0`, `en1`), исключаются VPN, виртуалки и APIPA (`169.254.*`). Функция используется в `get_mobile_share_info`, `get_status` и для расчета широковещательных UDP адресов в `discovery.rs`.
 
 ---
 
@@ -133,11 +138,11 @@
   - *Файлы:* [src-tauri/src/commands.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/commands.rs), [src/renderer/src/components/settings/LogsSection.tsx](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/components/settings/LogsSection.tsx)
   - *Root Cause:* Команда `clear_logs` в Rust не отправляла событие `logs-cleared` во фронтенд, а в UI не было немедленной очистки стейта.
   - *Решение:* Добавлен эмит события `logs-cleared` в Rust и принудительная локальная очистка стейта `setLogs([])` в React.
-- [ ] **5.3. Системный автозапуск (macOS Login Items)**
+- [X] **5.3. Системный автозапуск (macOS Login Items)**
   - *Связанный пункт чеклиста:* `8.4`
-  - *Файлы:* [src-tauri/src/commands.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/commands.rs)
-  - *Root Cause:* Изменялся только JSON-конфиг без фактической регистрации в системе.
-  - *Решение:* Добавить плагин `tauri-plugin-autostart` или генерацию LaunchAgent `.plist`.
+  - *Файлы:* [src-tauri/src/autostart.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/autostart.rs), [src-tauri/src/commands.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/commands.rs), [src-tauri/src/lib.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/lib.rs)
+  - *Root Cause:* Изменялся только JSON-конфиг без фактической регистрации автозапуска в операционной системе.
+  - *Решение:* Создан модуль [autostart.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/autostart.rs) для управления системным `LaunchAgent` macOS (`~/Library/LaunchAgents/com.macdrop.desktop.plist`). При включении тумблера «Запуск при старте системы» автоматически генерируется и сохраняется plist-манифест с путем к исполняемому файлу приложения; при выключении манифест удаляется. При старте приложения также выполняется синхронизация системного состояния.
 
 ---
 

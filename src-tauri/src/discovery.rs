@@ -43,8 +43,8 @@ pub fn guess_platform_from_name(name: &str) -> &'static str {
 
 pub fn get_broadcast_addrs() -> Vec<SocketAddr> {
     let mut addrs = vec!["255.255.255.255:8385".parse().unwrap()];
-    if let Ok(ip) = local_ip_address::local_ip() {
-        if let std::net::IpAddr::V4(ipv4) = ip {
+    for ip_str in crate::net_utils::get_local_network_ips() {
+        if let Ok(std::net::IpAddr::V4(ipv4)) = ip_str.parse::<std::net::IpAddr>() {
             let octets = ipv4.octets();
             let bcast_ip = std::net::Ipv4Addr::new(octets[0], octets[1], octets[2], 255);
             let bcast_sock = SocketAddr::new(std::net::IpAddr::V4(bcast_ip), BROADCAST_PORT);
@@ -100,7 +100,68 @@ pub async fn start_peer_discovery(state: Arc<EngineState>) {
         }
     });
 
-    // 2. Incoming listener loop
+    // 2. Background task for pruning stale peers (> 6s) and tracking offline status (> 8s)
+    let prune_state = state.clone();
+    tokio::spawn(async move {
+        loop {
+            tokio::time::sleep(Duration::from_millis(2000)).await;
+            let now = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_millis() as i64;
+
+            let mut peers_changed = false;
+            {
+                let mut peers = prune_state.discovered_peers.write().await;
+                let before_len = peers.len();
+                peers.retain(|_, p| (now - p.last_seen) < 6000);
+                if peers.len() != before_len {
+                    peers_changed = true;
+                }
+            }
+            if peers_changed {
+                let all_peers: Vec<DiscoveredPeer> = {
+                    let peers = prune_state.discovered_peers.read().await;
+                    peers.values().cloned().collect()
+                };
+                if let Some(handle) = prune_state.app_handle.read().await.as_ref() {
+                    let _ = handle.emit("peers-update", &all_peers);
+                }
+            }
+
+            let mut status_changed = false;
+            {
+                let mut cfg = prune_state.config.write().await;
+                for device in cfg.paired_devices.iter_mut() {
+                    if (now - device.last_seen) > 8000 {
+                        if device.connection_mode.as_deref() != Some("offline") {
+                            device.connection_mode = Some("offline".to_string());
+                            status_changed = true;
+                        }
+                    }
+                }
+            }
+
+            let mut mobile_timed_out = false;
+            {
+                let last = *prune_state.last_mobile_seen.read().await;
+                let queue_empty = prune_state.mobile_queue.read().await.is_empty();
+                if last > 0 && (now - last) >= 60_000 && queue_empty {
+                    *prune_state.last_mobile_seen.write().await = 0;
+                    mobile_timed_out = true;
+                }
+            }
+
+            if status_changed || mobile_timed_out {
+                if let Some(handle) = prune_state.app_handle.read().await.as_ref() {
+                    let status = prune_state.get_status().await;
+                    let _ = handle.emit("status-changed", &status);
+                }
+            }
+        }
+    });
+
+    // 3. Incoming listener loop
     let mut buf = [0u8; 2048];
     loop {
         match socket.recv_from(&mut buf).await {
@@ -125,11 +186,32 @@ pub async fn start_peer_discovery(state: Arc<EngineState>) {
                             .unwrap_or_default()
                             .as_millis() as i64;
 
-                        let clean_ip = remote_addr.ip().to_string();
+                        let clean_ip = remote_addr.ip().to_string().replace("::ffff:", "");
+
+                        // Update paired device info and online connection mode
+                        let mut status_changed = false;
                         let is_paired = {
-                            let cfg = state.config.read().await;
-                            cfg.paired_devices.iter().any(|d| d.id == msg.device_id)
+                            let mut cfg = state.config.write().await;
+                            let mut paired = false;
+                            if let Some(p) = cfg.paired_devices.iter_mut().find(|d| d.id == msg.device_id) {
+                                paired = true;
+                                p.ip = clean_ip.clone();
+                                p.port = msg.port;
+                                p.last_seen = now;
+                                if p.connection_mode.as_deref() != Some("local") {
+                                    p.connection_mode = Some("local".to_string());
+                                    status_changed = true;
+                                }
+                            }
+                            paired
                         };
+
+                        if status_changed {
+                            if let Some(handle) = state.app_handle.read().await.as_ref() {
+                                let status = state.get_status().await;
+                                let _ = handle.emit("status-changed", &status);
+                            }
+                        }
 
                         let peer = DiscoveredPeer {
                             id: msg.device_id.clone(),
@@ -229,7 +311,7 @@ mod tests {
         let msg = DiscoveryMessage {
             device_id: "MAC-1234".to_string(),
             device_name: "MacBook Air".to_string(),
-            port: 8384,
+            port: 52520,
             platform: Some("darwin".to_string()),
             reply: false,
         };
@@ -239,6 +321,6 @@ mod tests {
 
         let parsed: DiscoveryMessage = serde_json::from_str(&json).expect("Deserialize");
         assert_eq!(parsed.device_id, "MAC-1234");
-        assert_eq!(parsed.port, 8384);
+        assert_eq!(parsed.port, 52520);
     }
 }

@@ -1,8 +1,11 @@
+pub mod autostart;
 pub mod commands;
 pub mod config;
 pub mod discovery;
 pub mod engine;
 pub mod logger;
+pub mod mobile_web;
+pub mod net_utils;
 pub mod transfer;
 pub mod tray;
 
@@ -16,6 +19,9 @@ use crate::logger::AppLogger;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let cfg = load_config();
+    if cfg.auto_start {
+        let _ = crate::autostart::set_system_autostart(true);
+    }
     let app_logger = AppLogger::new();
     let engine_state = Arc::new(EngineState::new(cfg, app_logger.clone()));
 
@@ -94,6 +100,7 @@ pub fn run() {
             commands::get_discovered_peers,
             commands::scan_nearby_peers,
             commands::pair_device,
+            commands::respond_pairing_request,
             commands::unpair_device,
             commands::update_device_name,
             commands::remove_device,

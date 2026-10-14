@@ -133,7 +133,23 @@ pub fn load_config() -> AppConfig {
     let file_path = get_config_file_path();
     if file_path.exists() {
         if let Ok(content) = fs::read_to_string(&file_path) {
-            if let Ok(cfg) = serde_json::from_str::<AppConfig>(&content) {
+            if let Ok(mut cfg) = serde_json::from_str::<AppConfig>(&content) {
+                // Migrate legacy 8384 port to 52520
+                let mut migrated = false;
+                if cfg.api_port == 8384 {
+                    cfg.api_port = 52520;
+                    migrated = true;
+                }
+                for p in cfg.paired_devices.iter_mut() {
+                    if p.port == 8384 {
+                        p.port = 52520;
+                        migrated = true;
+                    }
+                }
+                if migrated {
+                    save_config(&cfg);
+                }
+
                 // Ensure target folder exists
                 if !Path::new(&cfg.target_folder).exists() {
                     let _ = fs::create_dir_all(&cfg.target_folder);
@@ -157,7 +173,7 @@ pub fn load_config() -> AppConfig {
         device_id: generate_short_device_id(),
         device_name: get_default_device_name(),
         paired_devices: Vec::new(),
-        api_port: 8384,
+        api_port: 52520,
         api_key: generate_random_key(32),
         upnp_enabled: Some(true),
         wan_ip: None,
@@ -215,7 +231,7 @@ mod tests {
                 original_name: "Desktop".to_string(),
                 custom_name: "My PC".to_string(),
                 ip: "192.168.1.100".to_string(),
-                port: 8384,
+                port: 52520,
                 remote_ip: None,
                 remote_port: None,
                 paired_at: "2026-10-12".to_string(),
@@ -225,7 +241,7 @@ mod tests {
                 auth_token: Some("secret".to_string()),
                 platform: Some("win32".to_string()),
             }],
-            api_port: 8384,
+            api_port: 52520,
             api_key: "abc123".to_string(),
             upnp_enabled: Some(true),
             wan_ip: None,

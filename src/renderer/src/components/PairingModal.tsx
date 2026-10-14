@@ -143,6 +143,8 @@ export const PairingModal: React.FC<PairingModalProps> = ({
   const [successNotice, setSuccessNotice] = useState<string | null>(null);
   const [showMobileQr, setShowMobileQr] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
+  const [manualIp, setManualIp] = useState('');
+  const [ipValidationError, setIpValidationError] = useState<string | null>(null);
 
   // Mobile Web Drop info
   const [mobileInfo, setMobileInfo] = useState<{
@@ -183,6 +185,8 @@ export const PairingModal: React.FC<PairingModalProps> = ({
       setSuccessNotice(null);
       setIsSubmitting(false);
       setShowMobileQr(false);
+      setManualIp('');
+      setIpValidationError(null);
 
       handleTriggerScan();
 
@@ -196,6 +200,8 @@ export const PairingModal: React.FC<PairingModalProps> = ({
       }).catch(() => {});
     } else {
       setSelectedPeerId(null);
+      setManualIp('');
+      setIpValidationError(null);
     }
   }, [isOpen]);
 
@@ -207,13 +213,66 @@ export const PairingModal: React.FC<PairingModalProps> = ({
     setTimeout(() => setIsScanning(false), 1500);
   };
 
+  const validateIp = (value: string): boolean => {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      setIpValidationError(t('pairing.enterValidIp'));
+      return false;
+    }
+    const clean = trimmed.replace(/^https?:\/\//i, '').replace(/\/+$/, '');
+    const parts = clean.split(':');
+    const host = parts[0];
+    const port = parts[1];
+
+    if (port && (!/^\d+$/.test(port) || parseInt(port, 10) > 65535)) {
+      setIpValidationError(t('pairing.enterValidIp'));
+      return false;
+    }
+
+    const ipv4Regex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+    const hostRegex = /^[a-zA-Z0-9.-]+$/;
+
+    if (!ipv4Regex.test(host) && !hostRegex.test(host)) {
+      setIpValidationError(t('pairing.enterValidIp'));
+      return false;
+    }
+
+    setIpValidationError(null);
+    return true;
+  };
+
+  const handleConnectManualIp = async () => {
+    if (!validateIp(manualIp) || isSubmitting) return;
+    setIsSubmitting(true);
+    setError(null);
+    setSuccessNotice(null);
+
+    try {
+      const target = manualIp.trim();
+      const res = await onPairWithCode(target);
+      if (res.success) {
+        setSuccessNotice(t('pairing.connectedSuccess', { name: target }));
+        setTimeout(() => {
+          onClose();
+        }, 1200);
+      } else {
+        setError(res.error || t('pairing.connectionFailed'));
+      }
+    } catch (err: any) {
+      setError(err?.message || t('pairing.connectionFailed'));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleConnectWith = async (peer: DiscoveredPeerItem) => {
     if (!peer || isSubmitting) return;
     setIsSubmitting(true);
     setError(null);
 
     try {
-      const res = await onPairWithCode(peer.ip || peer.deviceId);
+      const target = peer.port && peer.ip ? `${peer.ip}:${peer.port}` : (peer.ip || peer.deviceId);
+      const res = await onPairWithCode(target);
       if (res.success) {
         setSuccessNotice(t('pairing.connectedSuccess', { name: peer.deviceName }));
         setTimeout(() => {
@@ -470,6 +529,49 @@ export const PairingModal: React.FC<PairingModalProps> = ({
                   <span>{t('pairing.mobileQrBtn')}</span>
                 </button>
               </div>
+            </div>
+
+            {/* Manual IP Direct Connect */}
+            <div className="w-full mt-2 pt-2 border-t border-white/[0.08] text-left">
+              <div className="flex items-center justify-between text-[11px] text-[#8E8E93] mb-1 px-0.5">
+                <span>{t('pairing.orEnterIp')}</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="text"
+                  value={manualIp}
+                  onChange={(e) => {
+                    setManualIp(e.target.value);
+                    if (ipValidationError) setIpValidationError(null);
+                    if (error) setError(null);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleConnectManualIp();
+                    }
+                  }}
+                  placeholder="192.168.1.50"
+                  className="flex-1 h-7 px-2.5 bg-black/30 border border-white/[0.1] focus:border-[#007AFF] rounded-[7px] text-[11px] font-mono text-white placeholder-[#636366] focus:outline-none transition-colors"
+                />
+                <button
+                  type="button"
+                  onClick={handleConnectManualIp}
+                  disabled={!manualIp.trim() || isSubmitting}
+                  className="h-7 px-2.5 rounded-[7px] bg-[#007AFF] hover:bg-[#0071E3] active:bg-[#0062C4] disabled:opacity-35 disabled:cursor-not-allowed text-white text-[11px] font-medium transition-all flex items-center justify-center gap-1 cursor-pointer shrink-0"
+                >
+                  {isSubmitting && !selectedPeer ? (
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                  ) : (
+                    <span>{t('pairing.connect')}</span>
+                  )}
+                </button>
+              </div>
+              {ipValidationError && (
+                <div className="text-[10px] text-[#FF453A] mt-1 px-1">
+                  {ipValidationError}
+                </div>
+              )}
             </div>
 
             {/* Footer Buttons: Cancel & Pair */}
