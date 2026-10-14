@@ -154,6 +154,10 @@ export async function initTauriBridge(): Promise<void> {
       invokeTauri('maximize_window');
     },
 
+    fillWindow: () => {
+      invokeTauri('fill_window');
+    },
+
     closeWindow: () => {
       invokeTauri('close_window');
     },
@@ -349,6 +353,42 @@ export async function initTauriBridge(): Promise<void> {
           unlistenFn = fn;
         });
         return () => { if (unlistenFn) unlistenFn(); };
+      }
+      return () => {};
+    },
+
+    onDragDrop: (callback) => {
+      if (isTauri()) {
+        let unlistenFn: (() => void) | null = null;
+        let isDisposed = false;
+
+        import('@tauri-apps/api/webview')
+          .then(({ getCurrentWebview }) => {
+            if (isDisposed) return;
+            return getCurrentWebview().onDragDropEvent((event) => {
+              if (!isDisposed) {
+                callback(event.payload);
+              }
+            });
+          })
+          .then((unlisten) => {
+            if (isDisposed) {
+              if (unlisten) unlisten();
+            } else {
+              unlistenFn = unlisten || null;
+            }
+          })
+          .catch((err) => {
+            console.warn('[Bridge] onDragDropEvent registration failed:', err);
+          });
+
+        return () => {
+          isDisposed = true;
+          if (unlistenFn) {
+            unlistenFn();
+            unlistenFn = null;
+          }
+        };
       }
       return () => {};
     }

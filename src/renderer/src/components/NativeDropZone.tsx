@@ -8,7 +8,9 @@ interface NativeDropZoneProps {
   targetDevice?: PairedDevice;
   onFilesDropped: (filePaths: string[], targetDeviceId?: string) => Promise<any> | void;
   onChooseFiles: (targetDeviceId?: string) => void;
+  onChooseFolder?: (targetDeviceId?: string) => void;
   className?: string;
+  onHoveredTargetChange?: (targetDeviceId: string | null) => void;
 }
 
 export const NativeDropZone: React.FC<NativeDropZoneProps> = ({
@@ -16,7 +18,9 @@ export const NativeDropZone: React.FC<NativeDropZoneProps> = ({
   targetDevice,
   onFilesDropped,
   onChooseFiles,
-  className = ''
+  onChooseFolder,
+  className = '',
+  onHoveredTargetChange
 }) => {
   const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -34,7 +38,8 @@ export const NativeDropZone: React.FC<NativeDropZoneProps> = ({
     zoneRef: containerRef,
     onDropFiles: onFilesDropped,
     hysteresisBuffer: 8,
-    debounceMs: 100
+    debounceMs: 100,
+    onHoveredTargetChange
   });
 
   const isTargetRemote = activeTarget?.connectionMode === 'remote';
@@ -103,10 +108,10 @@ export const NativeDropZone: React.FC<NativeDropZoneProps> = ({
         ref={containerRef}
         className={`h-[120px] mt-1 rounded-[6px] relative select-none overflow-hidden transition-colors duration-150 ${
           isOverZone
-            ? 'border-[1.5px] border-[#007AFF] bg-[#18181A] shadow-[0_0_16px_rgba(0,122,255,0.15)]'
+            ? 'border-[1.5px] border-[#007AFF] bg-[#007AFF]/15 shadow-[0_0_16px_rgba(0,122,255,0.2)]'
             : isDragging
-            ? 'border border-[#007AFF]/60 bg-[#1A1A1A]'
-            : 'border border-dashed border-[#3A3A3C] hover:border-[#8E8E93] bg-[#1A1A1A]'
+            ? 'border border-[#007AFF]/60 bg-white/[0.06]'
+            : 'border border-dashed border-white/15 hover:border-white/30 bg-white/[0.03]'
         }`}
       >
         {/* ==================== LAYER 1: IDLE / RESTING ==================== */}
@@ -141,22 +146,26 @@ export const NativeDropZone: React.FC<NativeDropZoneProps> = ({
             {t('dropzone.orClickToSelectFiles')}
           </span>
 
-          {/* Native macOS Button */}
+          {/* Action Button: Unified picker for files & folders */}
           <button
             type="button"
             onClick={(e) => {
               e.stopPropagation();
               onChooseFiles(activeTarget?.id);
             }}
-            className="mt-1 px-3.5 py-1 text-[12px] font-medium bg-[#2C2C2E] hover:bg-[#38383A] text-[#F2F2F7] border border-[#3A3A3C] rounded-[5px] shadow-[0_0.5px_1px_rgba(0,0,0,0.4)] transition-colors cursor-pointer"
+            className="mt-1 px-3.5 py-1 text-[12px] font-medium bg-[#2C2C2E] hover:bg-[#38383A] text-[#F2F2F7] border border-[#3A3A3C] rounded-[5px] shadow-[0_0.5px_1px_rgba(0,0,0,0.4)] transition-colors cursor-pointer flex items-center gap-1.5"
           >
-            {t('dropzone.chooseFilesBtn')}
+            <svg className="w-3.5 h-3.5 text-[#007AFF]" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+            </svg>
+            <span>{t('dropzone.chooseFilesBtn')}</span>
           </button>
         </div>
 
         {/* ==================== LAYER 2: DRAG-OVER MULTI-TARGET ==================== */}
         <div
-          className={`absolute inset-0 w-full h-full p-2 flex gap-2 transition-opacity duration-150 bg-[#161618] ${
+          className={`absolute inset-0 w-full h-full p-2 flex gap-2 transition-opacity duration-150 bg-black/40 ${
             isDragging ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
           }`}
         >
@@ -176,6 +185,7 @@ export const NativeDropZone: React.FC<NativeDropZoneProps> = ({
               return (
                 <div
                   key={device.id}
+                  data-device-id={device.id}
                   ref={(el) => registerTarget(device.id, el)}
                   className={`flex-1 h-full rounded-[6px] p-2.5 flex flex-col justify-between relative overflow-hidden transition-all duration-100 ${
                     isHovered

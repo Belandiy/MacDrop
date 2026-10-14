@@ -42,16 +42,23 @@ export default function ClassicNativeDesign(props: DesignProps) {
     handleOpenSettings,
     handleOpenPairing,
     handleChooseFiles,
+    handleChooseFolder,
     handleUnpairDevice,
     handleDeviceUpdated,
-    handleDeviceRemoved
+    handleDeviceRemoved,
+    platform = window.macdrop?.platform || 'darwin'
   } = props;
+
+  const isMac = platform === 'darwin' || (typeof navigator !== 'undefined' && /Mac|iPhone|iPod|iPad/i.test(navigator.platform));
 
   const { t } = useTranslation();
 
   // Device context menu & modals state
   const [contextMenuDevice, setContextMenuDevice] = useState<PairedDevice | null>(null);
   const [contextMenuPos, setContextMenuPos] = useState<{ x: number; y: number } | null>(null);
+
+  // Active hover target during drag & drop
+  const [dropHoveredDeviceId, setDropHoveredDeviceId] = useState<string | null>(null);
 
   const [historyModalDevice, setHistoryModalDevice] = useState<PairedDevice | null>(null);
   const [renameModalDevice, setRenameModalDevice] = useState<PairedDevice | null>(null);
@@ -183,7 +190,7 @@ export default function ClassicNativeDesign(props: DesignProps) {
   const showCompletedRows = transferFilter === 'all' || transferFilter === 'completed';
 
   return (
-    <div className="w-full h-full bg-[#161616] text-[#F2F2F7] flex flex-col overflow-hidden select-none font-sans antialiased">
+    <div className="w-full h-full bg-transparent text-[#F2F2F7] flex flex-col overflow-hidden select-none font-sans antialiased">
       {/* ========================================================
           UNIFIED macOS TOOLBAR / TITLEBAR (38px)
           ======================================================== */}
@@ -198,29 +205,43 @@ export default function ClassicNativeDesign(props: DesignProps) {
             window.macdrop?.startDragging?.();
           }
         }}
-        className="h-[38px] px-3 bg-[#232326] border-b border-[#2C2C2E] flex items-center justify-between shrink-0 relative select-none cursor-default"
+        onDoubleClick={(e) => {
+          if ((e.target as HTMLElement).closest('button, a, input, select, textarea, [data-no-drag]')) {
+            return;
+          }
+          if (window.macdrop?.fillWindow) {
+            window.macdrop.fillWindow();
+          } else {
+            window.macdrop?.maximizeWindow?.();
+          }
+        }}
+        className="h-[38px] px-3 bg-[#1e1e22]/50 border-b border-white/[0.08] flex items-center justify-between shrink-0 relative select-none cursor-default backdrop-blur-md"
       >
-        {/* Genuine macOS Traffic Lights */}
-        <div data-no-drag style={{ WebkitAppRegion: 'no-drag' } as any} className="flex items-center gap-[7px] z-10">
-          <button
-            data-no-drag
-            onClick={() => window.macdrop?.closeWindow()}
-            title={t('window.close')}
-            className="w-3 h-3 rounded-full bg-[#FF5F56] border border-[#E0443E]/60 flex items-center justify-center cursor-pointer transition-transform active:scale-95"
-          />
-          <button
-            data-no-drag
-            onClick={() => window.macdrop?.minimizeWindow()}
-            title={t('window.minimize')}
-            className="w-3 h-3 rounded-full bg-[#FFBD2E] border border-[#DEA123]/60 flex items-center justify-center cursor-pointer transition-transform active:scale-95"
-          />
-          <button
-            data-no-drag
-            onClick={() => window.macdrop?.maximizeWindow?.()}
-            title={t('window.zoom')}
-            className="w-3 h-3 rounded-full bg-[#27C93F] border border-[#1AAB29]/60 flex items-center justify-center cursor-pointer transition-transform active:scale-95"
-          />
-        </div>
+        {/* Genuine macOS Traffic Lights (Native on macOS, simulated fallback on other platforms) */}
+        {isMac ? (
+          <div className="w-[68px] h-full shrink-0 pointer-events-none" />
+        ) : (
+          <div data-no-drag style={{ WebkitAppRegion: 'no-drag' } as any} className="flex items-center gap-[7px] z-10">
+            <button
+              data-no-drag
+              onClick={() => window.macdrop?.closeWindow()}
+              title={t('window.close')}
+              className="w-3 h-3 rounded-full bg-[#FF5F56] border border-[#E0443E]/60 flex items-center justify-center cursor-pointer transition-transform active:scale-95"
+            />
+            <button
+              data-no-drag
+              onClick={() => window.macdrop?.minimizeWindow()}
+              title={t('window.minimize')}
+              className="w-3 h-3 rounded-full bg-[#FFBD2E] border border-[#DEA123]/60 flex items-center justify-center cursor-pointer transition-transform active:scale-95"
+            />
+            <button
+              data-no-drag
+              onClick={() => window.macdrop?.maximizeWindow?.()}
+              title={t('window.zoom')}
+              className="w-3 h-3 rounded-full bg-[#27C93F] border border-[#1AAB29]/60 flex items-center justify-center cursor-pointer transition-transform active:scale-95"
+            />
+          </div>
+        )}
 
         {/* Centered Window Title */}
         <div data-tauri-drag-region className="absolute inset-x-0 flex items-center justify-center pointer-events-none">
@@ -249,7 +270,7 @@ export default function ClassicNativeDesign(props: DesignProps) {
         {/* ================= LEFT SIDEBAR (Resizable) ================= */}
         <aside
           style={{ width: `${sidebarWidth}px` }}
-          className="bg-[#1E1E1E] p-[12px_10px] flex flex-col justify-between shrink-0 select-none overflow-hidden"
+          className="bg-[#141416]/50 border-r border-white/[0.08] p-[12px_10px] flex flex-col justify-between shrink-0 select-none overflow-hidden backdrop-blur-md"
         >
           {/* Top Section: Devices */}
           <div className="overflow-hidden">
@@ -282,9 +303,12 @@ export default function ClassicNativeDesign(props: DesignProps) {
                     nameLower.includes('laptop') ||
                     nameLower.includes('notebook');
 
+                  const isDropHovered = dropHoveredDeviceId === device.id;
+
                   return (
                     <div
                       key={device.id}
+                      data-device-id={device.id}
                       onClick={() => setActiveTargetDeviceAndSave(device.id)}
                       onContextMenu={(e) => {
                         e.preventDefault();
@@ -297,8 +321,10 @@ export default function ClassicNativeDesign(props: DesignProps) {
                         e.dataTransfer.dropEffect = 'copy';
                       }}
                       onDrop={(e) => handleFileDropOnTarget(e, device.id)}
-                      className={`w-full h-8 px-2 rounded-[6px] flex items-center justify-between text-[13px] font-normal transition-colors text-left cursor-pointer group ${
-                        isSelected
+                      className={`w-full h-8 px-2 rounded-[6px] flex items-center justify-between text-[13px] font-normal transition-all text-left cursor-pointer group ${
+                        isDropHovered
+                          ? 'bg-[#007AFF]/35 border border-[#007AFF] text-white shadow-sm ring-1 ring-[#007AFF]/50'
+                          : isSelected
                           ? 'bg-[#007AFF] text-white shadow-sm'
                           : 'text-[#E5E5EA] hover:bg-[#282828]'
                       }`}
@@ -420,18 +446,20 @@ export default function ClassicNativeDesign(props: DesignProps) {
           }`}
           title="Изменить ширину боковой панели"
         >
-          <div className="w-[1px] h-full bg-[#2C2C2E] pointer-events-none group-hover:bg-[#007AFF]" />
+          <div className="w-[1px] h-full bg-white/[0.08] pointer-events-none group-hover:bg-[#007AFF]" />
         </div>
 
         {/* ================= RIGHT MAIN AREA ================= */}
-        <main className="flex-1 bg-[#161616] flex flex-col min-w-0 overflow-hidden select-none">
+        <main className="flex-1 bg-transparent flex flex-col min-w-0 overflow-hidden select-none">
           {/* Top Section: Send / Drop Area (180px) */}
-          <section className="h-[180px] p-4 border-b border-[#2C2C2E] flex flex-col box-border justify-center">
+          <section className="h-[180px] p-4 border-b border-white/[0.08] flex flex-col box-border justify-center">
             <NativeDropZone
               devices={devices}
               targetDevice={targetDevice}
               onFilesDropped={handleFilesDropped}
               onChooseFiles={handleChooseFiles}
+              onChooseFolder={handleChooseFolder}
+              onHoveredTargetChange={setDropHoveredDeviceId}
             />
           </section>
 
@@ -442,12 +470,12 @@ export default function ClassicNativeDesign(props: DesignProps) {
               <span className="text-[13px] font-semibold text-[#F2F2F7]">{t('transfers.title')}</span>
 
               {/* macOS Segmented Control */}
-              <div className="inline-flex p-0.5 rounded-[6px] bg-[#252528] border border-[#333336] text-[11px]">
+              <div className="inline-flex p-0.5 rounded-[6px] bg-white/[0.06] border border-white/[0.08] text-[11px]">
                 <button
                   onClick={() => setTransferFilter('all')}
                   className={`px-2.5 py-0.5 rounded-[4px] font-medium transition-all cursor-pointer ${
                     transferFilter === 'all'
-                      ? 'bg-[#3A3A3E] text-white shadow-sm'
+                      ? 'bg-white/20 text-white shadow-sm'
                       : 'text-[#8E8E93] hover:text-[#E5E5EA]'
                   }`}
                 >

@@ -34,6 +34,7 @@ export interface MacDropApi {
   toggleAutostart: (enable: boolean) => Promise<boolean>;
   minimizeWindow: () => void;
   maximizeWindow?: () => void;
+  fillWindow?: () => void;
   closeWindow: () => void;
   resizeWindow?: (width: number, height: number) => void;
   startDragging?: () => Promise<void> | void;
@@ -64,7 +65,14 @@ export interface MacDropApi {
   openLogsFolder?: () => Promise<boolean>;
   onLogEntry?: (callback: (entry: LogEntry) => void) => () => void;
   onLogsCleared?: (callback: () => void) => () => void;
+  onDragDrop?: (callback: (payload: DragDropPayload) => void) => () => void;
 }
+
+export type DragDropPayload =
+  | { type: 'enter'; paths: string[]; position: { x: number; y: number } }
+  | { type: 'over'; position: { x: number; y: number } }
+  | { type: 'drop'; paths: string[]; position: { x: number; y: number } }
+  | { type: 'leave' };
 
 export interface UpdateProgressInfo {
   percent: number;

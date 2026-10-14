@@ -2,6 +2,92 @@
 
 Все важные изменения проекта MacDrop фиксируются в этом файле.
 
+## [feat/tauri-fixes - Итерация 5 (Единый нативный пикер файлов и папок с авто-архивацией)] - 2026-10-14
+
+### Единая кнопка выбора и гибридный мультиселект (файлы + папки)
+- **Унификация кнопки дропзоны**:
+  - В [NativeDropZone.tsx](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/components/NativeDropZone.tsx) удалена раздельная кнопка «Выбрать папку». Теперь в дропзоне расположена одна универсальная кнопка macOS: «Выбрать файлы и папки...» (`chooseFilesBtn`).
+  - Обновлены языковые файлы [ru.ts](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/i18n/locales/ru.ts) и [en.ts](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/i18n/locales/en.ts).
+- **Нативный гибридный диалог macOS (NSOpenPanel через objc2)**:
+  - Ограничение крейта `rfd` (который принудительно разделяет выбор файлов и папок) преодолено прямой интеграцией с `NSOpenPanel` через `objc2`:
+    - `setCanChooseFiles: true`
+    - `setCanChooseDirectories: true`
+    - `setAllowsMultipleSelection: true`
+  - Вызов модального окна безопасно выполняется в основном потоке AppKit через `app.run_on_main_thread` с каналом `tokio::sync::oneshot`.
+  - Пользователь может в одном диалоге с зажатыми Cmd/Shift выделить одновременно любое количество файлов и папок.
+- **Автоматическая архивация папок в ZIP и очистка временных файлов**:
+  - В [src-tauri/src/transfer.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/transfer.rs): папки автоматически упаковываются в индивидуальные архивы `{folder_name}.zip` через `zip_directory`, а временные файлы удаляются сразу после завершения отправки.
+  - В [src-tauri/src/engine.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/engine.rs): веб-интерфейс мобильной раздачи (`handle_mobile_download`) также поддерживает скачивание сброшенных папок в виде ZIP.
+
+## [feat/tauri-fixes - Итерация 4 (Фаза 2: Нативный Drag & Drop и файловые диалоги)] - 2026-10-12
+
+### Нативный Drag & Drop Webview API, хит-тестинг и диалоги macOS
+- **2.1. Переход на нативный Tauri Webview DragDrop API (WebKit Safari)**:
+  - В [src/renderer/src/bridge/index.ts](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/bridge/index.ts) и [src/renderer/src/vite-env.d.ts](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/vite-env.d.ts) реализован подписчик `window.macdrop.onDragDrop`, вызывающий `getCurrentWebview().onDragDropEvent(...)`.
+  - В [useStableDropZone.ts](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/hooks/useStableDropZone.ts) реализована обработка нативных событий `enter`, `over`, `drop`, `leave` с физическим пересчетом координат курсора через `position / window.devicePixelRatio`.
+  - Предотвращено задвоение событий с DOM в среде Tauri при сохранении полной обратной совместимости с HTML5 Drag & Drop для Electron/Vitest.
+  - Добавлен динамический счетчик файлов при пакетном сбросе (например, `document.pdf (+4)`).
+  - Устранена порча кириллических имен и спецсимволов: в [src-tauri/src/engine.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/engine.rs) функция `urlencoding_decode` переведена на надежный парсер `urlencoding::decode` с обработкой пробелов и UTF-8.
+- **2.2. Множественный выбор файлов в системном диалоге (Cmd/Shift multi-select)**:
+  - В [src-tauri/src/commands.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/commands.rs) добавлен вызов `activateIgnoringOtherApps: true` на macOS для гарантированной передачи фокуса и обработки системных модификаторов клавиш Cmd/Shift в `NSOpenPanel`.
+  - Добавлена подстановка стартовой директории из `config.target_folder` / `dirs::download_dir()`.
+- **2.3. Кнопка выбора папки и интеграция с сайдбаром**:
+  - В [NativeDropZone.tsx](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/components/NativeDropZone.tsx) добавлен нативный блок кнопок macOS («Выбрать файлы» и «Выбрать папку») с иконками и локализацией `t('dropzone.chooseFolder')`.
+  - В [useAppLogic.ts](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/hooks/useAppLogic.ts) и [classic-native/index.tsx](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/designs/classic-native/index.tsx) экспортирован и подключен вызов `handleChooseFolder`.
+  - Реализован хит-тестинг устройств в сайдбаре: узлы помечены атрибутом `data-device-id`, при наведении файла из Finder плитка устройства в сайдбаре подсвечивается синим (`ring-1 ring-[#007AFF]`), а сброс файла отправляет его напрямую на выбранный узел.
+
+## [feat/tauri-fixes - Итерация 3 (Native macOS Traffic Lights & Smooth Corners)] - 2026-10-12
+
+### Нативные кнопки macOS и аппаратное скругление всех 4 углов окна
+- **Устранение дефекта квадратных нижних углов (Sharp 90° Bottom Corners Artifact)**:
+  - В [tauri.conf.json](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/tauri.conf.json) конфигурация окна переведена на `"decorations": true`, `"titleBarStyle": "Overlay"` и `"hiddenTitle": true`. В связке с `NSWindowStyleMask::Titled | NSWindowStyleMask::FullSizeContentView` Window Server macOS теперь аппаратно скругляет **все 4 угла окна** (и верхние, и нижние) с одинаковым системным радиусом 14px и плавной тенью, устраняя квадратную рамку в нижних углах.
+  - В [src-tauri/src/lib.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/lib.rs) слой `contentView.layer` настраивается на `cornerRadius: 14.0` и `masksToBounds: true`, а также вызывается `[ns_window invalidateShadow]`, синхронизируя тень Window Server с границами размытия.
+- **Подключение настоящих нативных кнопок Traffic Lights (красный, желтый, зеленый)**:
+  - В [tauri.conf.json](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/tauri.conf.json) задан `trafficLightPosition: { "x": 16, "y": 20 }` и `"acceptFirstMouse": true`. Нативные кнопки системно центрируются по вертикальной оси кастомной шапки окна высотой 38px.
+  - В [src-tauri/src/lib.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/lib.rs) нативные кнопки (`Close`, `Miniaturize`, `Zoom`) остаются видимыми и активными.
+  - В [classic-native/index.tsx](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/designs/classic-native/index.tsx) на macOS вместо simulated HTML-кнопок выделен прозрачный контейнер `w-[68px] pointer-events-none`. Пользователь получает:
+    - Системные иконки (`x`, `-`, `+`) при наведении курсора;
+    - Аппаратное затемнение/десатурацию кнопок при неактивном окне;
+    - Нативное контекстное меню тайлинга окон macOS Sequoia / Sonoma при наведении на зеленую кнопку;
+    - Сохранение кастомного поведения `Fill` при двойном клике по пустому пространству шапки.
+    - Fallback: на других ОС (Windows/Linux) отображаются стилизованные веб-кнопки управления.
+
+## [feat/tauri-fixes - Итерация 2 (Frosted Glass Modals)] - 2026-10-12
+
+### Полупрозрачность и матовое стекло во всех модальных окнах
+- **Унификация оверлеев и карточек модальных окон под нативный macOS Frosted Glass**:
+  - **Оверлеи (Backdrop scrim)**: переведены с плотного `bg-black/65 backdrop-blur-sm` на элегантный `bg-black/40 backdrop-blur-md` во всех модальных диалогах, что позволяет системному размытию (Vibrancy) и фону десктопа мягко просвечивать сквозь диалог.
+  - **Карточки диалогов (Modal Cards)**: заменены глухие сплошные заливки (`bg-[#161616]`, `bg-[#1C1C1F]`) на полупрозрачные контейнеры матового стекла `bg-[#1c1c20]/80 backdrop-blur-2xl border border-white/10 rounded-[14px] shadow-[0_24px_50px_rgba(0,0,0,0.65),0_0_0_1px_rgba(255,255,255,0.08)]`.
+  - **Шапки и элементы управления (Headers & Controls)**:
+    - [SettingsModal.tsx](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/components/SettingsModal.tsx): полупрозрачная шапка `bg-white/[0.04] backdrop-blur-md border-b border-white/[0.08]`, сегментированные переключатели `bg-black/30 border border-white/[0.08]`, активные вкладки `bg-white/[0.14] text-white shadow-sm`.
+    - [TargetFolderSetting.tsx](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/components/settings/TargetFolderSetting.tsx): стеклянный блок пути и кнопка выбора.
+    - [ToggleSetting.tsx](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/components/settings/ToggleSetting.tsx) и [UpnpStatusSection.tsx](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/components/settings/UpnpStatusSection.tsx): аккуратные полупрозрачные подложки и разделители `border-white/[0.08]`.
+    - [UpdatesSection.tsx](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/components/settings/UpdatesSection.tsx): карточки статусов и кнопки перезапуска переведены на `bg-black/30` и `bg-white/[0.08]`.
+    - [LogsSection.tsx](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/components/settings/LogsSection.tsx): поисковая строка, сегментированный фильтр уровней, терминальный блок логов и кнопки управления адаптированы под полупрозрачный стиль.
+    - [PairingModal.tsx](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/components/PairingModal.tsx): радар связи, кнопки вызова QR и карточка выбора интерфейса переведены на стеклянные токены.
+    - [PairingRequestModal.tsx](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/components/PairingRequestModal.tsx): карточка входящего запроса на сопряжение и блок устройства оформлены в стиле macOS HUD.
+    - [DeviceContextMenu.tsx](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/components/DeviceMenu/DeviceContextMenu.tsx): контекстное меню устройств получило `bg-[#1c1c20]/90 backdrop-blur-2xl border border-white/10`.
+    - [DeviceRenameModal.tsx](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/components/DeviceMenu/DeviceRenameModal.tsx), [DeviceHistoryModal.tsx](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/components/DeviceMenu/DeviceHistoryModal.tsx), [DeviceUnpairModal.tsx](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/components/DeviceMenu/DeviceUnpairModal.tsx): все модальные окна управления устройствами приведены к единому стандарту матового стекла.
+
+## [feat/tauri-fixes - Итерация 1 (Фаза 1 + Фаза 5.1/5.2)] - 2026-10-12
+
+### macOS Vibrancy, оконный зум, надежность настроек и очистка логов
+- **Восстановление размытия фона macOS (Window Vibrancy, пункт 1.10 чеклиста)**:
+  - В [src-tauri/Cargo.toml](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/Cargo.toml) включена обязательная для прозрачности фича `macos-private-api` в зависимостях `tauri`.
+  - В [src-tauri/tauri.conf.json](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/tauri.conf.json) добавлены `"macOSPrivateApi": true` и нативная конфигурация `"windowEffects"` с эффектом `"underWindowBackground"` и скруглением 14px.
+  - В [src-tauri/src/lib.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/lib.rs) вызов `apply_vibrancy` обернут в `app.run_on_main_thread` для безопасного выполнения в главном UI-потоке AppKit.
+  - В [App.tsx](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/App.tsx) и [classic-native/index.tsx](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/designs/classic-native/index.tsx) устранены наслоения темных фонов (`bg-[#161616]/80` поверх `bg-[#161616]/80`), установлена чистая прозрачность корневых контейнеров с легким матовым стеклом на панелях (`bg-[#1e1e22]/50`, `bg-[#141416]/50`).
+- **Разделение режимов окна: Fill по шапке и Zoom по зеленой кнопке (пункты 1.2, 1.4 чеклиста)**:
+  - Добавлена выделенная команда `fill_window` в [src-tauri/src/commands.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/commands.rs) и метод `fillWindow` в [bridge/index.ts](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/bridge/index.ts).
+  - Двойной клик по шапке окна теперь вызывает **Fill** (максимизирует и восстанавливает размер окна на рабочем столе без смены Spaces).
+  - Зеленая кнопка Traffic Lights продолжает отвечать за **Zoom / Fullscreen** с системной анимацией macOS.
+- **Устранение взаимного сброса тумблеров настроек (пункты 8.3, 8.4 чеклиста)**:
+  - В [src/renderer/src/hooks/useAppLogic.ts](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/hooks/useAppLogic.ts) `handleToggleAutoStart`, `handleToggleNotifications` и `handleSetLanguage` теперь передают полный объединенный объект конфига (`{ ...config, ... }`).
+  - В [src-tauri/src/commands.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/commands.rs) команда `save_config` дополнена поддержкой частичного слияния полей JSON, предотвращая перезапись неуказанных настроек.
+- **Исправление очистки логов (пункт 9.3 чеклиста)**:
+  - В [src-tauri/src/commands.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/commands.rs) команда `clear_logs` отправляет системное событие `logs-cleared` во фронтенд через `app.emit("logs-cleared", ())`.
+  - В [src/renderer/src/components/settings/LogsSection.tsx](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/components/settings/LogsSection.tsx) добавлено немедленное локальное обнуление стейта `setLogs([])` и `setExpandedIds({})`.
+
 ## [feat/tauri-migration - Logo Update] - 2026-10-12
 
 ### Обновление логотипа приложения и генерация иконок для всех платформ

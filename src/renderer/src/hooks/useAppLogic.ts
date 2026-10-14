@@ -206,29 +206,29 @@ export function useAppLogic() {
   const handleToggleAutoStart = useCallback(async (enable: boolean) => {
     if (window.macdrop) {
       await window.macdrop.toggleAutostart(enable);
-      const updated = await window.macdrop.saveConfig({ autoStart: enable });
+      const updated = await window.macdrop.saveConfig({ ...config, autoStart: enable });
       setConfig(updated);
     }
-  }, []);
+  }, [config]);
 
   const handleToggleNotifications = useCallback(async (enable: boolean) => {
     if (window.macdrop) {
-      const updated = await window.macdrop.saveConfig({ notifications: enable });
+      const updated = await window.macdrop.saveConfig({ ...config, notifications: enable });
       setConfig(updated);
     }
-  }, []);
+  }, [config]);
 
   const handleSetLanguage = useCallback(async (lang: 'ru' | 'en') => {
     try {
       localStorage.setItem('macdrop_language', lang);
     } catch {}
     if (window.macdrop?.saveConfig) {
-      const updated = await window.macdrop.saveConfig({ language: lang });
+      const updated = await window.macdrop.saveConfig({ ...config, language: lang });
       setConfig(updated);
     } else {
       setConfig((prev: any) => ({ ...prev, language: lang }));
     }
-  }, []);
+  }, [config]);
 
   const handlePairWithCode = useCallback(async (code: string) => {
     if (window.macdrop) {
@@ -324,6 +324,14 @@ export function useAppLogic() {
     window.macdrop?.pickAndSendFiles(effectiveTargetId);
   }, [activeTargetDeviceId, devices]);
 
+  const handleChooseFolder = useCallback((targetId?: string) => {
+    const effectiveTargetId =
+      targetId ||
+      activeTargetDeviceId ||
+      (devices.length > 0 ? devices[0].id : undefined);
+    window.macdrop?.pickAndSendFolder?.(effectiveTargetId);
+  }, [activeTargetDeviceId, devices]);
+
   return {
     config,
     status,
@@ -357,6 +365,7 @@ export function useAppLogic() {
     handleOpenSettings,
     handleOpenPairing,
     handleChooseFiles,
+    handleChooseFolder,
     handleCheckForUpdates,
     handleInstallUpdate
   };

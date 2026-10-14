@@ -186,6 +186,10 @@ pub async fn execute_peer_transfer(
         };
 
         state.history.write().await.push(entry);
+
+        if is_temp {
+            let _ = fs::remove_file(&send_path);
+        }
     }
 
     Ok(true)

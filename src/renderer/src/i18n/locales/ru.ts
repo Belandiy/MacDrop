@@ -62,7 +62,7 @@ export const ru = {
     chooseInFinder: 'Выбрать в Finder',
     chooseForTarget: 'Выбрать для {name}',
     chooseFiles: 'Выбрать файлы',
-    chooseFilesBtn: 'Выбрать файлы...',
+    chooseFilesBtn: 'Выбрать файлы и папки...',
     chooseFolder: 'Выбрать папку',
     recipient: 'Получатель:',
     selectDevice: 'Выберите устройство',

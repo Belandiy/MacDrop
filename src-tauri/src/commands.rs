@@ -1,7 +1,7 @@
 use serde_json::Value;
 use std::path::PathBuf;
 use std::sync::Arc;
-use tauri::{State, Window};
+use tauri::{AppHandle, State, Window};
 
 use crate::config::AppConfig;
 use crate::engine::{DiscoveredPeer, EngineState, EngineStatus, HistoryEntry};
@@ -16,13 +16,28 @@ pub async fn get_config(state: State<'_, Arc<EngineState>>) -> Result<AppConfig,
 #[tauri::command]
 pub async fn save_config(
     state: State<'_, Arc<EngineState>>,
-    config: AppConfig,
+    config: serde_json::Value,
 ) -> Result<AppConfig, String> {
     let mut cfg = state.config.write().await;
-    *cfg = config.clone();
+    if let Ok(incoming) = serde_json::from_value::<AppConfig>(config.clone()) {
+        *cfg = incoming;
+    } else if let serde_json::Value::Object(map) = config {
+        if let Some(val) = map.get("targetFolder").and_then(|v| v.as_str()) {
+            cfg.target_folder = val.to_string();
+        }
+        if let Some(val) = map.get("autoStart").and_then(|v| v.as_bool()) {
+            cfg.auto_start = val;
+        }
+        if let Some(val) = map.get("notifications").and_then(|v| v.as_bool()) {
+            cfg.notifications = val;
+        }
+        if let Some(val) = map.get("language").and_then(|v| v.as_str()) {
+            cfg.language = Some(val.to_string());
+        }
+    }
     crate::config::save_config(&cfg);
     state.logger.info("Config", "Configuration saved", None);
-    Ok(config)
+    Ok(cfg.clone())
 }
 
 #[tauri::command]
@@ -31,8 +46,33 @@ pub async fn get_status(state: State<'_, Arc<EngineState>>) -> Result<EngineStat
 }
 
 #[tauri::command]
-pub async fn select_folder() -> Result<String, String> {
-    let res = rfd::AsyncFileDialog::new().pick_folder().await;
+pub async fn select_folder(state: State<'_, Arc<EngineState>>) -> Result<String, String> {
+    let starting_dir = {
+        let cfg = state.config.read().await;
+        if !cfg.target_folder.is_empty() && std::path::Path::new(&cfg.target_folder).exists() {
+            cfg.target_folder.clone()
+        } else {
+            dirs::download_dir()
+                .or_else(dirs::home_dir)
+                .map(|p| p.to_string_lossy().to_string())
+                .unwrap_or_default()
+        }
+    };
+
+    #[cfg(target_os = "macos")]
+    unsafe {
+        use objc2::runtime::AnyObject;
+        let ns_app: *mut AnyObject = objc2::msg_send![objc2::class!(NSApplication), sharedApplication];
+        if !ns_app.is_null() {
+            let () = objc2::msg_send![ns_app, activateIgnoringOtherApps: true];
+        }
+    }
+
+    let mut dialog = rfd::AsyncFileDialog::new().set_title("Выберите папку для сохранения");
+    if !starting_dir.is_empty() {
+        dialog = dialog.set_directory(&starting_dir);
+    }
+    let res = dialog.pick_folder().await;
     if let Some(folder) = res {
         Ok(folder.path().to_string_lossy().to_string())
     } else {
@@ -81,7 +121,14 @@ pub async fn get_logs(
 
 #[tauri::command]
 pub async fn clear_logs(state: State<'_, Arc<EngineState>>) -> Result<bool, String> {
-    Ok(state.logger.clear_logs())
+    let cleared = state.logger.clear_logs();
+    if let Ok(guard) = state.app_handle.try_read() {
+        if let Some(app) = guard.as_ref() {
+            use tauri::Emitter;
+            let _ = app.emit("logs-cleared", ());
+        }
+    }
+    Ok(cleared)
 }
 
 #[tauri::command]
@@ -244,6 +291,23 @@ pub async fn minimize_window(window: Window) -> Result<(), String> {
 
 #[tauri::command]
 pub async fn maximize_window(window: Window) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        let is_fs = window.is_fullscreen().unwrap_or(false);
+        window.set_fullscreen(!is_fs).map_err(|e| e.to_string())
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        if window.is_maximized().unwrap_or(false) {
+            window.unmaximize().map_err(|e| e.to_string())
+        } else {
+            window.maximize().map_err(|e| e.to_string())
+        }
+    }
+}
+
+#[tauri::command]
+pub async fn fill_window(window: Window) -> Result<(), String> {
     if window.is_maximized().unwrap_or(false) {
         window.unmaximize().map_err(|e| e.to_string())
     } else {
@@ -271,17 +335,137 @@ pub async fn resize_window(
     window.set_size(size).map_err(|e| e.to_string())
 }
 
+#[cfg(target_os = "macos")]
+fn nsstring_from_str(s: &str) -> *mut objc2::runtime::AnyObject {
+    unsafe {
+        let c_str = std::ffi::CString::new(s).unwrap_or_default();
+        objc2::msg_send![objc2::class!(NSString), stringWithUTF8String: c_str.as_ptr()]
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn pick_files_and_folders_native(starting_dir: &str) -> Vec<String> {
+    unsafe {
+        use objc2::runtime::AnyObject;
+
+        let ns_app: *mut AnyObject = objc2::msg_send![objc2::class!(NSApplication), sharedApplication];
+        if !ns_app.is_null() {
+            let () = objc2::msg_send![ns_app, activateIgnoringOtherApps: true];
+        }
+
+        let panel: *mut AnyObject = objc2::msg_send![objc2::class!(NSOpenPanel), openPanel];
+        if panel.is_null() {
+            return Vec::new();
+        }
+
+        // Enable choosing both files and directories, plus multi-selection
+        let () = objc2::msg_send![panel, setCanChooseFiles: true];
+        let () = objc2::msg_send![panel, setCanChooseDirectories: true];
+        let () = objc2::msg_send![panel, setAllowsMultipleSelection: true];
+        let () = objc2::msg_send![panel, setCanCreateDirectories: false];
+
+        // Prompt button label
+        let prompt_ns = nsstring_from_str("Выбрать");
+        if !prompt_ns.is_null() {
+            let () = objc2::msg_send![panel, setPrompt: prompt_ns];
+        }
+
+        // Title and message
+        let title_ns = nsstring_from_str("Выберите файлы и папки для отправки");
+        if !title_ns.is_null() {
+            let () = objc2::msg_send![panel, setMessage: title_ns];
+        }
+
+        // Starting directory
+        if !starting_dir.is_empty() {
+            let dir_ns = nsstring_from_str(starting_dir);
+            if !dir_ns.is_null() {
+                let dir_url: *mut AnyObject = objc2::msg_send![
+                    objc2::class!(NSURL),
+                    fileURLWithPath: dir_ns
+                ];
+                if !dir_url.is_null() {
+                    let () = objc2::msg_send![panel, setDirectoryURL: dir_url];
+                }
+            }
+        }
+
+        let res: isize = objc2::msg_send![panel, runModal];
+        if res == 1 { // NSModalResponseOK
+            let urls: *mut AnyObject = objc2::msg_send![panel, URLs];
+            if urls.is_null() {
+                return Vec::new();
+            }
+            let count: usize = objc2::msg_send![urls, count];
+            let mut result = Vec::with_capacity(count);
+            for i in 0..count {
+                let url: *mut AnyObject = objc2::msg_send![urls, objectAtIndex: i];
+                if !url.is_null() {
+                    let path: *mut AnyObject = objc2::msg_send![url, path];
+                    if !path.is_null() {
+                        let utf8: *const std::os::raw::c_char = objc2::msg_send![path, UTF8String];
+                        if !utf8.is_null() {
+                            let s = std::ffi::CStr::from_ptr(utf8).to_string_lossy().to_string();
+                            result.push(s);
+                        }
+                    }
+                }
+            }
+            result
+        } else {
+            Vec::new()
+        }
+    }
+}
+
 #[tauri::command]
 pub async fn pick_and_send_files(
+    app: AppHandle,
     state: State<'_, Arc<EngineState>>,
     target_device_id: Option<String>,
 ) -> Result<bool, String> {
-    let files = rfd::AsyncFileDialog::new().pick_files().await;
-    if let Some(file_handles) = files {
-        let paths: Vec<String> = file_handles
-            .into_iter()
-            .map(|h| h.path().to_string_lossy().to_string())
-            .collect();
+    let starting_dir = {
+        let cfg = state.config.read().await;
+        if !cfg.target_folder.is_empty() && std::path::Path::new(&cfg.target_folder).exists() {
+            cfg.target_folder.clone()
+        } else {
+            dirs::download_dir()
+                .or_else(dirs::document_dir)
+                .or_else(dirs::home_dir)
+                .map(|p| p.to_string_lossy().to_string())
+                .unwrap_or_default()
+        }
+    };
+
+    #[cfg(target_os = "macos")]
+    let paths = {
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        let dir = starting_dir.clone();
+        app.run_on_main_thread(move || {
+            let res = pick_files_and_folders_native(&dir);
+            let _ = tx.send(res);
+        }).map_err(|e| e.to_string())?;
+        rx.await.map_err(|e| e.to_string())?
+    };
+
+    #[cfg(not(target_os = "macos"))]
+    let paths = {
+        let mut dialog = rfd::AsyncFileDialog::new().set_title("Выберите файлы и папки для отправки");
+        if !starting_dir.is_empty() {
+            dialog = dialog.set_directory(&starting_dir);
+        }
+        let files = dialog.pick_files().await;
+        if let Some(file_handles) = files {
+            file_handles
+                .into_iter()
+                .map(|h| h.path().to_string_lossy().to_string())
+                .collect()
+        } else {
+            Vec::new()
+        }
+    };
+
+    if !paths.is_empty() {
         send_dropped_files(state, paths, target_device_id).await.map(|_| true)
     } else {
         Ok(false)
@@ -290,16 +474,11 @@ pub async fn pick_and_send_files(
 
 #[tauri::command]
 pub async fn pick_and_send_folder(
+    app: AppHandle,
     state: State<'_, Arc<EngineState>>,
     target_device_id: Option<String>,
 ) -> Result<bool, String> {
-    let folder = rfd::AsyncFileDialog::new().pick_folder().await;
-    if let Some(h) = folder {
-        let path = h.path().to_string_lossy().to_string();
-        send_dropped_files(state, vec![path], target_device_id).await.map(|_| true)
-    } else {
-        Ok(false)
-    }
+    pick_and_send_files(app, state, target_device_id).await
 }
 
 #[tauri::command]

@@ -1,10 +1,13 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { isTauri } from '../bridge';
+import type { DragDropPayload } from '../vite-env';
 
 export interface UseStableDropZoneOptions {
   zoneRef: React.RefObject<HTMLElement | null>;
   onDropFiles: (filePaths: string[], targetDeviceId?: string) => Promise<any> | void;
   hysteresisBuffer?: number;
   debounceMs?: number;
+  onHoveredTargetChange?: (targetDeviceId: string | null) => void;
 }
 
 export interface UseStableDropZoneReturn {
@@ -29,18 +32,18 @@ function isPointInsideRect(x: number, y: number, rect: DOMRect, buffer: number =
 }
 
 /**
- * Robust Chromium-proof Drag & Drop Hook:
- * - Solves e.relatedTarget === null quirk.
- * - Solves dragleave (0,0) coordinates quirk.
- * - Replaces unstable dragCounters with a Watchdog Debounce (100ms).
- * - Uses continuous window.dragover geometric collision detection with hysteresis.
- * - Children can use pointer-events-none to eliminate parasitic bubbling.
+ * Robust Drag & Drop Hook:
+ * - Native Tauri Webview DragDrop integration (WebKit on macOS does not provide file paths in DOM).
+ * - Fallback HTML5 Drag & Drop with Watchdog Debounce (100ms) for Electron and test environments.
+ * - Continuous geometric collision detection for main dropzone and individual device targets.
+ * - Hit-tests both explicitly registered elements and DOM nodes marked with [data-device-id].
  */
 export function useStableDropZone({
   zoneRef,
   onDropFiles,
   hysteresisBuffer = 8,
-  debounceMs = 100
+  debounceMs = 100,
+  onHoveredTargetChange
 }: UseStableDropZoneOptions): UseStableDropZoneReturn {
   const [isDragging, setIsDragging] = useState(false);
   const [isOverZone, setIsOverZone] = useState(false);
@@ -50,6 +53,9 @@ export function useStableDropZone({
   // Map of target tiles: deviceId -> HTMLElement
   const targetsMapRef = useRef<Map<string, HTMLElement>>(new Map());
 
+  // Cached file paths from Tauri drag-enter/over events
+  const cachedPathsRef = useRef<string[]>([]);
+
   // Watchdog debounce timer to prevent dragleave flutter
   const watchdogTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -57,10 +63,15 @@ export function useStableDropZone({
   const isOverZoneRef = useRef(false);
   const hoveredTargetIdRef = useRef<string | null>(null);
   const onDropFilesRef = useRef(onDropFiles);
+  const onHoveredTargetChangeRef = useRef(onHoveredTargetChange);
 
   useEffect(() => {
     onDropFilesRef.current = onDropFiles;
   }, [onDropFiles]);
+
+  useEffect(() => {
+    onHoveredTargetChangeRef.current = onHoveredTargetChange;
+  }, [onHoveredTargetChange]);
 
   const registerTarget = useCallback((id: string, element: HTMLElement | null) => {
     if (element) {
@@ -85,78 +96,149 @@ export function useStableDropZone({
     setHoveredTargetId(null);
     hoveredTargetIdRef.current = null;
     setDraggedFileName(null);
+    cachedPathsRef.current = [];
+    onHoveredTargetChangeRef.current?.(null);
   }, [clearWatchdog]);
 
+  /**
+   * Updates hit-testing state for both the central zone and target devices.
+   */
+  const updateCoordinates = useCallback((rawX: number, rawY: number, isCssPixel = false) => {
+    const dpr = isCssPixel ? 1 : (typeof window !== 'undefined' ? (window.devicePixelRatio || 1) : 1);
+    const x = rawX / dpr;
+    const y = rawY / dpr;
+
+    // 1. Geometric hit-testing for central dropzone
+    const zoneEl = zoneRef.current;
+    let insideZone = false;
+    if (zoneEl) {
+      const zoneRect = zoneEl.getBoundingClientRect();
+      const buffer = isOverZoneRef.current ? hysteresisBuffer : 0;
+      insideZone = isPointInsideRect(x, y, zoneRect, buffer);
+    }
+
+    if (insideZone !== isOverZoneRef.current) {
+      isOverZoneRef.current = insideZone;
+      setIsOverZone(insideZone);
+    }
+
+    // 2. Geometric hit-testing for target devices
+    let matchedId: string | null = null;
+
+    // Check explicitly registered targets first
+    for (const [id, el] of targetsMapRef.current.entries()) {
+      const tileRect = el.getBoundingClientRect();
+      if (isPointInsideRect(x, y, tileRect, 2)) {
+        matchedId = id;
+        break;
+      }
+    }
+
+    // Fallback: Check elements under point for [data-device-id] (e.g. sidebar devices)
+    if (!matchedId && typeof document !== 'undefined' && typeof document.elementFromPoint === 'function') {
+      try {
+        const el = document.elementFromPoint(x, y);
+        const targetEl = el?.closest('[data-device-id]') as HTMLElement | null;
+        if (targetEl) {
+          matchedId = targetEl.getAttribute('data-device-id');
+        }
+      } catch {
+        // Ignore any hit-testing errors
+      }
+    }
+
+    if (matchedId !== hoveredTargetIdRef.current) {
+      hoveredTargetIdRef.current = matchedId;
+      setHoveredTargetId(matchedId);
+      onHoveredTargetChangeRef.current?.(matchedId);
+    }
+  }, [zoneRef, hysteresisBuffer]);
+
+  // ==================== 1. TAURI NATIVE DRAG & DROP ====================
   useEffect(() => {
+    if (typeof window === 'undefined' || !window.macdrop?.onDragDrop) {
+      return;
+    }
+
+    const unlisten = window.macdrop.onDragDrop(async (payload: DragDropPayload) => {
+      if (payload.type === 'enter') {
+        clearWatchdog();
+        setIsDragging(true);
+        const paths = payload.paths || [];
+        cachedPathsRef.current = paths;
+        if (paths.length > 0) {
+          const first = paths[0].split(/[/\\]/).pop() || '';
+          setDraggedFileName(paths.length > 1 ? `${first} (+${paths.length - 1})` : first);
+        }
+        if (payload.position) {
+          updateCoordinates(payload.position.x, payload.position.y, false);
+        }
+      } else if (payload.type === 'over') {
+        clearWatchdog();
+        setIsDragging(true);
+        if (payload.position) {
+          updateCoordinates(payload.position.x, payload.position.y, false);
+        }
+      } else if (payload.type === 'drop') {
+        clearWatchdog();
+        const wasOverZone = isOverZoneRef.current;
+        const targetId = hoveredTargetIdRef.current || undefined;
+        const paths = (payload.paths && payload.paths.length > 0) ? payload.paths : cachedPathsRef.current;
+
+        resetDragState();
+
+        if ((wasOverZone || targetId) && paths && paths.length > 0) {
+          await onDropFilesRef.current(paths, targetId);
+        }
+      } else if (payload.type === 'leave') {
+        clearWatchdog();
+        watchdogTimerRef.current = setTimeout(() => {
+          resetDragState();
+        }, debounceMs);
+      }
+    });
+
+    return () => {
+      unlisten();
+    };
+  }, [clearWatchdog, debounceMs, resetDragState, updateCoordinates]);
+
+  // ==================== 2. HTML5 DOM FALLBACK ====================
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
     const handleWindowDragOver = (e: DragEvent) => {
-      // Must preventDefault to allow dropping in Chromium
       e.preventDefault();
 
       if (!e.dataTransfer || !e.dataTransfer.types.includes('Files')) {
         return;
       }
 
-      // 1. WATCHDOG: Any ongoing dragover cancels pending leave watchdog
       clearWatchdog();
-
-      // Ensure dragging state is active
       setIsDragging(true);
 
-      // Extract filename once if present
-      if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
+      // In non-Tauri environments, extract filename from dataTransfer.items
+      if (!isTauri() && e.dataTransfer.items && e.dataTransfer.items.length > 0) {
         const first = e.dataTransfer.items[0];
         if (first.kind === 'file') {
           const file = first.getAsFile();
           if (file && file.name) {
-            setDraggedFileName(file.name);
+            setDraggedFileName(
+              e.dataTransfer.items.length > 1
+                ? `${file.name} (+${e.dataTransfer.items.length - 1})`
+                : file.name
+            );
           }
         }
       }
 
-      const x = e.clientX;
-      const y = e.clientY;
-
-      // 2. GEOMETRIC HIT-TESTING FOR MAIN ZONE
-      const zoneEl = zoneRef.current;
-      if (!zoneEl) return;
-
-      const zoneRect = zoneEl.getBoundingClientRect();
-      // Apply hysteresis buffer only if already inside to prevent boundary jitter
-      const buffer = isOverZoneRef.current ? hysteresisBuffer : 0;
-      const insideZone = isPointInsideRect(x, y, zoneRect, buffer);
-
-      if (insideZone !== isOverZoneRef.current) {
-        isOverZoneRef.current = insideZone;
-        setIsOverZone(insideZone);
-      }
-
-      // 3. GEOMETRIC HIT-TESTING FOR DEVICE TILES
-      if (insideZone) {
-        let matchedId: string | null = null;
-
-        for (const [id, el] of targetsMapRef.current.entries()) {
-          const tileRect = el.getBoundingClientRect();
-          if (isPointInsideRect(x, y, tileRect, 2)) {
-            matchedId = id;
-            break;
-          }
-        }
-
-        if (matchedId !== hoveredTargetIdRef.current) {
-          hoveredTargetIdRef.current = matchedId;
-          setHoveredTargetId(matchedId);
-        }
-      } else if (hoveredTargetIdRef.current !== null) {
-        hoveredTargetIdRef.current = null;
-        setHoveredTargetId(null);
-      }
+      updateCoordinates(e.clientX, e.clientY, true);
     };
 
-    const handleWindowDragLeave = (e: DragEvent) => {
-      // Chromium quirk: dragleave coordinates are always (0, 0) for OS drags.
-      // We start a watchdog debounce instead of immediately tearing down state.
+    const handleWindowDragLeave = (_e: DragEvent) => {
       clearWatchdog();
-
       watchdogTimerRef.current = setTimeout(() => {
         resetDragState();
       }, debounceMs);
@@ -166,14 +248,19 @@ export function useStableDropZone({
       e.preventDefault();
       clearWatchdog();
 
+      // If Tauri is active, Tauri native onDragDrop handles drop with native absolute paths.
+      // This prevents duplicate drop actions.
+      if (isTauri()) {
+        return;
+      }
+
       const wasOverZone = isOverZoneRef.current;
       const targetId = hoveredTargetIdRef.current || undefined;
-
       const files = Array.from(e.dataTransfer?.files || []);
 
       resetDragState();
 
-      if (wasOverZone && files.length > 0) {
+      if ((wasOverZone || targetId) && files.length > 0) {
         const filePaths = files
           .map((f: any) => {
             if (window.macdrop?.getPathForFile) {
@@ -199,10 +286,12 @@ export function useStableDropZone({
       window.removeEventListener('dragleave', handleWindowDragLeave);
       window.removeEventListener('drop', handleWindowDrop);
     };
-  }, [zoneRef, hysteresisBuffer, debounceMs, clearWatchdog, resetDragState]);
+  }, [debounceMs, clearWatchdog, resetDragState, updateCoordinates]);
 
   const handleChooseFiles = useCallback((targetDeviceId?: string) => {
-    // Choose files callback handler
+    if (window.macdrop?.pickAndSendFiles) {
+      window.macdrop.pickAndSendFiles(targetDeviceId);
+    }
   }, []);
 
   return {

@@ -429,24 +429,10 @@ async fn handle_upload(
 }
 
 fn urlencoding_decode(s: &str) -> String {
-    // Simple decoding or percent_encoding
-    let mut res = String::with_capacity(s.len());
-    let mut bytes = s.bytes();
-    while let Some(b) = bytes.next() {
-        if b == b'%' {
-            let h1 = bytes.next().unwrap_or(b'0');
-            let h2 = bytes.next().unwrap_or(b'0');
-            let hex_str = format!("{}{}", h1 as char, h2 as char);
-            if let Ok(num) = u8::from_str_radix(&hex_str, 16) {
-                res.push(num as char);
-            }
-        } else if b == b'+' {
-            res.push(' ');
-        } else {
-            res.push(b as char);
-        }
-    }
-    res
+    let with_spaces = s.replace('+', " ");
+    urlencoding::decode(&with_spaces)
+        .map(|c| c.into_owned())
+        .unwrap_or_else(|_| with_spaces)
 }
 
 // -----------------------------------------------------------------------------
@@ -588,15 +574,27 @@ async fn handle_mobile_download(
             return Err((StatusCode::NOT_FOUND, "Файл не найден".to_string()));
         }
 
-        let content = fs::read(&path)
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Read error: {}", e)))?;
+        let (content, dl_filename) = if path.is_dir() {
+            let folder_name = path.file_name().and_then(|s| s.to_str()).unwrap_or("folder");
+            let temp_zip = std::env::temp_dir().join(format!("{}_{}.zip", folder_name, SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_millis()));
+            crate::transfer::zip_directory(&path, &temp_zip)
+                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Zip error: {}", e)))?;
+            let data = fs::read(&temp_zip)
+                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Read error: {}", e)))?;
+            let _ = fs::remove_file(&temp_zip);
+            (data, format!("{}.zip", folder_name))
+        } else {
+            let data = fs::read(&path)
+                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Read error: {}", e)))?;
+            (data, decoded.clone())
+        };
 
         let body = Body::from(content);
         let mut res = Response::new(body);
-        res.headers_mut().insert(
-            header::CONTENT_DISPOSITION,
-            format!("attachment; filename=\"{}\"", decoded).parse().unwrap(),
-        );
+        let cd_header = format!("attachment; filename=\"{}\"", dl_filename.replace('"', "\\\""));
+        if let Ok(val) = cd_header.parse() {
+            res.headers_mut().insert(header::CONTENT_DISPOSITION, val);
+        }
         res.headers_mut().insert(
             header::CONTENT_TYPE,
             "application/octet-stream".parse().unwrap(),
@@ -751,6 +749,10 @@ mod tests {
         assert_eq!(urlencoding_decode("hello%20world.txt"), "hello world.txt");
         assert_eq!(urlencoding_decode("file+name.pdf"), "file name.pdf");
         assert_eq!(urlencoding_decode("normal.png"), "normal.png");
+
+        let cyrillic_raw = "Документ [версия 2.0] & правки.docx";
+        let encoded = urlencoding::encode(cyrillic_raw);
+        assert_eq!(urlencoding_decode(&encoded), cyrillic_raw);
     }
 }
 

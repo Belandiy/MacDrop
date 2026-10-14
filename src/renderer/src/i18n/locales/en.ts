@@ -64,7 +64,7 @@ export const en: LocaleSchema = {
     chooseInFinder: 'Choose in Finder',
     chooseForTarget: 'Choose for {name}',
     chooseFiles: 'Select Files',
-    chooseFilesBtn: 'Choose Files...',
+    chooseFilesBtn: 'Choose Files & Folders...',
     chooseFolder: 'Select Directory',
     recipient: 'Recipient:',
     selectDevice: 'Select Device',
