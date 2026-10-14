@@ -117,7 +117,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     <div
       data-modal
       style={{ WebkitAppRegion: 'no-drag' } as any}
-      className="modal-overlay fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/65 backdrop-blur-sm animate-in fade-in duration-150 select-none"
+      className="modal-overlay fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-md animate-in fade-in duration-150 select-none"
       onClick={(e) => {
         if (e.target === e.currentTarget) {
           onClose();
@@ -126,18 +126,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     >
       <div
         style={{ WebkitAppRegion: 'no-drag' } as any}
-        className="bg-[#161616] border border-[#2C2C2E] rounded-[10px] w-full max-w-[460px] shadow-[0_20px_45px_rgba(0,0,0,0.65),0_0_0_1px_#333336] overflow-hidden flex flex-col"
+        className="bg-[#1c1c20]/80 backdrop-blur-2xl border border-white/10 rounded-[14px] w-full max-w-[460px] shadow-[0_24px_50px_rgba(0,0,0,0.65),0_0_0_1px_rgba(255,255,255,0.08)] overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div
           style={{ WebkitAppRegion: 'no-drag' } as any}
-          className="h-[38px] px-3.5 bg-[#232326] border-b border-[#2C2C2E] flex items-center justify-between shrink-0"
+          className="h-[40px] px-3.5 bg-white/[0.04] backdrop-blur-md border-b border-white/[0.08] flex items-center justify-between shrink-0"
         >
           {/* Segmented Control Tabs */}
           <div
             style={{ WebkitAppRegion: 'no-drag' } as any}
-            className="inline-flex p-0.5 rounded-[6px] bg-[#252528] border border-[#333336] text-[11px]"
+            className="inline-flex p-0.5 rounded-[6px] bg-black/30 border border-white/[0.08] text-[11px]"
           >
             {/* General Tab */}
             <button
@@ -146,7 +146,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               onClick={() => setActiveTab('general')}
               className={`flex items-center gap-1.5 px-2.5 py-0.5 rounded-[4px] font-medium transition-colors cursor-pointer ${
                 activeTab === 'general'
-                  ? 'bg-[#3A3A3E] text-white shadow-sm'
+                  ? 'bg-white/[0.14] text-white shadow-sm border border-white/[0.08]'
                   : 'text-[#8E8E93] hover:text-[#E5E5EA]'
               }`}
             >
@@ -161,7 +161,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               onClick={() => setActiveTab('updates')}
               className={`flex items-center gap-1.5 px-2.5 py-0.5 rounded-[4px] font-medium transition-colors cursor-pointer ${
                 activeTab === 'updates'
-                  ? 'bg-[#3A3A3E] text-white shadow-sm'
+                  ? 'bg-white/[0.14] text-white shadow-sm border border-white/[0.08]'
                   : 'text-[#8E8E93] hover:text-[#E5E5EA]'
               }`}
             >
@@ -187,7 +187,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               onClick={() => setActiveTab('logs')}
               className={`flex items-center gap-1.5 px-2.5 py-0.5 rounded-[4px] font-medium transition-colors cursor-pointer ${
                 activeTab === 'logs'
-                  ? 'bg-[#3A3A3E] text-white shadow-sm'
+                  ? 'bg-white/[0.14] text-white shadow-sm border border-white/[0.08]'
                   : 'text-[#8E8E93] hover:text-[#E5E5EA]'
               }`}
             >
@@ -206,7 +206,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             type="button"
             style={{ WebkitAppRegion: 'no-drag' } as any}
             onClick={onClose}
-            className="w-6 h-6 flex items-center justify-center rounded text-[#8E8E93] hover:text-[#FFFFFF] hover:bg-[#2C2C2E] transition-colors cursor-pointer"
+            className="w-6 h-6 flex items-center justify-center rounded-full bg-white/[0.05] hover:bg-white/[0.12] text-[#8E8E93] hover:text-[#FFFFFF] transition-colors cursor-pointer"
             title={t('window.close')}
           >
             <X className="w-3.5 h-3.5" />
@@ -222,7 +222,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 onSelectFolder={onSelectFolder}
               />
 
-              <div className="h-px bg-[#2C2C2E]" />
+              <div className="h-px bg-white/[0.08]" />
 
               <ToggleSetting
                 title={t('settings.autoStart')}
@@ -240,12 +240,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 onToggle={onToggleNotifications}
               />
 
-              <div className="h-px bg-[#2C2C2E]" />
+              <div className="h-px bg-white/[0.08]" />
 
               {/* Language Selection Setting */}
               <div className="flex items-center justify-between py-1 select-none">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-7 h-7 rounded-[6px] bg-[#202022] border border-[#2C2C2E] flex items-center justify-center text-[#8E8E93] shrink-0">
+                  <div className="w-7 h-7 rounded-[6px] bg-white/[0.05] border border-white/[0.08] flex items-center justify-center text-[#8E8E93] shrink-0">
                     <Languages className="w-3.5 h-3.5 text-[#007AFF]" />
                   </div>
                   <div>
@@ -258,7 +258,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </div>
                 </div>
 
-                <div className="inline-flex p-0.5 rounded-[6px] bg-[#202022] border border-[#2C2C2E] text-[11px]">
+                <div className="inline-flex p-0.5 rounded-[6px] bg-black/30 border border-white/[0.08] text-[11px]">
                   {availableLanguages.map((item) => (
                     <button
                       key={item.code}

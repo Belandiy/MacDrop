@@ -36,7 +36,7 @@ export default function App() {
       language={config.language || 'ru'}
       onLanguageChange={handleSetLanguage}
     >
-      <div className="flex flex-col h-screen bg-[#161616] text-[#F2F2F7] select-none antialiased overflow-hidden rounded-[14px] border border-white/[0.08] shadow-2xl">
+      <div className="flex flex-col h-screen bg-transparent text-[#F2F2F7] select-none antialiased overflow-hidden rounded-[14px] border border-white/[0.08] shadow-2xl">
         {/* Main Classic Native View */}
         <div className="flex-1 overflow-hidden relative">
           <ClassicNativeDesign {...appLogic} />

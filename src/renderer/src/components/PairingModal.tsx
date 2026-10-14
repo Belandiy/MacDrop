@@ -260,16 +260,16 @@ export const PairingModal: React.FC<PairingModalProps> = ({
     <div
       data-modal="true"
       style={{ WebkitAppRegion: 'no-drag' } as any}
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-black/65 backdrop-blur-md animate-in fade-in duration-200 select-none"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-black/40 backdrop-blur-md animate-in fade-in duration-200 select-none"
     >
       <div
-        className="relative w-full max-w-[390px] bg-[#1C1C1F] border border-[#2C2C30] rounded-[16px] shadow-[0_20px_50px_rgba(0,0,0,0.85)] overflow-hidden flex flex-col p-4 text-center select-none"
+        className="relative w-full max-w-[390px] bg-[#1c1c20]/80 backdrop-blur-2xl border border-white/10 rounded-[18px] shadow-[0_24px_50px_rgba(0,0,0,0.65),0_0_0_1px_rgba(255,255,255,0.08)] overflow-hidden flex flex-col p-4 text-center select-none"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Close Button Top-Right */}
         <button
           onClick={onClose}
-          className="absolute top-3 right-3 w-6 h-6 rounded-full bg-white/[0.06] hover:bg-white/[0.12] text-[#8E8E93] hover:text-white flex items-center justify-center transition-colors cursor-pointer z-30"
+          className="absolute top-3 right-3 w-6 h-6 rounded-full bg-white/[0.06] hover:bg-white/[0.14] text-[#8E8E93] hover:text-white flex items-center justify-center transition-colors cursor-pointer z-30"
           title={t('window.close')}
         >
           <X className="w-3.5 h-3.5" />
@@ -422,7 +422,7 @@ export const PairingModal: React.FC<PairingModalProps> = ({
             )}
 
             {/* Middle Status Row + Phone QR Button */}
-            <div className="w-full flex items-center justify-between mt-1 pt-2 border-t border-[#2C2C30]">
+            <div className="w-full flex items-center justify-between mt-1 pt-2 border-t border-white/[0.08]">
               {/* Ready to connect status indicator */}
               <div className="flex items-center gap-1.5 text-[11px] text-[#8E8E93] truncate mr-2">
                 {isSubmitting ? (
@@ -463,7 +463,7 @@ export const PairingModal: React.FC<PairingModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowMobileQr(true)}
-                  className="flex items-center gap-1 px-2 py-1 rounded-[5px] bg-[#2C2C30] hover:bg-[#38383E] text-[#D1D1D6] hover:text-white border border-[#3A3A3C] text-[10px] font-medium transition-colors cursor-pointer"
+                  className="flex items-center gap-1 px-2 py-1 rounded-[6px] bg-white/[0.08] hover:bg-white/[0.14] text-[#D1D1D6] hover:text-white border border-white/[0.1] text-[10px] font-medium transition-colors cursor-pointer"
                   title="Подключить телефон через локальный Web Drop"
                 >
                   <Smartphone className="w-3 h-3 text-[#007AFF]" />
@@ -477,7 +477,7 @@ export const PairingModal: React.FC<PairingModalProps> = ({
               <button
                 type="button"
                 onClick={onClose}
-                className="w-full py-1.5 rounded-[7px] bg-[#2C2C30] hover:bg-[#38383E] text-[#F2F2F7] text-[11px] font-medium border border-[#3A3A3C] transition-colors cursor-pointer"
+                className="w-full py-1.5 rounded-[7px] bg-white/[0.08] hover:bg-white/[0.14] text-[#F2F2F7] text-[11px] font-medium border border-white/[0.1] transition-colors cursor-pointer"
               >
                 {t('pairing.cancel')}
               </button>
@@ -527,7 +527,7 @@ export const PairingModal: React.FC<PairingModalProps> = ({
 
             {/* Network Interface selection if multiple IPs */}
             {mobileInfo && mobileInfo.ips && mobileInfo.ips.length > 1 && (
-              <div className="w-full bg-[#161619] border border-[#2C2C30] rounded-[5px] px-2.5 py-1 mb-2 flex items-center justify-between text-[10px] text-[#8E8E93]">
+              <div className="w-full bg-black/30 border border-white/[0.08] rounded-[6px] px-2.5 py-1 mb-2 flex items-center justify-between text-[10px] text-[#8E8E93]">
                 <span>IP сети:</span>
                 <select
                   value={activeMobileIp}
@@ -544,7 +544,7 @@ export const PairingModal: React.FC<PairingModalProps> = ({
             )}
 
             {/* Action buttons: Back to radar & Refresh key */}
-            <div className="w-full flex items-center justify-between pt-2 border-t border-[#2C2C30]">
+            <div className="w-full flex items-center justify-between pt-2 border-t border-white/[0.08]">
               <button
                 type="button"
                 onClick={() => setShowMobileQr(false)}

@@ -20,7 +20,7 @@ export const UpnpStatusSection: React.FC<UpnpStatusSectionProps> = ({ upnpStatus
   const { t } = useTranslation();
 
   return (
-    <div className="flex flex-col gap-2 pt-1 border-t border-[#2C2C2E] select-none">
+    <div className="flex flex-col gap-2 pt-1 border-t border-white/[0.08] select-none">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5">
           <Globe className="w-3.5 h-3.5 text-[#007AFF]" />
@@ -32,14 +32,14 @@ export const UpnpStatusSection: React.FC<UpnpStatusSectionProps> = ({ upnpStatus
             <span>{t('settings.portOpened', { port: upnpStatus.externalPort || 8384 })}</span>
           </span>
         ) : (
-          <span className="text-[10px] bg-[#2C2C2E] text-[#8E8E93] border border-[#3A3A3C] px-2 py-0.5 rounded-full font-medium">
+          <span className="text-[10px] bg-white/[0.06] text-[#8E8E93] border border-white/[0.1] px-2 py-0.5 rounded-full font-medium">
             {upnpStatus?.error || t('settings.searchingRouter')}
           </span>
         )}
       </div>
 
       {upnpStatus?.active && (
-        <div className="bg-[#1A1A1A] p-2.5 rounded-[6px] border border-[#2C2C2E] text-[11px] space-y-1">
+        <div className="bg-black/30 p-2.5 rounded-[8px] border border-white/[0.08] text-[11px] space-y-1">
           <div className="flex items-center justify-between text-[#8E8E93]">
             <span>{t('settings.router')}</span>
             <span className="text-[#F2F2F7] font-medium truncate max-w-[170px]" title={upnpStatus.routerName}>

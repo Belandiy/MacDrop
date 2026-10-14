@@ -22,7 +22,7 @@ export const ToggleSetting: React.FC<ToggleSettingProps> = ({
   return (
     <div className="flex items-center justify-between py-1 select-none">
       <div className="flex items-center gap-2.5">
-        <div className="w-7 h-7 rounded-[6px] bg-[#202022] border border-[#2C2C2E] flex items-center justify-center text-[#8E8E93] shrink-0">
+        <div className="w-7 h-7 rounded-[6px] bg-white/[0.05] border border-white/[0.08] flex items-center justify-center text-[#8E8E93] shrink-0">
           <Icon className="w-3.5 h-3.5" />
         </div>
         <div>

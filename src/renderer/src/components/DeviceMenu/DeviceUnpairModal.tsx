@@ -48,17 +48,17 @@ export const DeviceUnpairModal: React.FC<DeviceUnpairModalProps> = ({
   return (
     <div
       style={{ WebkitAppRegion: 'no-drag' } as any}
-      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/65 backdrop-blur-sm animate-in fade-in duration-150 select-none"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-md animate-in fade-in duration-150 select-none"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
       <div
-        className="bg-[#1C1C1E] border border-[#2C2C2E] rounded-[10px] w-full max-w-[360px] shadow-[0_20px_45px_rgba(0,0,0,0.65),0_0_0_1px_#333336] overflow-hidden flex flex-col"
+        className="bg-[#1c1c20]/80 backdrop-blur-2xl border border-white/10 rounded-[14px] w-full max-w-[360px] shadow-[0_24px_50px_rgba(0,0,0,0.65),0_0_0_1px_rgba(255,255,255,0.08)] overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="h-[38px] px-3.5 bg-[#252528] border-b border-[#2C2C2E] flex items-center justify-between shrink-0">
+        <div className="h-[40px] px-3.5 bg-white/[0.04] backdrop-blur-md border-b border-white/[0.08] flex items-center justify-between shrink-0">
           <div className="flex items-center gap-1.5 text-[13px] font-semibold text-[#FF453A]">
             <Unlink className="w-3.5 h-3.5" />
             <span>{t('devices.unpairDeviceConfirmTitle')}</span>
@@ -67,7 +67,7 @@ export const DeviceUnpairModal: React.FC<DeviceUnpairModalProps> = ({
             type="button"
             onClick={onClose}
             title={t('common.close')}
-            className="w-6 h-6 rounded-full hover:bg-[#3A3A3C] text-[#8E8E93] hover:text-[#FFFFFF] flex items-center justify-center transition-colors cursor-pointer"
+            className="w-6 h-6 rounded-full bg-white/[0.05] hover:bg-white/[0.12] text-[#8E8E93] hover:text-[#FFFFFF] flex items-center justify-center transition-colors cursor-pointer"
           >
             <X className="w-3.5 h-3.5" />
           </button>
@@ -85,12 +85,12 @@ export const DeviceUnpairModal: React.FC<DeviceUnpairModalProps> = ({
           </div>
 
           {/* Action buttons */}
-          <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#2A2A2C]">
+          <div className="flex items-center justify-end gap-2 pt-2 border-t border-white/[0.08]">
             <button
               type="button"
               onClick={onClose}
               disabled={isDeleting}
-              className="px-3 py-1 text-[12px] font-medium bg-[#2C2C2E] hover:bg-[#38383A] text-[#D1D1D6] hover:text-white rounded-[5px] border border-[#3A3A3C] transition-colors cursor-pointer"
+              className="px-3 py-1.5 text-[12px] font-medium bg-white/[0.08] hover:bg-white/[0.14] text-[#D1D1D6] hover:text-white rounded-[6px] border border-white/[0.1] transition-colors cursor-pointer"
             >
               {t('common.cancel')}
             </button>
@@ -98,7 +98,7 @@ export const DeviceUnpairModal: React.FC<DeviceUnpairModalProps> = ({
               type="button"
               onClick={handleUnpair}
               disabled={isDeleting}
-              className="px-3 py-1 text-[12px] font-medium bg-[#FF453A] hover:bg-[#D73329] disabled:opacity-50 text-white rounded-[5px] transition-colors cursor-pointer shadow-sm flex items-center gap-1.5"
+              className="px-3 py-1.5 text-[12px] font-medium bg-[#FF453A] hover:bg-[#D73329] disabled:opacity-50 text-white rounded-[6px] transition-colors cursor-pointer shadow-sm flex items-center gap-1.5"
             >
               <Unlink className="w-3 h-3" />
               <span>{isDeleting ? t('common.deleting') : t('devices.unlink')}</span>

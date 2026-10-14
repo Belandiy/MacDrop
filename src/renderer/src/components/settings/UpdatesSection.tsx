@@ -56,15 +56,15 @@ export const UpdatesSection: React.FC<UpdatesSectionProps> = ({
   return (
     <div className="flex flex-col gap-3 select-none">
       {/* App & Version Info Card */}
-      <div className="flex items-center justify-between p-3 rounded-[6px] bg-[#1A1A1A] border border-[#2C2C2E]">
+      <div className="flex items-center justify-between p-3 rounded-[8px] bg-black/30 border border-white/[0.08]">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-[6px] overflow-hidden shrink-0 border border-[#2C2C2E] bg-[#202022] flex items-center justify-center">
+          <div className="w-9 h-9 rounded-[8px] overflow-hidden shrink-0 border border-white/[0.1] bg-white/[0.04] flex items-center justify-center">
             <img src={logoImg} alt="MacDrop" className="w-full h-full object-cover" />
           </div>
           <div>
             <div className="flex items-center gap-1.5">
               <span className="font-semibold text-[13px] text-[#F2F2F7] tracking-tight">MacDrop</span>
-              <span className="font-mono text-[10px] font-medium px-1.5 py-0.2 rounded bg-[#2C2C2E] text-[#D1D1D6] border border-[#3A3A3C]">
+              <span className="font-mono text-[10px] font-medium px-1.5 py-0.2 rounded bg-white/[0.08] text-[#D1D1D6] border border-white/[0.1]">
                 v{appVersion}
               </span>
             </div>
@@ -84,9 +84,9 @@ export const UpdatesSection: React.FC<UpdatesSectionProps> = ({
 
       {/* Main Status Container */}
       {isDownloaded && (
-        <div className="p-3.5 rounded-[6px] bg-[#1A1A1A] border border-[#34C759]/40 flex flex-col gap-3">
+        <div className="p-3.5 rounded-[8px] bg-black/30 border border-[#34C759]/40 flex flex-col gap-3">
           <div className="flex items-start gap-2.5">
-            <div className="w-7 h-7 rounded-[5px] bg-[#34C759]/15 border border-[#34C759]/30 flex items-center justify-center shrink-0 text-[#34C759]">
+            <div className="w-7 h-7 rounded-[6px] bg-[#34C759]/15 border border-[#34C759]/30 flex items-center justify-center shrink-0 text-[#34C759]">
               <Sparkles className="w-3.5 h-3.5" />
             </div>
             <div>
@@ -102,7 +102,7 @@ export const UpdatesSection: React.FC<UpdatesSectionProps> = ({
           <button
             type="button"
             onClick={onInstallUpdate}
-            className="w-full flex items-center justify-center gap-2 py-1.5 px-3 rounded-[5px] bg-[#007AFF] hover:bg-[#0071E3] active:bg-[#0062C4] text-white font-medium text-[12px] shadow-[0_0.5px_1px_rgba(0,0,0,0.4)] transition-colors cursor-pointer"
+            className="w-full flex items-center justify-center gap-2 py-1.5 px-3 rounded-[6px] bg-[#007AFF] hover:bg-[#0071E3] active:bg-[#0062C4] text-white font-medium text-[12px] shadow-[0_0.5px_1px_rgba(0,0,0,0.4)] transition-colors cursor-pointer"
           >
             <RefreshCw className="w-3.5 h-3.5" />
             <span>{t('updates.restartAndInstall')}</span>
@@ -111,10 +111,10 @@ export const UpdatesSection: React.FC<UpdatesSectionProps> = ({
       )}
 
       {isDownloading && (
-        <div className="p-3.5 rounded-[6px] bg-[#1A1A1A] border border-[#007AFF]/40 flex flex-col gap-2.5">
+        <div className="p-3.5 rounded-[8px] bg-black/30 border border-[#007AFF]/40 flex flex-col gap-2.5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-[5px] bg-[#007AFF]/20 border border-[#007AFF]/30 flex items-center justify-center text-[#007AFF]">
+              <div className="w-6 h-6 rounded-[6px] bg-[#007AFF]/20 border border-[#007AFF]/30 flex items-center justify-center text-[#007AFF]">
                 <ArrowDown className="w-3.5 h-3.5 animate-bounce" />
               </div>
               <div>
@@ -132,7 +132,7 @@ export const UpdatesSection: React.FC<UpdatesSectionProps> = ({
           </div>
 
           {/* Progress Bar */}
-          <div className="h-1.5 w-full bg-[#2C2C2E] rounded-[2px] overflow-hidden">
+          <div className="h-1.5 w-full bg-white/[0.1] rounded-[2px] overflow-hidden">
             <div
               className="h-full bg-[#007AFF] rounded-[2px] transition-all duration-300 ease-out"
               style={{ width: `${percent}%` }}
@@ -154,7 +154,7 @@ export const UpdatesSection: React.FC<UpdatesSectionProps> = ({
       )}
 
       {isChecking && (
-        <div className="p-4 rounded-[6px] bg-[#1A1A1A] border border-[#2C2C2E] flex flex-col items-center justify-center text-center gap-1.5">
+        <div className="p-4 rounded-[8px] bg-black/30 border border-white/[0.08] flex flex-col items-center justify-center text-center gap-1.5">
           <RefreshCw className="w-4 h-4 text-[#007AFF] animate-spin" />
           <div className="text-[12px] font-medium text-[#F2F2F7]">{t('updates.checking')}</div>
           <div className="text-[11px] text-[#8E8E93]">{t('updates.checkingDesc')}</div>
@@ -162,7 +162,7 @@ export const UpdatesSection: React.FC<UpdatesSectionProps> = ({
       )}
 
       {isError && (
-        <div className="p-3.5 rounded-[6px] bg-[#1A1A1A] border border-[#FF453A]/30 flex flex-col gap-2.5">
+        <div className="p-3.5 rounded-[8px] bg-black/30 border border-[#FF453A]/30 flex flex-col gap-2.5">
           <div className="flex items-start gap-2">
             <AlertCircle className="w-4 h-4 text-[#FF453A] shrink-0 mt-0.5" />
             <div>
@@ -177,7 +177,7 @@ export const UpdatesSection: React.FC<UpdatesSectionProps> = ({
             type="button"
             onClick={handleManualCheck}
             disabled={isChecking}
-            className="flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-[5px] bg-[#2C2C2E] hover:bg-[#38383A] text-[#D1D1D6] hover:text-white font-medium text-[11px] border border-[#3A3A3C] transition-colors cursor-pointer"
+            className="flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-[6px] bg-white/[0.08] hover:bg-white/[0.14] text-[#D1D1D6] hover:text-white font-medium text-[11px] border border-white/[0.1] transition-colors cursor-pointer"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isChecking ? 'animate-spin' : ''}`} />
             <span>{t('updates.retry')}</span>
@@ -186,9 +186,9 @@ export const UpdatesSection: React.FC<UpdatesSectionProps> = ({
       )}
 
       {isUpToDate && !isDownloaded && !isDownloading && !isChecking && !isError && (
-        <div className="p-3.5 rounded-[6px] bg-[#1A1A1A] border border-[#2C2C2E] flex flex-col gap-3">
+        <div className="p-3.5 rounded-[8px] bg-black/30 border border-white/[0.08] flex flex-col gap-3">
           <div className="flex items-start gap-2.5">
-            <div className="w-7 h-7 rounded-[5px] bg-[#34C759]/15 border border-[#34C759]/30 flex items-center justify-center shrink-0 text-[#34C759]">
+            <div className="w-7 h-7 rounded-[6px] bg-[#34C759]/15 border border-[#34C759]/30 flex items-center justify-center shrink-0 text-[#34C759]">
               <CheckCircle2 className="w-3.5 h-3.5" />
             </div>
             <div>
@@ -205,7 +205,7 @@ export const UpdatesSection: React.FC<UpdatesSectionProps> = ({
             type="button"
             onClick={handleManualCheck}
             disabled={isChecking}
-            className="w-full flex items-center justify-center gap-2 py-1.5 px-3 rounded-[5px] bg-[#2C2C2E] hover:bg-[#38383A] text-[#D1D1D6] hover:text-white font-medium text-[12px] border border-[#3A3A3C] shadow-[0_0.5px_1px_rgba(0,0,0,0.4)] transition-colors cursor-pointer"
+            className="w-full flex items-center justify-center gap-2 py-1.5 px-3 rounded-[6px] bg-white/[0.08] hover:bg-white/[0.14] text-[#D1D1D6] hover:text-white font-medium text-[12px] border border-white/[0.1] shadow-[0_0.5px_1px_rgba(0,0,0,0.4)] transition-colors cursor-pointer"
           >
             <RefreshCw className={`w-3.5 h-3.5 text-[#007AFF] ${isChecking ? 'animate-spin' : ''}`} />
             <span>{t('updates.checkUpdates')}</span>

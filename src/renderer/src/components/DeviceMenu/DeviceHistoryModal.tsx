@@ -122,17 +122,17 @@ export const DeviceHistoryModal: React.FC<DeviceHistoryModalProps> = ({
   return (
     <div
       style={{ WebkitAppRegion: 'no-drag' } as any}
-      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/65 backdrop-blur-sm animate-in fade-in duration-150 select-none"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-md animate-in fade-in duration-150 select-none"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
       <div
-        className="bg-[#1C1C1E] border border-[#2C2C2E] rounded-[10px] w-full max-w-[500px] max-h-[420px] shadow-[0_20px_45px_rgba(0,0,0,0.65),0_0_0_1px_#333336] overflow-hidden flex flex-col"
+        className="bg-[#1c1c20]/80 backdrop-blur-2xl border border-white/10 rounded-[14px] w-full max-w-[500px] max-h-[420px] shadow-[0_24px_50px_rgba(0,0,0,0.65),0_0_0_1px_rgba(255,255,255,0.08)] overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="h-[42px] px-3.5 bg-[#252528] border-b border-[#2C2C2E] flex items-center justify-between shrink-0">
+        <div className="h-[42px] px-3.5 bg-white/[0.04] backdrop-blur-md border-b border-white/[0.08] flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2 min-w-0">
             <span className="shrink-0 flex items-center justify-center text-[#8E8E93]">
               {isWindows ? (
@@ -155,20 +155,20 @@ export const DeviceHistoryModal: React.FC<DeviceHistoryModalProps> = ({
             type="button"
             onClick={onClose}
             title={t('common.close')}
-            className="w-6 h-6 rounded-full hover:bg-[#3A3A3C] text-[#8E8E93] hover:text-[#FFFFFF] flex items-center justify-center transition-colors cursor-pointer"
+            className="w-6 h-6 rounded-full bg-white/[0.05] hover:bg-white/[0.12] text-[#8E8E93] hover:text-[#FFFFFF] flex items-center justify-center transition-colors cursor-pointer"
           >
             <X className="w-3.5 h-3.5" />
           </button>
         </div>
 
         {/* Sub-toolbar: Segmented Filter & Count */}
-        <div className="px-3.5 py-2 bg-[#202022] border-b border-[#2A2A2C] flex items-center justify-between">
-          <div className="inline-flex p-0.5 rounded-[5px] bg-[#161616] border border-[#2C2C2E] text-[11px]">
+        <div className="px-3.5 py-2 bg-black/20 border-b border-white/[0.08] flex items-center justify-between">
+          <div className="inline-flex p-0.5 rounded-[6px] bg-black/30 border border-white/[0.08] text-[11px]">
             <button
               onClick={() => setFilter('all')}
-              className={`px-2 py-0.5 rounded-[3px] font-medium transition-colors cursor-pointer ${
+              className={`px-2 py-0.5 rounded-[4px] font-medium transition-colors cursor-pointer ${
                 filter === 'all'
-                  ? 'bg-[#3A3A3E] text-white shadow-sm'
+                  ? 'bg-white/[0.14] text-white shadow-sm border border-white/[0.08]'
                   : 'text-[#8E8E93] hover:text-[#E5E5EA]'
               }`}
             >
@@ -176,9 +176,9 @@ export const DeviceHistoryModal: React.FC<DeviceHistoryModalProps> = ({
             </button>
             <button
               onClick={() => setFilter('incoming')}
-              className={`px-2 py-0.5 rounded-[3px] font-medium transition-colors cursor-pointer ${
+              className={`px-2 py-0.5 rounded-[4px] font-medium transition-colors cursor-pointer ${
                 filter === 'incoming'
-                  ? 'bg-[#3A3A3E] text-white shadow-sm'
+                  ? 'bg-white/[0.14] text-white shadow-sm border border-white/[0.08]'
                   : 'text-[#8E8E93] hover:text-[#E5E5EA]'
               }`}
             >
@@ -186,9 +186,9 @@ export const DeviceHistoryModal: React.FC<DeviceHistoryModalProps> = ({
             </button>
             <button
               onClick={() => setFilter('outgoing')}
-              className={`px-2 py-0.5 rounded-[3px] font-medium transition-colors cursor-pointer ${
+              className={`px-2 py-0.5 rounded-[4px] font-medium transition-colors cursor-pointer ${
                 filter === 'outgoing'
-                  ? 'bg-[#3A3A3E] text-white shadow-sm'
+                  ? 'bg-white/[0.14] text-white shadow-sm border border-white/[0.08]'
                   : 'text-[#8E8E93] hover:text-[#E5E5EA]'
               }`}
             >
@@ -230,7 +230,7 @@ export const DeviceHistoryModal: React.FC<DeviceHistoryModalProps> = ({
                 <div
                   key={item.id}
                   onClick={() => handleOpenFile(item.filename)}
-                  className="flex items-center justify-between p-2 rounded-[6px] hover:bg-[#28282A] border border-transparent hover:border-[#38383A] transition-colors cursor-pointer group"
+                  className="flex items-center justify-between p-2 rounded-[6px] hover:bg-white/[0.05] border border-transparent hover:border-white/[0.08] transition-colors cursor-pointer group"
                 >
                   <div className="flex items-center gap-2.5 min-w-0 pr-2">
                     {/* Direction Icon Badge */}

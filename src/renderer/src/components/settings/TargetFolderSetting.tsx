@@ -21,7 +21,7 @@ export const TargetFolderSetting: React.FC<TargetFolderSettingProps> = ({
       </label>
       <div className="flex items-center gap-2">
         <div
-          className="bg-[#1A1A1A] text-[11px] text-[#D1D1D6] px-2.5 py-1.5 rounded-[5px] border border-[#2C2C2E] truncate flex-1 font-mono"
+          className="bg-black/30 text-[11px] text-[#D1D1D6] px-2.5 py-1.5 rounded-[6px] border border-white/[0.08] truncate flex-1 font-mono"
           title={targetFolder}
         >
           {targetFolder}
@@ -29,7 +29,7 @@ export const TargetFolderSetting: React.FC<TargetFolderSettingProps> = ({
         <button
           type="button"
           onClick={onSelectFolder}
-          className="px-3 py-1.5 text-[11px] font-medium bg-[#2C2C2E] hover:bg-[#38383A] text-[#D1D1D6] hover:text-white border border-[#3A3A3C] rounded-[4px] shadow-[0_0.5px_1px_rgba(0,0,0,0.4)] transition-colors shrink-0 cursor-pointer"
+          className="px-3 py-1.5 text-[11px] font-medium bg-white/[0.08] hover:bg-white/[0.14] text-[#D1D1D6] hover:text-white border border-white/[0.1] rounded-[6px] shadow-[0_0.5px_1px_rgba(0,0,0,0.4)] transition-colors shrink-0 cursor-pointer"
         >
           {t('folder.browse')}
         </button>

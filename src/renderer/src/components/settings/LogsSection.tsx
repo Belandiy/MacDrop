@@ -94,8 +94,10 @@ export const LogsSection: React.FC = () => {
     }).catch(() => {});
   };
 
-  const handleClear = () => {
-    window.macdrop?.clearLogs?.();
+  const handleClear = async () => {
+    setLogs([]);
+    setExpandedIds({});
+    await window.macdrop?.clearLogs?.();
   };
 
   const handleOpenFolder = () => {
@@ -112,7 +114,7 @@ export const LogsSection: React.FC = () => {
           placeholder={t('logs.searchPlaceholder')}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full bg-[#1A1A1A] border border-[#2C2C2E] rounded-[5px] pl-7 pr-14 py-1 text-[11px] text-[#F2F2F7] placeholder-[#636366] focus:outline-none focus:border-[#007AFF] transition-colors h-7"
+          className="w-full bg-black/30 border border-white/[0.08] rounded-[6px] pl-7 pr-14 py-1 text-[11px] text-[#F2F2F7] placeholder-[#636366] focus:outline-none focus:border-[#007AFF] transition-colors h-7"
         />
         {searchQuery && (
           <button
@@ -125,12 +127,12 @@ export const LogsSection: React.FC = () => {
       </div>
 
       {/* Level Filters - Segmented style */}
-      <div className="grid grid-cols-4 gap-0.5 bg-[#252528] p-0.5 rounded-[6px] border border-[#333336] w-full shrink-0">
+      <div className="grid grid-cols-4 gap-0.5 bg-black/30 p-0.5 rounded-[6px] border border-white/[0.08] w-full shrink-0">
         <button
           onClick={() => setLevelFilter('all')}
           className={`h-6 px-1 rounded-[4px] text-[10px] font-medium transition-colors flex items-center justify-center gap-1 cursor-pointer ${
             levelFilter === 'all'
-              ? 'bg-[#3A3A3E] text-white shadow-sm'
+              ? 'bg-white/[0.14] text-white shadow-sm border border-white/[0.08]'
               : 'text-[#8E8E93] hover:text-[#E5E5EA]'
           }`}
         >
@@ -174,7 +176,7 @@ export const LogsSection: React.FC = () => {
       {/* Terminal View Container - Strictly locked height */}
       <div
         ref={listContainerRef}
-        className="bg-[#141416] border border-[#2C2C2E] rounded-[6px] p-2.5 h-[265px] min-h-[265px] max-h-[265px] overflow-y-auto font-mono text-[11px] flex flex-col gap-1 shadow-inner select-text"
+        className="bg-black/40 border border-white/[0.08] rounded-[8px] p-2.5 h-[265px] min-h-[265px] max-h-[265px] overflow-y-auto font-mono text-[11px] flex flex-col gap-1 shadow-inner select-text"
       >
         {filteredLogs.length === 0 ? (
           <div className="h-full flex-1 flex flex-col items-center justify-center text-center p-4 text-[#8E8E93] select-none">
@@ -279,7 +281,7 @@ export const LogsSection: React.FC = () => {
           <button
             onClick={handleCopyLogs}
             disabled={filteredLogs.length === 0}
-            className="w-6 h-6 rounded-[4px] bg-[#2C2C2E] hover:bg-[#38383A] text-[#D1D1D6] hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0 flex items-center justify-center cursor-pointer border border-[#3A3A3C]"
+            className="w-6 h-6 rounded-[5px] bg-white/[0.08] hover:bg-white/[0.14] text-[#D1D1D6] hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0 flex items-center justify-center cursor-pointer border border-white/[0.1]"
             title={copied ? t('logs.copied') : t('logs.copy')}
           >
             {copied ? (
@@ -292,7 +294,7 @@ export const LogsSection: React.FC = () => {
           {/* Open Logs Folder */}
           <button
             onClick={handleOpenFolder}
-            className="flex items-center gap-1 px-2 h-6 rounded-[4px] bg-[#2C2C2E] hover:bg-[#38383A] text-[11px] text-[#D1D1D6] hover:text-white border border-[#3A3A3C] transition-colors shrink-0 cursor-pointer"
+            className="flex items-center gap-1 px-2 h-6 rounded-[5px] bg-white/[0.08] hover:bg-white/[0.14] text-[11px] text-[#D1D1D6] hover:text-white border border-white/[0.1] transition-colors shrink-0 cursor-pointer"
             title="Folder"
           >
             <FolderOpen className="w-3 h-3 text-[#007AFF]" />
@@ -303,7 +305,7 @@ export const LogsSection: React.FC = () => {
           <button
             onClick={handleClear}
             disabled={logs.length === 0}
-            className="flex items-center gap-1 px-2 h-6 rounded-[4px] bg-[#FF453A]/10 hover:bg-[#FF453A]/20 text-[11px] text-[#FF453A] border border-[#FF453A]/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0 cursor-pointer"
+            className="flex items-center gap-1 px-2 h-6 rounded-[5px] bg-[#FF453A]/15 hover:bg-[#FF453A]/25 text-[11px] text-[#FF453A] border border-[#FF453A]/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0 cursor-pointer"
             title={t('logs.clear')}
           >
             <Trash2 className="w-3 h-3" />

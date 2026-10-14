@@ -70,10 +70,10 @@ export const DeviceContextMenu: React.FC<DeviceContextMenuProps> = ({
         zIndex: 9999
       }}
       ref={menuRef}
-      className="w-[210px] bg-[#232326]/95 backdrop-blur-xl border border-[#3A3A3C] rounded-[8px] p-1 shadow-[0_12px_30px_rgba(0,0,0,0.65),0_0_0_1px_rgba(255,255,255,0.08)] select-none text-[#F2F2F7] animate-in fade-in duration-100"
+      className="w-[210px] bg-[#1c1c20]/90 backdrop-blur-2xl border border-white/10 rounded-[10px] p-1 shadow-[0_16px_36px_rgba(0,0,0,0.65),0_0_0_1px_rgba(255,255,255,0.08)] select-none text-[#F2F2F7] animate-in fade-in duration-100"
     >
       {/* Device Name Header */}
-      <div className="px-2.5 py-1.5 text-[11px] font-semibold text-[#8E8E93] truncate border-b border-[#2C2C2E] mb-1">
+      <div className="px-2.5 py-1.5 text-[11px] font-semibold text-[#8E8E93] truncate border-b border-white/[0.08] mb-1">
         {device.customName || device.originalName}
       </div>
 
@@ -132,7 +132,7 @@ export const DeviceContextMenu: React.FC<DeviceContextMenuProps> = ({
       </button>
 
       {/* Divider */}
-      <div className="h-[1px] bg-[#3A3A3C] my-1 mx-1" />
+      <div className="h-[1px] bg-white/[0.08] my-1 mx-1" />
 
       {/* 4. Unpair Device */}
       <button

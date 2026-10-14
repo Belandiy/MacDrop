@@ -2530,6 +2530,7 @@ dependencies = [
  "local-ip-address",
  "log",
  "notify-rust",
+ "objc2",
  "open",
  "rand",
  "reqwest 0.12.28",

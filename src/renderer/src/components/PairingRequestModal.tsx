@@ -39,7 +39,7 @@ const DeviceInfoCard: React.FC<{ request: PairingRequest }> = ({ request }) => {
   const { t } = useTranslation();
 
   return (
-    <div className="w-full bg-[#1C1C1E] border border-[#2C2C2E] rounded-[8px] p-3 mt-3.5 text-left space-y-2">
+    <div className="w-full bg-black/30 border border-white/[0.08] rounded-[8px] p-3 mt-3.5 text-left space-y-2">
       <div className="flex items-center justify-between">
         <span className="text-[11px] font-medium text-[#8E8E93]">{t('pairing.deviceName')}</span>
         <span className="text-[12px] font-medium text-[#F2F2F7] truncate max-w-[170px]">
@@ -74,7 +74,7 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({ onRespond }) => {
       <button
         type="button"
         onClick={() => onRespond(false)}
-        className="flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-[6px] bg-[#2C2C2E] hover:bg-[#38383A] active:bg-[#252527] text-[#FF453A] border border-[#3A3A3C] font-medium text-[12px] transition-colors cursor-pointer"
+        className="flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-[6px] bg-white/[0.08] hover:bg-white/[0.14] active:bg-white/[0.05] text-[#FF453A] border border-white/[0.1] font-medium text-[12px] transition-colors cursor-pointer"
       >
         <X className="w-3.5 h-3.5" />
         <span>{t('pairing.decline')}</span>
@@ -138,7 +138,7 @@ export const PairingRequestModal: React.FC<PairingRequestModalProps> = ({ reques
     <div
       data-modal
       style={{ WebkitAppRegion: 'no-drag' } as any}
-      className="modal-overlay fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150"
+      className="modal-overlay fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-md animate-in fade-in duration-150"
       onClick={(e) => {
         if (e.target === e.currentTarget) {
           onRespond(request.requestId, false);
@@ -147,7 +147,7 @@ export const PairingRequestModal: React.FC<PairingRequestModalProps> = ({ reques
     >
       <div
         style={{ WebkitAppRegion: 'no-drag' } as any}
-        className="relative w-full max-w-[340px] bg-[#161616] border border-[#2C2C2E] rounded-[10px] shadow-[0_20px_45px_rgba(0,0,0,0.65),0_0_0_1px_#333336] overflow-hidden select-none animate-in zoom-in-95 duration-150"
+        className="relative w-full max-w-[340px] bg-[#1c1c20]/80 backdrop-blur-2xl border border-white/10 rounded-[14px] shadow-[0_24px_50px_rgba(0,0,0,0.65),0_0_0_1px_rgba(255,255,255,0.08)] overflow-hidden select-none animate-in zoom-in-95 duration-150"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header Progress Bar for Timeout */}
