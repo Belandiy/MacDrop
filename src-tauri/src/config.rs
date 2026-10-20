@@ -140,12 +140,6 @@ pub fn load_config() -> AppConfig {
                     cfg.api_port = 52520;
                     migrated = true;
                 }
-                for p in cfg.paired_devices.iter_mut() {
-                    if p.port == 8384 {
-                        p.port = 52520;
-                        migrated = true;
-                    }
-                }
                 if migrated {
                     save_config(&cfg);
                 }

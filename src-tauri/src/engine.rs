@@ -173,6 +173,7 @@ impl EngineState {
     pub async fn emit_status_changed(&self) {
         if let Some(handle) = self.app_handle.read().await.as_ref() {
             let status = self.get_status().await;
+            let _ = handle.emit("status-update", &status);
             let _ = handle.emit("status-changed", &status);
         }
     }
@@ -362,7 +363,6 @@ async fn handle_pair(
     };
 
     if is_already_paired {
-        let mut cfg = state.config.write().await;
         let token = payload.auth_token.clone().unwrap_or_else(|| {
             use rand::Rng;
             let mut rng = rand::rng();
@@ -375,27 +375,28 @@ async fn handle_pair(
             .unwrap_or_default()
             .as_millis() as i64;
 
-        if let Some(existing) = cfg.paired_devices.iter_mut().find(|d| d.id == payload.device_id) {
-            existing.original_name = payload.device_name.clone();
-            existing.ip = effective_ip.clone();
-            existing.port = payload.port.unwrap_or(52520);
-            existing.auth_token = Some(token.clone());
-            existing.last_seen = now;
-            existing.connection_mode = Some("local".to_string());
-        }
+        let (resp_device_id, resp_device_name) = {
+            let mut cfg = state.config.write().await;
+            if let Some(existing) = cfg.paired_devices.iter_mut().find(|d| d.id == payload.device_id) {
+                existing.original_name = payload.device_name.clone();
+                existing.ip = effective_ip.clone();
+                existing.port = payload.port.unwrap_or(52520);
+                existing.auth_token = Some(token.clone());
+                existing.last_seen = now;
+                existing.connection_mode = Some("local".to_string());
+            }
+            save_config(&cfg);
+            (cfg.device_id.clone(), cfg.device_name.clone())
+        };
 
-        save_config(&cfg);
         state.logger.info("Pairing", &format!("Re-paired with existing device \"{}\" ({})", payload.device_name, effective_ip), None);
 
-        if let Some(handle) = state.app_handle.read().await.as_ref() {
-            let status = state.get_status().await;
-            let _ = handle.emit("status-changed", &status);
-        }
+        state.emit_status_changed().await;
 
         return (StatusCode::OK, Json(serde_json::json!({
             "success": true,
-            "deviceId": cfg.device_id.clone(),
-            "deviceName": cfg.device_name.clone(),
+            "deviceId": resp_device_id,
+            "deviceName": resp_device_name,
             "authToken": token,
         }))).into_response();
     }
@@ -435,7 +436,6 @@ async fn handle_pair(
 
     match tokio::time::timeout(std::time::Duration::from_secs(30), rx).await {
         Ok(Ok(true)) => {
-            let mut cfg = state.config.write().await;
             let token = auth_token.unwrap_or_else(|| {
                 use rand::Rng;
                 let mut rng = rand::rng();
@@ -463,21 +463,22 @@ async fn handle_pair(
                 platform: None,
             };
 
-            cfg.paired_devices.retain(|d| d.id != device_id);
-            cfg.paired_devices.push(paired);
-            save_config(&cfg);
+            let (resp_device_id, resp_device_name) = {
+                let mut cfg = state.config.write().await;
+                cfg.paired_devices.retain(|d| d.id != device_id);
+                cfg.paired_devices.push(paired);
+                save_config(&cfg);
+                (cfg.device_id.clone(), cfg.device_name.clone())
+            };
 
             state.logger.info("Pairing", &format!("Device \"{}\" successfully paired and saved", device_name), None);
 
-            if let Some(handle) = state.app_handle.read().await.as_ref() {
-                let status = state.get_status().await;
-                let _ = handle.emit("status-changed", &status);
-            }
+            state.emit_status_changed().await;
 
             (StatusCode::OK, Json(serde_json::json!({
                 "success": true,
-                "deviceId": cfg.device_id.clone(),
-                "deviceName": cfg.device_name.clone(),
+                "deviceId": resp_device_id,
+                "deviceName": resp_device_name,
                 "authToken": token,
             }))).into_response()
         }

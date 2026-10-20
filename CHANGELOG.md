@@ -2,6 +2,25 @@
 
 Все важные изменения проекта MacDrop фиксируются в этом файле.
 
+## [fix/tauri-pairing-and-status-events] - 2026-10-14
+
+### Исправление сопряжения и обновления списка устройств в Tauri
+- **Параллельное HTTP-сканирование подсети (`discovery.rs`)**:
+  - В [src-tauri/src/discovery.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/discovery.rs) реализована функция `probe_subnet()` с асинхронным пулом (семафор на 40 воркеров). Она сканирует адреса подсети (`192.168.0.1..254`) по портам 52520 и 8384 через эндпоинт `/api/ping`. Это позволяет находить устройства в сети, даже когда UDP-радар (порт 8385) блокируется роутером (AP Isolation) или брандмауэром. Сканирование автоматически стартует через 2.5 сек после запуска и при каждом ручном обновлении радара.
+- **Устранение взаимной блокировки (Deadlock) при сопряжении (`engine.rs`)**:
+  - В [src-tauri/src/engine.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/engine.rs) внутри `handle_pair` захватывался `RwLockWriteGuard` (`state.config.write().await`), после чего сразу вызывался `state.emit_status_changed().await`, который внутри вызывал `get_status()` и пытался взять лок на чтение (`self.config.read().await`). Поскольку `tokio::sync::RwLock` не является реентерабельным, асинхронная задача мгновенно зависала намертво: эмит события не происходил, а HTTP-ответ клиенту не отправлялся. Лок на запись изолирован в явный блок, освобождаемый до вызова `emit_status_changed()`.
+- **Эмит статуса в Rust-бэкенде (`src-tauri`)**:
+  - В [src-tauri/src/engine.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/engine.rs) метод `emit_status_changed()` теперь эмитит оба события: `status-update` и `status-changed`. Фронтенд-мост MacDrop ожидает именно `status-update`, поэтому при входящем и исходящем сопряжении список устройств в UI не обновлялся.
+  - Все прямые вызовы `handle.emit("status-changed")` в `engine.rs`, `commands.rs` и `discovery.rs` переведены на вызов единого метода `state.emit_status_changed().await`.
+- **Фолбэк портов и сохранение активного порта при сопряжении (`commands.rs`)**:
+  - В [src-tauri/src/commands.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/commands.rs) логика фолбэка между портами 52520 и 8384 отвязана от флага `has_explicit_port`: теперь при ошибке соединения на любой стандартный порт автоматически опрашивается альтернативный порт MacDrop (52520 ↔ 8384).
+  - При успешном сопряжении в конфигурацию сохраняется `actual_port` (порт, ответивший на запрос), а не исходный порт до фолбэка.
+  - В случае ошибки рукопожатия в лог выводится подробное описание сетевой ошибки (`err`), а не общая маскирующая фраза.
+- **Сохранение портов удаленных устройств (`config.rs`)**:
+  - В [src-tauri/src/config.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/config.rs) удалена перезапись портов сопряженных устройств в цикле миграции с 8384 на 52520, ломавшая подключение к Electron-клиентам.
+- **Изоляция исходников Electron (`src/`)**:
+  - Все ранее внесенные изменения в каталог `src/` полностью отменены. Папка `src/` оставлена в исходном неизменном состоянии.
+
 ## [feat/tauri-fixes - Итерация 7 (Фаза 4 + 5.3: Мобильный клиент AirBridge, виртуальное устройство «Телефон», реальный IP и автозапуск)] - 2026-10-14
 
 ### Мобильный веб-клиент Web Drop, виртуальный узел `mobile-web`, фильтрация IP и системный автозапуск

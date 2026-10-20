@@ -71,6 +71,13 @@ pub async fn start_peer_discovery(state: Arc<EngineState>) {
 
     state.logger.info("Discovery", "UDP Peer Discovery running on port 8385", None);
 
+    // Initial background subnet sweep after 2.5 seconds to populate discovered peers
+    let init_state = state.clone();
+    tokio::spawn(async move {
+        tokio::time::sleep(Duration::from_millis(2500)).await;
+        probe_subnet(init_state).await;
+    });
+
     // 1. Background task for broadcasting presence
     let broadcast_socket = socket.clone();
     let broadcast_state = state.clone();
@@ -153,10 +160,7 @@ pub async fn start_peer_discovery(state: Arc<EngineState>) {
             }
 
             if status_changed || mobile_timed_out {
-                if let Some(handle) = prune_state.app_handle.read().await.as_ref() {
-                    let status = prune_state.get_status().await;
-                    let _ = handle.emit("status-changed", &status);
-                }
+                prune_state.emit_status_changed().await;
             }
         }
     });
@@ -207,10 +211,7 @@ pub async fn start_peer_discovery(state: Arc<EngineState>) {
                         };
 
                         if status_changed {
-                            if let Some(handle) = state.app_handle.read().await.as_ref() {
-                                let status = state.get_status().await;
-                                let _ = handle.emit("status-changed", &status);
-                            }
+                            state.emit_status_changed().await;
                         }
 
                         let peer = DiscoveredPeer {
@@ -271,7 +272,121 @@ pub async fn start_peer_discovery(state: Arc<EngineState>) {
     }
 }
 
-pub async fn trigger_manual_scan(state: &EngineState) {
+pub async fn probe_subnet(state: Arc<EngineState>) {
+    let local_ips = crate::net_utils::get_local_network_ips();
+    let mut subnets = Vec::new();
+    for ip_str in &local_ips {
+        let parts: Vec<&str> = ip_str.split('.').collect();
+        if parts.len() == 4 {
+            let prefix = format!("{}.{}.{}", parts[0], parts[1], parts[2]);
+            if !subnets.contains(&prefix) {
+                subnets.push(prefix);
+            }
+        }
+    }
+
+    if subnets.is_empty() {
+        return;
+    }
+
+    let our_id = {
+        let cfg = state.config.read().await;
+        cfg.device_id.clone()
+    };
+
+    let client = match reqwest::Client::builder()
+        .timeout(Duration::from_millis(350))
+        .build()
+    {
+        Ok(c) => c,
+        Err(_) => return,
+    };
+
+    let semaphore = Arc::new(tokio::sync::Semaphore::new(40));
+    let mut tasks = Vec::new();
+
+    for subnet in subnets {
+        for i in 1..=254 {
+            let target_ip = format!("{}.{}", subnet, i);
+            if local_ips.contains(&target_ip) {
+                continue;
+            }
+
+            for &port in &[52520u16, 8384u16] {
+                let client = client.clone();
+                let state = state.clone();
+                let sem = semaphore.clone();
+                let our_id = our_id.clone();
+                let target_ip = target_ip.clone();
+
+                tasks.push(tokio::spawn(async move {
+                    let _permit = match sem.acquire().await {
+                        Ok(p) => p,
+                        Err(_) => return,
+                    };
+
+                    let url = format!("http://{}:{}/api/ping", target_ip, port);
+                    if let Ok(resp) = client.get(&url).send().await {
+                        if resp.status().is_success() {
+                            if let Ok(json) = resp.json::<serde_json::Value>().await {
+                                if json.get("status").and_then(|v| v.as_str()) == Some("ok") {
+                                    if let Some(peer_id) = json.get("deviceId").and_then(|v| v.as_str()) {
+                                        if peer_id != our_id {
+                                            let peer_name = json.get("deviceName").and_then(|v| v.as_str()).unwrap_or("Устройство");
+                                            let platform = json.get("platform").and_then(|v| v.as_str()).map(|s| s.to_string());
+
+                                            let now = SystemTime::now()
+                                                .duration_since(UNIX_EPOCH)
+                                                .unwrap_or_default()
+                                                .as_millis() as i64;
+
+                                            let is_paired = {
+                                                let cfg = state.config.read().await;
+                                                cfg.paired_devices.iter().any(|d| d.id == peer_id)
+                                            };
+
+                                            let peer = DiscoveredPeer {
+                                                id: peer_id.to_string(),
+                                                name: peer_name.to_string(),
+                                                device_id: peer_id.to_string(),
+                                                device_name: peer_name.to_string(),
+                                                ip: target_ip.clone(),
+                                                port,
+                                                platform,
+                                                last_seen: now,
+                                                is_paired,
+                                            };
+
+                                            {
+                                                let mut peers = state.discovered_peers.write().await;
+                                                peers.insert(peer_id.to_string(), peer);
+                                            }
+
+                                            let all_peers: Vec<DiscoveredPeer> = {
+                                                let peers = state.discovered_peers.read().await;
+                                                peers.values().cloned().collect()
+                                            };
+
+                                            if let Some(handle) = state.app_handle.read().await.as_ref() {
+                                                let _ = handle.emit("peers-update", &all_peers);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }));
+            }
+        }
+    }
+
+    for task in tasks {
+        let _ = task.await;
+    }
+}
+
+pub async fn trigger_manual_scan(state: Arc<EngineState>) {
     if let Ok(socket) = UdpSocket::bind("0.0.0.0:0").await {
         let _ = socket.set_broadcast(true);
         let (device_id, device_name, port) = {
@@ -292,6 +407,8 @@ pub async fn trigger_manual_scan(state: &EngineState) {
             }
         }
     }
+
+    probe_subnet(state).await;
 }
 
 #[cfg(test)]

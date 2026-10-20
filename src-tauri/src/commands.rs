@@ -2,7 +2,7 @@ use serde_json::Value;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use tauri::{AppHandle, Emitter, State, Window};
+use tauri::{AppHandle, State, Window};
 
 use crate::config::{AppConfig, PairedDevice};
 use crate::engine::{chrono_like_now, DiscoveredPeer, EngineState, EngineStatus, HistoryEntry};
@@ -192,7 +192,7 @@ pub async fn get_discovered_peers(
 pub async fn scan_nearby_peers(
     state: State<'_, Arc<EngineState>>,
 ) -> Result<Vec<DiscoveredPeer>, String> {
-    crate::discovery::trigger_manual_scan(&state).await;
+    crate::discovery::trigger_manual_scan(state.inner().clone()).await;
     get_discovered_peers(state).await
 }
 
@@ -338,15 +338,17 @@ pub async fn pair_device(
 
     let mut resp = client.post(&url).json(&payload).send().await;
 
-    // Automatic fallback between standard ports 52520 <-> 8384 if initial connection refused and port was not explicit
-    if resp.is_err() && !has_explicit_port {
-        let fallback_port = if actual_port == 52520 { 8384 } else { 52520 };
-        let fallback_url = format!("http://{}:{}/api/pair", target_ip, fallback_port);
-        state.logger.info("Pairing", &format!("Handshake on port {} failed, attempting fallback port {}:{}", actual_port, target_ip, fallback_port), None);
-        let fb_res = client.post(&fallback_url).json(&payload).send().await;
-        if fb_res.is_ok() {
-            actual_port = fallback_port;
-            resp = fb_res;
+    // Automatic fallback between standard ports 52520 <-> 8384 if initial connection failed and was not a timeout
+    if resp.is_err() && !resp.as_ref().err().map(|e| e.is_timeout()).unwrap_or(false) {
+        if actual_port == 52520 || actual_port == 8384 {
+            let fallback_port = if actual_port == 52520 { 8384 } else { 52520 };
+            let fallback_url = format!("http://{}:{}/api/pair", target_ip, fallback_port);
+            state.logger.info("Pairing", &format!("Handshake on port {} failed, attempting fallback port {}:{}", actual_port, target_ip, fallback_port), None);
+            let fb_res = client.post(&fallback_url).json(&payload).send().await;
+            if fb_res.is_ok() {
+                actual_port = fallback_port;
+                resp = fb_res;
+            }
         }
     }
 
@@ -356,7 +358,7 @@ pub async fn pair_device(
             let msg = if err.is_timeout() {
                 "Таймаут подключения: удаленное устройство не ответило вовремя или отклонило запрос".to_string()
             } else {
-                format!("Не удалось подключиться к {}:{}. Проверьте доступность устройства в сети.", target_ip, actual_port)
+                format!("Не удалось подключиться к {}:{}. Проверьте доступность устройства в сети ({}).", target_ip, actual_port, err)
             };
             state.logger.error("Pairing", &msg, None);
             return Ok(serde_json::json!({
@@ -398,24 +400,22 @@ pub async fn pair_device(
             let mut cfg = state.config.write().await;
             if let Some(existing) = cfg.paired_devices.iter_mut().find(|d| d.id == peer_device_id) {
                 existing.ip = target_ip.clone();
-                existing.port = target_port;
+                existing.port = actual_port;
                 existing.original_name = peer_device_name.clone();
                 existing.auth_token = paired_peer.auth_token.clone();
                 existing.last_seen = now;
                 existing.connection_mode = Some("local".to_string());
                 paired_peer = existing.clone();
             } else {
+                paired_peer.port = actual_port;
                 cfg.paired_devices.push(paired_peer.clone());
             }
             crate::config::save_config(&cfg);
         }
 
-        state.logger.info("Pairing", &format!("Successfully paired with device \"{}\" ({}:{})", peer_device_name, target_ip, target_port), None);
+        state.logger.info("Pairing", &format!("Successfully paired with device \"{}\" ({}:{})", peer_device_name, target_ip, actual_port), None);
 
-        if let Some(handle) = state.app_handle.read().await.as_ref() {
-            let status = state.get_status().await;
-            let _ = handle.emit("status-changed", &status);
-        }
+        state.emit_status_changed().await;
 
         Ok(serde_json::json!({
             "success": true,
@@ -466,10 +466,7 @@ pub async fn unpair_device(
             state.logger.info("Pairing", "All devices unpaired", None);
         }
     }
-    if let Some(handle) = state.app_handle.read().await.as_ref() {
-        let status = state.get_status().await;
-        let _ = handle.emit("status-changed", &status);
-    }
+    state.emit_status_changed().await;
     Ok(true)
 }
 
@@ -489,10 +486,7 @@ pub async fn update_device_name(
         }
     }
     if updated {
-        if let Some(handle) = state.app_handle.read().await.as_ref() {
-            let status = state.get_status().await;
-            let _ = handle.emit("status-changed", &status);
-        }
+        state.emit_status_changed().await;
         return Ok(true);
     }
     Ok(false)
@@ -522,10 +516,7 @@ pub async fn toggle_device_receive(
         }
     }
     if updated {
-        if let Some(handle) = state.app_handle.read().await.as_ref() {
-            let status = state.get_status().await;
-            let _ = handle.emit("status-changed", &status);
-        }
+        state.emit_status_changed().await;
         return Ok(true);
     }
     Ok(false)
