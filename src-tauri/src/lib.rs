@@ -82,6 +82,22 @@ pub fn run() {
                     }
                 }
 
+                #[cfg(target_os = "windows")]
+                {
+                    if let Some(win) = app.get_webview_window("main") {
+                        let win_clone = win.clone();
+                        let _ = app.run_on_main_thread(move || {
+                            // On Windows 11, apply Mica with dark theme
+                            if window_vibrancy::apply_mica(&win_clone, Some(true)).is_err() {
+                                // Fallback to Tabbed, then Acrylic on Windows 10
+                                if window_vibrancy::apply_tabbed(&win_clone, Some(true)).is_err() {
+                                    let _ = window_vibrancy::apply_acrylic(&win_clone, Some((20, 20, 24, 210)));
+                                }
+                            }
+                        });
+                    }
+                }
+
                 Ok(())
             }
         })

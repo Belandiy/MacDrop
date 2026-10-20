@@ -2,6 +2,25 @@
 
 Все важные изменения проекта MacDrop фиксируются в этом файле.
 
+## [feat/tauri-windows-portable-and-ui-fix] - 2026-10-20
+
+### Сборка Portable-версии для Windows, исправление прозрачности и устранение двойного заголовка
+- **Сборка Portable-версии для Windows**:
+  - Добавлен скрипт [scripts/copy-tauri-portable.js](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/scripts/copy-tauri-portable.js), который извлекает скомпилированный бинарник `macdrop.exe` из `src-tauri/target/release` и публикует его в `release/MacDrop-{version}-portable.exe` и `release/MacDrop-portable.exe`, а также копирует NSIS-инсталлятор.
+  - В [package.json](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/package.json) добавлены команды:
+    - `npm run package:tauri:win:portable` — быстрая сборка портативной версии без оверхеда на упаковку NSIS.
+    - `npm run package:tauri:win:all` — полная сборка как NSIS-инсталлятора, так и Portable .exe.
+    - `npm run package:tauri:win` теперь также автоматически копирует портативную версию в `release/`.
+  - В [.github/workflows/build-tauri.yml](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/.github/workflows/build-tauri.yml) добавлен шаг подготовки портативных исполняемых файлов для автоматического включения в артефакты CI/CD.
+- **Устранение двойного верхнего меню на Windows**:
+  - В [src/renderer/src/designs/classic-native/index.tsx](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/designs/classic-native/index.tsx) кастомная панель заголовка `<header>` со светофорными кнопками Mac и дублирующимся заголовком "MacDrop" теперь отображается **только на macOS** (`{isMac && ...}`). На Windows используется нативный системный заголовок окна DWM.
+  - Кнопка настроек (шестеренка) на Windows вынесена в правый верхний угол блока устройств в сайдбаре (`ПОДКЛЮЧЕННЫЕ УСТРОЙСТВА`) и в правый угол строки отправки в [src/renderer/src/components/NativeDropZone.tsx](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/components/NativeDropZone.tsx) (`headerRight`).
+- **Исправление прозрачности окна и артефактов границ на Windows**:
+  - В [src-tauri/src/lib.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/lib.rs) добавлен блок `#[cfg(target_os = "windows")]` с аппаратной поддержкой Windows 11 Mica (в темной теме), а также автоматическим фолбэком на Tabbed и Acrylic на Windows 10.
+  - В [src-tauri/tauri.conf.json](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/tauri.conf.json) в `windowEffects.effects` добавлен эффект `"micaDark"`.
+  - В [src/renderer/src/App.tsx](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/App.tsx) корневой контейнер адаптирован под платформу: на macOS сохраняется скругление `rounded-[14px]` и `bg-transparent`, а на Windows применяется фоновое размытие с благородным темным оттенком `bg-[#121318]/85 backdrop-blur-2xl` и прямыми углами `rounded-none border-0`, что убирает артефакты дыр в углах окна и делает текст контрастным и легко читаемым.
+  - В [src/renderer/src/designs/classic-native/index.tsx](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/designs/classic-native/index.tsx) скорректирован фон сайдбара на Windows (`bg-[#0e0f14]/70`) для создания четкой визуальной иерархии между сайдбаром и основной областью.
+
 ## [fix/tauri-pairing-and-status-events] - 2026-10-14
 
 ### Исправление сопряжения и обновления списка устройств в Tauri

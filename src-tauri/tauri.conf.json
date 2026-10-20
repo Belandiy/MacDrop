@@ -33,7 +33,8 @@
         "shadow": true,
         "windowEffects": {
           "effects": [
-            "underWindowBackground"
+            "underWindowBackground",
+            "micaDark"
           ],
           "state": "active",
           "radius": 14.0

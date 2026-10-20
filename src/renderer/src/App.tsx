@@ -31,12 +31,22 @@ export default function App() {
     handleInstallUpdate
   } = appLogic;
 
+  const isMac =
+    platform === 'darwin' ||
+    (typeof navigator !== 'undefined' && /Mac|iPhone|iPod|iPad/i.test(navigator.platform || navigator.userAgent));
+
   return (
     <LanguageProvider
       language={config.language || 'ru'}
       onLanguageChange={handleSetLanguage}
     >
-      <div className="flex flex-col h-screen bg-transparent text-[#F2F2F7] select-none antialiased overflow-hidden rounded-[14px] border border-white/[0.08] shadow-2xl">
+      <div
+        className={`flex flex-col h-screen text-[#F2F2F7] select-none antialiased overflow-hidden ${
+          isMac
+            ? 'bg-transparent rounded-[14px] border border-white/[0.08] shadow-2xl'
+            : 'bg-[#121318]/85 backdrop-blur-2xl rounded-none border-0 shadow-none'
+        }`}
+      >
         {/* Main Classic Native View */}
         <div className="flex-1 overflow-hidden relative">
           <ClassicNativeDesign {...appLogic} />

@@ -49,7 +49,9 @@ export default function ClassicNativeDesign(props: DesignProps) {
     platform = window.macdrop?.platform || 'darwin'
   } = props;
 
-  const isMac = platform === 'darwin' || (typeof navigator !== 'undefined' && /Mac|iPhone|iPod|iPad/i.test(navigator.platform));
+  const isMac =
+    platform === 'darwin' ||
+    (typeof navigator !== 'undefined' && /Mac|iPhone|iPod|iPad/i.test(navigator.platform || navigator.userAgent));
 
   const { t } = useTranslation();
 
@@ -193,75 +195,56 @@ export default function ClassicNativeDesign(props: DesignProps) {
     <div className="w-full h-full bg-transparent text-[#F2F2F7] flex flex-col overflow-hidden select-none font-sans antialiased">
       {/* ========================================================
           UNIFIED macOS TOOLBAR / TITLEBAR (38px)
+          Rendered only on macOS (which uses overlay titlebar).
+          On Windows: native DWM titlebar is used, so no duplicate header.
           ======================================================== */}
-      <header
-        data-tauri-drag-region
-        style={{ WebkitAppRegion: 'drag' } as any}
-        onMouseDown={(e) => {
-          if ((e.target as HTMLElement).closest('button, a, input, select, textarea, [data-no-drag]')) {
-            return;
-          }
-          if (e.button === 0) {
-            window.macdrop?.startDragging?.();
-          }
-        }}
-        onDoubleClick={(e) => {
-          if ((e.target as HTMLElement).closest('button, a, input, select, textarea, [data-no-drag]')) {
-            return;
-          }
-          if (window.macdrop?.fillWindow) {
-            window.macdrop.fillWindow();
-          } else {
-            window.macdrop?.maximizeWindow?.();
-          }
-        }}
-        className="h-[38px] px-3 bg-[#1e1e22]/50 border-b border-white/[0.08] flex items-center justify-between shrink-0 relative select-none cursor-default backdrop-blur-md"
-      >
-        {/* Genuine macOS Traffic Lights (Native on macOS, simulated fallback on other platforms) */}
-        {isMac ? (
-          <div className="w-[68px] h-full shrink-0 pointer-events-none" />
-        ) : (
-          <div data-no-drag style={{ WebkitAppRegion: 'no-drag' } as any} className="flex items-center gap-[7px] z-10">
-            <button
-              data-no-drag
-              onClick={() => window.macdrop?.closeWindow()}
-              title={t('window.close')}
-              className="w-3 h-3 rounded-full bg-[#FF5F56] border border-[#E0443E]/60 flex items-center justify-center cursor-pointer transition-transform active:scale-95"
-            />
-            <button
-              data-no-drag
-              onClick={() => window.macdrop?.minimizeWindow()}
-              title={t('window.minimize')}
-              className="w-3 h-3 rounded-full bg-[#FFBD2E] border border-[#DEA123]/60 flex items-center justify-center cursor-pointer transition-transform active:scale-95"
-            />
-            <button
-              data-no-drag
-              onClick={() => window.macdrop?.maximizeWindow?.()}
-              title={t('window.zoom')}
-              className="w-3 h-3 rounded-full bg-[#27C93F] border border-[#1AAB29]/60 flex items-center justify-center cursor-pointer transition-transform active:scale-95"
-            />
-          </div>
-        )}
-
-        {/* Centered Window Title */}
-        <div data-tauri-drag-region className="absolute inset-x-0 flex items-center justify-center pointer-events-none">
-          <span data-tauri-drag-region className="text-[13px] font-medium text-[#F2F2F7] tracking-tight">MacDrop</span>
-        </div>
-
-        {/* Settings Icon Button (Right) */}
-        <button
-          data-no-drag
-          style={{ WebkitAppRegion: 'no-drag' } as any}
-          onClick={() => handleOpenSettings('general')}
-          className="w-6 h-6 flex items-center justify-center rounded text-[#8E8E93] hover:text-[#FFFFFF] hover:bg-[#2C2C2E] transition-colors cursor-pointer z-10"
-          title={t('window.settings')}
+      {isMac && (
+        <header
+          data-tauri-drag-region
+          style={{ WebkitAppRegion: 'drag' } as any}
+          onMouseDown={(e) => {
+            if ((e.target as HTMLElement).closest('button, a, input, select, textarea, [data-no-drag]')) {
+              return;
+            }
+            if (e.button === 0) {
+              window.macdrop?.startDragging?.();
+            }
+          }}
+          onDoubleClick={(e) => {
+            if ((e.target as HTMLElement).closest('button, a, input, select, textarea, [data-no-drag]')) {
+              return;
+            }
+            if (window.macdrop?.fillWindow) {
+              window.macdrop.fillWindow();
+            } else {
+              window.macdrop?.maximizeWindow?.();
+            }
+          }}
+          className="h-[38px] px-3 bg-[#1e1e22]/50 border-b border-white/[0.08] flex items-center justify-between shrink-0 relative select-none cursor-default backdrop-blur-md"
         >
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" viewBox="0 0 24 24">
-            <circle cx="12" cy="12" r="3"></circle>
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-          </svg>
-        </button>
-      </header>
+          {/* Native macOS Traffic Lights sit over this 68px reserved zone */}
+          <div className="w-[68px] h-full shrink-0 pointer-events-none" />
+
+          {/* Centered Window Title */}
+          <div data-tauri-drag-region className="absolute inset-x-0 flex items-center justify-center pointer-events-none">
+            <span data-tauri-drag-region className="text-[13px] font-medium text-[#F2F2F7] tracking-tight">MacDrop</span>
+          </div>
+
+          {/* Settings Icon Button (Right) */}
+          <button
+            data-no-drag
+            style={{ WebkitAppRegion: 'no-drag' } as any}
+            onClick={() => handleOpenSettings('general')}
+            className="w-6 h-6 flex items-center justify-center rounded text-[#8E8E93] hover:text-[#FFFFFF] hover:bg-[#2C2C2E] transition-colors cursor-pointer z-10"
+            title={t('window.settings')}
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+            </svg>
+          </button>
+        </header>
+      )}
 
       {/* ========================================================
           SPLIT-VIEW CONTAINER
@@ -270,12 +253,30 @@ export default function ClassicNativeDesign(props: DesignProps) {
         {/* ================= LEFT SIDEBAR (Resizable) ================= */}
         <aside
           style={{ width: `${sidebarWidth}px` }}
-          className="bg-[#141416]/50 border-r border-white/[0.08] p-[12px_10px] flex flex-col justify-between shrink-0 select-none overflow-hidden backdrop-blur-md"
+          className={`${
+            isMac ? 'bg-[#141416]/50' : 'bg-[#0e0f14]/70'
+          } border-r border-white/[0.08] p-[12px_10px] flex flex-col justify-between shrink-0 select-none overflow-hidden backdrop-blur-md`}
         >
           {/* Top Section: Devices */}
           <div className="overflow-hidden">
-            <div className="px-2 py-1 text-[11px] font-semibold text-[#8E8E93] uppercase tracking-wider truncate">
-              {t('devices.title')}
+            <div className="flex items-center justify-between px-2 py-1">
+              <span className="text-[11px] font-semibold text-[#8E8E93] uppercase tracking-wider truncate">
+                {t('devices.title')}
+              </span>
+              {!isMac && (
+                <button
+                  type="button"
+                  data-no-drag
+                  onClick={() => handleOpenSettings('general')}
+                  className="w-5 h-5 flex items-center justify-center rounded text-[#8E8E93] hover:text-[#FFFFFF] hover:bg-[#2C2C2E] transition-colors cursor-pointer"
+                  title={t('window.settings')}
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="3"></circle>
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                  </svg>
+                </button>
+              )}
             </div>
             <nav className="mt-1 space-y-0.5 overflow-y-auto max-h-[calc(100vh-220px)]">
               {devices.length === 0 ? (
@@ -460,6 +461,22 @@ export default function ClassicNativeDesign(props: DesignProps) {
               onChooseFiles={handleChooseFiles}
               onChooseFolder={handleChooseFolder}
               onHoveredTargetChange={setDropHoveredDeviceId}
+              headerRight={
+                !isMac ? (
+                  <button
+                    type="button"
+                    data-no-drag
+                    onClick={() => handleOpenSettings('general')}
+                    className="w-5 h-5 flex items-center justify-center rounded text-[#8E8E93] hover:text-[#FFFFFF] hover:bg-[#2C2C2E] transition-colors cursor-pointer"
+                    title={t('window.settings')}
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" viewBox="0 0 24 24">
+                      <circle cx="12" cy="12" r="3"></circle>
+                      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                    </svg>
+                  </button>
+                ) : undefined
+              }
             />
           </section>
 

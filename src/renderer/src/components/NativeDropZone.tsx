@@ -11,6 +11,7 @@ interface NativeDropZoneProps {
   onChooseFolder?: (targetDeviceId?: string) => void;
   className?: string;
   onHoveredTargetChange?: (targetDeviceId: string | null) => void;
+  headerRight?: React.ReactNode;
 }
 
 export const NativeDropZone: React.FC<NativeDropZoneProps> = ({
@@ -20,7 +21,8 @@ export const NativeDropZone: React.FC<NativeDropZoneProps> = ({
   onChooseFiles,
   onChooseFolder,
   className = '',
-  onHoveredTargetChange
+  onHoveredTargetChange,
+  headerRight
 }) => {
   const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -98,6 +100,8 @@ export const NativeDropZone: React.FC<NativeDropZoneProps> = ({
             <span>{isOverZone ? t('dropzone.releaseToSendToTarget') : t('dropzone.hoverOverDestination')}</span>
           </div>
         )}
+
+        {!isDragging && headerRight}
       </div>
 
       {/* 
