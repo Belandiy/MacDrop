@@ -71,13 +71,13 @@ pub async fn start_peer_discovery(state: Arc<EngineState>) {
 
     state.logger.info("Discovery", "UDP Peer Discovery running on port 8385", None);
 
-    // Periodic background subnet sweep: initial sweep after 2.5s, then every 30s
+    // Periodic background subnet sweep: initial sweep after 8s, then every 60s
     let sweep_state = state.clone();
     tokio::spawn(async move {
-        tokio::time::sleep(Duration::from_millis(2500)).await;
+        tokio::time::sleep(Duration::from_millis(8000)).await;
         probe_subnet(sweep_state.clone()).await;
         loop {
-            tokio::time::sleep(Duration::from_secs(30)).await;
+            tokio::time::sleep(Duration::from_secs(60)).await;
             probe_subnet(sweep_state.clone()).await;
         }
     });
@@ -329,22 +329,6 @@ pub async fn probe_subnet(state: Arc<EngineState>) {
         return;
     }
 
-    // Add common neighboring subnets as secondary (matching Electron discovery)
-    let mut secondary = Vec::new();
-    for p in &subnets {
-        if p == "192.168.0" && !subnets.contains(&"192.168.1".to_string()) {
-            secondary.push("192.168.1".to_string());
-        }
-        if p == "192.168.1" && !subnets.contains(&"192.168.0".to_string()) {
-            secondary.push("192.168.0".to_string());
-        }
-    }
-    for s in secondary {
-        if !subnets.contains(&s) {
-            subnets.push(s);
-        }
-    }
-
     let our_id = {
         let cfg = state.config.read().await;
         cfg.device_id.clone()
@@ -359,7 +343,7 @@ pub async fn probe_subnet(state: Arc<EngineState>) {
         Err(_) => return,
     };
 
-    let semaphore = Arc::new(tokio::sync::Semaphore::new(40));
+    let semaphore = Arc::new(tokio::sync::Semaphore::new(16));
     let mut tasks = Vec::new();
 
     for subnet in subnets {
@@ -392,6 +376,10 @@ pub async fn probe_subnet(state: Arc<EngineState>) {
                                             let peer_name = json.get("deviceName").and_then(|v| v.as_str()).unwrap_or("Устройство");
                                             let platform = json.get("platform").and_then(|v| v.as_str()).map(|s| s.to_string());
 
+                                            // Prefer primary API port 52520 if reported by peer in remotePort
+                                            let remote_port = json.get("remotePort").and_then(|v| v.as_u64()).map(|p| p as u16).unwrap_or(port);
+                                            let effective_port = if remote_port == 52520 { 52520 } else { port };
+
                                             let now = SystemTime::now()
                                                 .duration_since(UNIX_EPOCH)
                                                 .unwrap_or_default()
@@ -408,7 +396,7 @@ pub async fn probe_subnet(state: Arc<EngineState>) {
                                                 device_id: peer_id.to_string(),
                                                 device_name: peer_name.to_string(),
                                                 ip: target_ip.clone(),
-                                                port,
+                                                port: effective_port,
                                                 platform,
                                                 last_seen: now,
                                                 is_paired,
@@ -424,7 +412,7 @@ pub async fn probe_subnet(state: Arc<EngineState>) {
                                                 let mut cfg = state.config.write().await;
                                                 if let Some(p) = cfg.paired_devices.iter_mut().find(|d| d.id == peer_id) {
                                                     p.ip = target_ip.clone();
-                                                    p.port = port;
+                                                    p.port = effective_port;
                                                     p.last_seen = now;
                                                     if p.connection_mode.as_deref() != Some("local") {
                                                         p.connection_mode = Some("local".to_string());

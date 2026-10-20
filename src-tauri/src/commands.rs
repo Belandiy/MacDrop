@@ -802,9 +802,13 @@ pub async fn send_dropped_files(
     file_paths: Vec<String>,
     target_device_id: Option<String>,
 ) -> Result<Value, String> {
+    let file_names: Vec<String> = file_paths
+        .iter()
+        .map(|p| std::path::Path::new(p).file_name().and_then(|s| s.to_str()).unwrap_or(p).to_string())
+        .collect();
     state.logger.info(
         "Engine",
-        &format!("Sending {} file(s)", file_paths.len()),
+        &format!("Sending {} file(s): {}", file_paths.len(), file_names.join(", ")),
         target_device_id.clone(),
     );
 

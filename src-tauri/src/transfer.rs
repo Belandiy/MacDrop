@@ -145,7 +145,17 @@ pub async fn execute_peer_transfer(
         state.emit_status_changed().await;
         return Ok(true);
     }
-    let (target_ip, target_port, auth_token, peer_name, peer_id) = {
+fn format_error_chain(e: &(dyn std::error::Error + 'static)) -> String {
+    let mut parts = vec![e.to_string()];
+    let mut curr = e.source();
+    while let Some(src) = curr {
+        parts.push(src.to_string());
+        curr = src.source();
+    }
+    parts.join(" -> ")
+}
+
+    let (target_ip, target_port, auth_token, peer_name, peer_id, remote_ip, remote_port) = {
         let cfg = state.config.read().await;
         let discovered = state.discovered_peers.read().await;
 
@@ -157,9 +167,9 @@ pub async fn execute_peer_transfer(
                 } else {
                     (paired.ip.clone(), paired.port)
                 };
-                (ip, port, paired.auth_token.clone(), paired.custom_name.clone(), paired.id.clone())
+                (ip, port, paired.auth_token.clone(), paired.custom_name.clone(), paired.id.clone(), paired.remote_ip.clone(), paired.remote_port)
             } else if let Some(peer) = discovered.get(tid) {
-                (peer.ip.clone(), peer.port, None, peer.name.clone(), peer.id.clone())
+                (peer.ip.clone(), peer.port, None, peer.name.clone(), peer.id.clone(), None, None)
             } else {
                 return Err("Целевое устройство не найдено".to_string());
             }
@@ -169,7 +179,7 @@ pub async fn execute_peer_transfer(
             } else {
                 (first_paired.ip.clone(), first_paired.port)
             };
-            (ip, port, first_paired.auth_token.clone(), first_paired.custom_name.clone(), first_paired.id.clone())
+            (ip, port, first_paired.auth_token.clone(), first_paired.custom_name.clone(), first_paired.id.clone(), first_paired.remote_ip.clone(), first_paired.remote_port)
         } else {
             return Err("Нет подключенных устройств для передачи".to_string());
         }
@@ -231,69 +241,88 @@ pub async fn execute_peer_transfer(
             let _ = handle.emit("progress-update", &prog);
         }
 
-        let url = format!("http://{}:{}/api/upload", target_ip, target_port);
-        let mut req = client
-            .post(&url)
-            .header("x-device-id", &our_device_id)
-            .header("x-filename", urlencoding::encode(&send_filename).as_ref())
-            .header("content-length", total_size.to_string())
-            .body(buffer.clone());
+        let alt_port = if target_port == 52520 { 8384 } else { 52520 };
 
-        if let Some(ref tok) = auth_token {
-            req = req.header("x-auth-token", tok);
+        // Progressive retry attempts across all candidate endpoints:
+        // (ip, port, delay_before_attempt_ms, label)
+        let mut attempts = Vec::new();
+        attempts.push((target_ip.clone(), target_port, 0u64, "primary_initial"));
+        attempts.push((target_ip.clone(), target_port, 500u64, "primary_retry"));
+        attempts.push((target_ip.clone(), alt_port, 700u64, "alt_port"));
+        if let Some(ref rip) = remote_ip {
+            if rip != &target_ip && !rip.is_empty() {
+                let rport = remote_port.unwrap_or(target_port);
+                attempts.push((rip.clone(), rport, 800u64, "remote_ip"));
+            }
         }
+        attempts.push((target_ip.clone(), target_port, 1000u64, "primary_final"));
 
-        let mut res = req.send().await;
+        let mut upload_success = false;
+        let mut last_err_desc = String::new();
 
-        // Fallback between standard ports 52520 and 8384 if initial connection fails
-        if res.is_err() {
-            // Retry once after 400ms on primary port (handles waking sockets / brief app restart)
-            tokio::time::sleep(std::time::Duration::from_millis(400)).await;
-            let mut retry_req = client
+        for (attempt_idx, (curr_ip, curr_port, delay_ms, label)) in attempts.into_iter().enumerate() {
+            if delay_ms > 0 {
+                tokio::time::sleep(std::time::Duration::from_millis(delay_ms)).await;
+            }
+
+            // Check if peer announced a newer live IP while we were retrying
+            let effective_ip = {
+                let discovered = state.discovered_peers.read().await;
+                if let Some(disc) = discovered.get(&peer_id) {
+                    disc.ip.clone()
+                } else {
+                    curr_ip
+                }
+            };
+
+            let url = format!("http://{}:{}/api/upload", effective_ip, curr_port);
+            let mut req = client
                 .post(&url)
                 .header("x-device-id", &our_device_id)
                 .header("x-filename", urlencoding::encode(&send_filename).as_ref())
-                .header("content-length", total_size.to_string())
                 .body(buffer.clone());
 
             if let Some(ref tok) = auth_token {
-                retry_req = retry_req.header("x-auth-token", tok);
+                req = req.header("x-auth-token", tok);
             }
 
-            let retry_res = retry_req.send().await;
-            if retry_res.is_ok() {
-                res = retry_res;
-            } else {
-                let alt_port = if target_port == 52520 { 8384 } else { 52520 };
-                let alt_url = format!("http://{}:{}/api/upload", target_ip, alt_port);
-                state.logger.info("Transfer", &format!("Upload to port {} failed, trying alternative port {}:{}", target_port, target_ip, alt_port), None);
-                let mut alt_req = client
-                    .post(&alt_url)
-                    .header("x-device-id", &our_device_id)
-                    .header("x-filename", urlencoding::encode(&send_filename).as_ref())
-                    .header("content-length", total_size.to_string())
-                    .body(buffer);
+            match req.send().await {
+                Ok(resp) => {
+                    let st = resp.status();
+                    if st.is_success() {
+                        upload_success = true;
+                        state.logger.info(
+                            "Transfer",
+                            &format!("File \"{}\" sent successfully to {}:{} ({})", send_filename, effective_ip, curr_port, label),
+                            Some(format!("Target: {}:{}", effective_ip, curr_port)),
+                        );
 
-                if let Some(ref tok) = auth_token {
-                    alt_req = alt_req.header("x-auth-token", tok);
-                }
-
-                let alt_res = alt_req.send().await;
-                if alt_res.is_ok() {
-                    res = alt_res;
-                    let mut cfg = state.config.write().await;
-                    if let Some(p) = cfg.paired_devices.iter_mut().find(|d| d.id == peer_id) {
-                        p.port = alt_port;
-                        crate::config::save_config(&cfg);
+                        // If working port or IP changed, persist to config
+                        let mut cfg = state.config.write().await;
+                        if let Some(p) = cfg.paired_devices.iter_mut().find(|d| d.id == peer_id) {
+                            if p.ip != effective_ip || p.port != curr_port {
+                                p.ip = effective_ip.clone();
+                                p.port = curr_port;
+                                crate::config::save_config(&cfg);
+                            }
+                        }
+                        break;
+                    } else {
+                        let err_body = resp.text().await.unwrap_or_default();
+                        last_err_desc = format!("HTTP {} ({})", st, err_body);
+                        state.logger.warn(
+                            "Transfer",
+                            &format!("Upload attempt #{} ({}) to {}:{} rejected: {}", attempt_idx + 1, label, effective_ip, curr_port, last_err_desc),
+                            Some(format!("Target: {}:{}", effective_ip, curr_port)),
+                        );
                     }
-                } else if let Err(ref e) = alt_res {
-                    let source_msg = std::error::Error::source(e)
-                        .map(|s| format!(" | cause: {}", s))
-                        .unwrap_or_default();
+                }
+                Err(e) => {
+                    last_err_desc = format_error_chain(&e);
                     state.logger.warn(
                         "Transfer",
-                        &format!("Upload to alternative port {} also failed: {}{}", alt_port, e, source_msg),
-                        Some(format!("Target: {}:{}", target_ip, alt_port)),
+                        &format!("Upload attempt #{} ({}) to {}:{} failed: {}", attempt_idx + 1, label, effective_ip, curr_port, last_err_desc),
+                        Some(format!("Target: {}:{}", effective_ip, curr_port)),
                     );
                 }
             }
@@ -303,33 +332,14 @@ pub async fn execute_peer_transfer(
             let _ = fs::remove_file(&send_path);
         }
 
-        let success = match res {
-            Ok(resp) => {
-                let st = resp.status();
-                if st.is_success() {
-                    true
-                } else {
-                    let err_body = resp.text().await.unwrap_or_default();
-                    state.logger.error(
-                        "Transfer",
-                        &format!("Server rejected upload: HTTP {} ({})", st, err_body),
-                        Some(format!("Target: {}:{}", target_ip, target_port)),
-                    );
-                    false
-                }
-            }
-            Err(e) => {
-                let source_msg = std::error::Error::source(&e)
-                    .map(|s| format!(" | cause: {}", s))
-                    .unwrap_or_default();
-                state.logger.error(
-                    "Transfer",
-                    &format!("Failed to send file: {}{}", e, source_msg),
-                    Some(format!("Target: {}:{}", target_ip, target_port)),
-                );
-                false
-            }
-        };
+        let success = upload_success;
+        if !success {
+            state.logger.error(
+                "Transfer",
+                &format!("Failed to send file \"{}\": {}", send_filename, last_err_desc),
+                Some(format!("Target: {}:{}", target_ip, target_port)),
+            );
+        }
 
         if success {
             {
@@ -480,3 +490,4 @@ mod tests {
         let _ = fs::remove_dir_all(&temp_dir);
     }
 }
+
