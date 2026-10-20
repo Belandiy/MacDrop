@@ -162,7 +162,22 @@ export default function ClassicNativeDesign(props: DesignProps) {
     }
   };
 
-  const currentProgress = status.currentProgress;
+  const rawProgress = status.currentProgress;
+  const currentProgress = rawProgress ? {
+    filename: rawProgress.filename || 'File',
+    bytesTransferred: rawProgress.bytesTransferred ?? rawProgress.bytes_transferred ?? rawProgress.transferred ?? 0,
+    totalBytes: rawProgress.totalBytes ?? rawProgress.total_bytes ?? rawProgress.total ?? 0,
+    speedBps: rawProgress.speedBps ?? rawProgress.speed_bps ?? rawProgress.bytesPerSecond ?? 0,
+    direction: rawProgress.direction || 'outgoing',
+    peerDeviceId: rawProgress.peerDeviceId ?? rawProgress.peer_device_id ?? '',
+    peerName: rawProgress.peerName ?? rawProgress.peer_name ?? '',
+    percent: rawProgress.percent !== undefined
+      ? rawProgress.percent
+      : (rawProgress.totalBytes || rawProgress.total_bytes || rawProgress.total)
+      ? Math.min(100, Math.round(((rawProgress.bytesTransferred ?? rawProgress.bytes_transferred ?? rawProgress.transferred ?? 0) / (rawProgress.totalBytes || rawProgress.total_bytes || rawProgress.total)) * 100))
+      : 0,
+  } : null;
+
   const recentHistory = status.recentHistory || [];
 
   const timeAgo = (timestamp: number): string => {
@@ -177,12 +192,12 @@ export default function ClassicNativeDesign(props: DesignProps) {
 
   // Calculate ETA for active transfer
   const getEtaString = () => {
-    if (!currentProgress || !currentProgress.bytesPerSecond || currentProgress.bytesPerSecond === 0) {
+    if (!currentProgress || !currentProgress.speedBps || currentProgress.speedBps === 0) {
       return '';
     }
-    const remainingBytes = (currentProgress.total || 0) - (currentProgress.transferred || 0);
+    const remainingBytes = (currentProgress.totalBytes || 0) - (currentProgress.bytesTransferred || 0);
     if (remainingBytes <= 0) return t('transfers.finishing');
-    const seconds = Math.ceil(remainingBytes / currentProgress.bytesPerSecond);
+    const seconds = Math.ceil(remainingBytes / currentProgress.speedBps);
     if (seconds < 60) return t('transfers.secLeft', { sec: seconds });
     return t('transfers.minLeft', { min: Math.ceil(seconds / 60) });
   };
@@ -452,17 +467,48 @@ export default function ClassicNativeDesign(props: DesignProps) {
 
         {/* ================= RIGHT MAIN AREA ================= */}
         <main className="flex-1 bg-transparent flex flex-col min-w-0 overflow-hidden select-none">
-          {/* Top Section: Send / Drop Area (180px) */}
-          <section className="h-[180px] p-4 border-b border-white/[0.08] flex flex-col box-border justify-center">
-            <NativeDropZone
-              devices={devices}
-              targetDevice={targetDevice}
-              onFilesDropped={handleFilesDropped}
-              onChooseFiles={handleChooseFiles}
-              onChooseFolder={handleChooseFolder}
-              onHoveredTargetChange={setDropHoveredDeviceId}
-              headerRight={
-                !isMac ? (
+          {/* Top Section: Transfers & Activity (Takes upper flexible space) */}
+          <section className="flex-1 p-[14px_16px] flex flex-col overflow-hidden min-h-0">
+            {/* Section Header Row */}
+            <div className="flex items-center justify-between mb-2.5 shrink-0">
+              <span className="text-[13px] font-semibold text-[#F2F2F7]">{t('transfers.title')}</span>
+
+              <div className="flex items-center gap-2">
+                {/* macOS Segmented Control */}
+                <div className="inline-flex p-0.5 rounded-[6px] bg-white/[0.06] border border-white/[0.08] text-[11px]">
+                  <button
+                    onClick={() => setTransferFilter('all')}
+                    className={`px-2.5 py-0.5 rounded-[4px] font-medium transition-all cursor-pointer ${
+                      transferFilter === 'all'
+                        ? 'bg-white/20 text-white shadow-sm'
+                        : 'text-[#8E8E93] hover:text-[#E5E5EA]'
+                    }`}
+                  >
+                    {t('transfers.all')}
+                  </button>
+                  <button
+                    onClick={() => setTransferFilter('active')}
+                    className={`px-2.5 py-0.5 rounded-[4px] font-medium transition-all cursor-pointer ${
+                      transferFilter === 'active'
+                        ? 'bg-[#3A3A3E] text-white shadow-sm'
+                        : 'text-[#8E8E93] hover:text-[#E5E5EA]'
+                    }`}
+                  >
+                    {t('transfers.active')}
+                  </button>
+                  <button
+                    onClick={() => setTransferFilter('completed')}
+                    className={`px-2.5 py-0.5 rounded-[4px] font-medium transition-all cursor-pointer ${
+                      transferFilter === 'completed'
+                        ? 'bg-[#3A3A3E] text-white shadow-sm'
+                        : 'text-[#8E8E93] hover:text-[#E5E5EA]'
+                    }`}
+                  >
+                    {t('transfers.completed')}
+                  </button>
+                </div>
+
+                {!isMac && (
                   <button
                     type="button"
                     data-no-drag
@@ -475,49 +521,7 @@ export default function ClassicNativeDesign(props: DesignProps) {
                       <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
                     </svg>
                   </button>
-                ) : undefined
-              }
-            />
-          </section>
-
-          {/* Bottom Section: Transfers & Activity (Remaining Height) */}
-          <section className="flex-1 p-[14px_16px] flex flex-col overflow-hidden">
-            {/* Section Header Row */}
-            <div className="flex items-center justify-between mb-2.5">
-              <span className="text-[13px] font-semibold text-[#F2F2F7]">{t('transfers.title')}</span>
-
-              {/* macOS Segmented Control */}
-              <div className="inline-flex p-0.5 rounded-[6px] bg-white/[0.06] border border-white/[0.08] text-[11px]">
-                <button
-                  onClick={() => setTransferFilter('all')}
-                  className={`px-2.5 py-0.5 rounded-[4px] font-medium transition-all cursor-pointer ${
-                    transferFilter === 'all'
-                      ? 'bg-white/20 text-white shadow-sm'
-                      : 'text-[#8E8E93] hover:text-[#E5E5EA]'
-                  }`}
-                >
-                  {t('transfers.all')}
-                </button>
-                <button
-                  onClick={() => setTransferFilter('active')}
-                  className={`px-2.5 py-0.5 rounded-[4px] font-medium transition-all cursor-pointer ${
-                    transferFilter === 'active'
-                      ? 'bg-[#3A3A3E] text-white shadow-sm'
-                      : 'text-[#8E8E93] hover:text-[#E5E5EA]'
-                  }`}
-                >
-                  {t('transfers.active')}
-                </button>
-                <button
-                  onClick={() => setTransferFilter('completed')}
-                  className={`px-2.5 py-0.5 rounded-[4px] font-medium transition-all cursor-pointer ${
-                    transferFilter === 'completed'
-                      ? 'bg-[#3A3A3E] text-white shadow-sm'
-                      : 'text-[#8E8E93] hover:text-[#E5E5EA]'
-                  }`}
-                >
-                  {t('transfers.completed')}
-                </button>
+                )}
               </div>
             </div>
 
@@ -525,46 +529,72 @@ export default function ClassicNativeDesign(props: DesignProps) {
             <div className="flex-1 overflow-y-auto divide-y divide-[#242426]">
               {/* Row 1: Active Transfer (if present) */}
               {showActiveRow && currentProgress && (
-                <div className="h-11 flex items-center justify-between py-1">
-                  {/* Left: File Metadata */}
+                <div className="min-h-12 flex items-center justify-between py-2 px-2.5 bg-white/[0.04] border border-white/[0.08] rounded-[8px] mb-2 shadow-sm animate-in fade-in duration-150">
+                  {/* Left: File Metadata & Direction Icon */}
                   <div className="flex items-center gap-2.5 min-w-0 pr-3">
-                    {/* Archive File Icon */}
-                    <div className="w-6 h-6 rounded bg-[#202838] border border-[#2D3850] flex items-center justify-center shrink-0 text-[#007AFF]">
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" viewBox="0 0 24 24">
-                        <rect height="18" rx="2" width="18" x="3" y="4"></rect>
-                        <line x1="12" x2="12" y1="4" y2="10"></line>
-                        <line x1="10" x2="14" y1="7" y2="7"></line>
-                      </svg>
+                    <div className={`w-7 h-7 rounded-[6px] border flex items-center justify-center shrink-0 ${
+                      currentProgress.direction === 'incoming'
+                        ? 'bg-[#1C3524] border-[#2A5235] text-[#34C759]'
+                        : 'bg-[#202838] border-[#2D3850] text-[#007AFF]'
+                    }`}>
+                      {currentProgress.direction === 'incoming' ? (
+                        <svg className="w-4 h-4 animate-bounce" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24">
+                          <line x1="12" y1="4" x2="12" y2="16"></line>
+                          <polyline points="7 11 12 16 17 11"></polyline>
+                        </svg>
+                      ) : (
+                        <svg className="w-4 h-4 animate-pulse" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24">
+                          <line x1="12" y1="16" x2="12" y2="4"></line>
+                          <polyline points="7 9 12 4 17 9"></polyline>
+                        </svg>
+                      )}
                     </div>
                     <div className="truncate">
-                      <div className="text-[12px] font-medium text-[#F2F2F7] leading-tight truncate">
-                        {currentProgress.filename}
+                      <div className="flex items-center gap-1.5 truncate">
+                        <span className="text-[12px] font-semibold text-[#F2F2F7] leading-tight truncate">
+                          {currentProgress.filename}
+                        </span>
+                        <span className={`text-[9px] px-1 py-0.2 rounded font-medium ${
+                          currentProgress.direction === 'incoming'
+                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                            : 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
+                        }`}>
+                          {currentProgress.direction === 'incoming' ? 'Получение' : 'Отправка'}
+                        </span>
+                        {currentProgress.peerName && (
+                          <span className="text-[10px] text-[#8E8E93] truncate">
+                            • {currentProgress.peerName}
+                          </span>
+                        )}
                       </div>
-                      <div className="text-[11px] text-[#8E8E93] leading-tight font-mono">
-                        {formatBytes(currentProgress.bytesPerSecond || 0)}/s {getEtaString() && `• ${getEtaString()}`}
+                      <div className="text-[11px] text-[#8E8E93] leading-tight font-mono mt-0.5">
+                        {formatBytes(currentProgress.bytesTransferred)} из {formatBytes(currentProgress.totalBytes)} • {formatBytes(currentProgress.speedBps)}/s {getEtaString() && `• ${getEtaString()}`}
                       </div>
                     </div>
                   </div>
 
-                  {/* Center: Native Linear Progress Bar */}
+                  {/* Center & Right: Native Linear Progress Bar & Readout */}
                   <div className="flex items-center gap-3 shrink-0">
-                    <div className="w-[140px] h-1 bg-[#2C2C2E] rounded-[2px] overflow-hidden">
+                    <div className="w-[140px] h-1.5 bg-[#2C2C2E] rounded-full overflow-hidden">
                       <div
-                        className="h-full bg-[#007AFF] rounded-[2px] transition-all duration-100"
-                        style={{ width: `${currentProgress.percent || 0}%` }}
+                        className={`h-full rounded-full transition-all duration-150 ${
+                          currentProgress.direction === 'incoming' ? 'bg-[#34C759]' : 'bg-[#007AFF]'
+                        }`}
+                        style={{ width: `${currentProgress.percent}%` }}
                       ></div>
                     </div>
-                    {/* Right: Status Readout & Cancel Button */}
-                    <span className="text-[11px] text-[#8E8E93] font-mono w-7 text-right">
-                      {Math.round(currentProgress.percent || 0)}%
+                    <span className="text-[11px] text-[#F2F2F7] font-mono w-9 text-right font-semibold">
+                      {Math.round(currentProgress.percent)}%
                     </span>
-                    <button
-                      onClick={() => window.macdrop?.cancelTransfer?.()}
-                      className="w-4 h-4 rounded-full bg-[#2C2C2E] hover:bg-[#3A3A3C] text-[#8E8E93] hover:text-[#F2F2F7] flex items-center justify-center transition-colors cursor-pointer"
-                      title={t('transfers.cancel')}
-                    >
-                      <X className="w-2.5 h-2.5" />
-                    </button>
+                    {currentProgress.direction === 'outgoing' && (
+                      <button
+                        onClick={() => window.macdrop?.cancelTransfer?.()}
+                        className="w-4 h-4 rounded-full bg-[#2C2C2E] hover:bg-[#3A3A3C] text-[#8E8E93] hover:text-[#F2F2F7] flex items-center justify-center transition-colors cursor-pointer"
+                        title={t('transfers.cancel')}
+                      >
+                        <X className="w-2.5 h-2.5" />
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
@@ -625,6 +655,18 @@ export default function ClassicNativeDesign(props: DesignProps) {
                 </div>
               )}
             </div>
+          </section>
+
+          {/* Bottom Section: Send / Drop Module situated at the bottom of the main screen */}
+          <section className="h-[165px] shrink-0 p-3.5 border-t border-white/[0.08] flex flex-col box-border justify-center bg-black/20 backdrop-blur-sm">
+            <NativeDropZone
+              devices={devices}
+              targetDevice={targetDevice}
+              onFilesDropped={handleFilesDropped}
+              onChooseFiles={handleChooseFiles}
+              onChooseFolder={handleChooseFolder}
+              onHoveredTargetChange={setDropHoveredDeviceId}
+            />
           </section>
         </main>
       </div>

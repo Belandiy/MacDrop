@@ -32,6 +32,39 @@ pub struct TransferProgress {
     pub direction: String, // "incoming" | "outgoing"
     pub peer_device_id: String,
     pub peer_name: String,
+    #[serde(default)]
+    pub percent: f64,
+    #[serde(default)]
+    pub bytes_per_second: f64,
+}
+
+impl TransferProgress {
+    pub fn new(
+        filename: String,
+        bytes_transferred: u64,
+        total_bytes: u64,
+        speed_bps: f64,
+        direction: String,
+        peer_device_id: String,
+        peer_name: String,
+    ) -> Self {
+        let percent = if total_bytes > 0 {
+            ((bytes_transferred as f64 / total_bytes as f64) * 100.0).min(100.0)
+        } else {
+            0.0
+        };
+        Self {
+            filename,
+            bytes_transferred,
+            total_bytes,
+            speed_bps,
+            direction,
+            peer_device_id,
+            peer_name,
+            percent,
+            bytes_per_second: speed_bps,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -672,6 +705,33 @@ async fn handle_upload(
         let _ = fs::create_dir_all(parent);
     }
 
+    let total_size = headers
+        .get("content-length")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|s| s.parse::<u64>().ok())
+        .unwrap_or(0);
+
+    let start_time = std::time::Instant::now();
+    let mut last_emit = std::time::Instant::now();
+
+    // Initial incoming progress for UI
+    {
+        let mut prog = state.current_progress.write().await;
+        *prog = Some(TransferProgress::new(
+            filename.clone(),
+            0,
+            total_size,
+            0.0,
+            "incoming".to_string(),
+            sender_id.to_string(),
+            peer_name.clone(),
+        ));
+    }
+    if let Some(handle) = state.app_handle.read().await.as_ref() {
+        let prog = state.current_progress.read().await.clone();
+        let _ = handle.emit("progress-update", &prog);
+    }
+
     // Stream body directly to disk
     let mut file = File::create(&final_path)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to create file: {}", e)))?;
@@ -691,6 +751,28 @@ async fn handle_upload(
         })?;
 
         bytes_transferred += chunk.len() as u64;
+
+        if last_emit.elapsed() >= std::time::Duration::from_millis(50) {
+            last_emit = std::time::Instant::now();
+            let elapsed_secs = start_time.elapsed().as_secs_f64().max(0.001);
+            let speed = bytes_transferred as f64 / elapsed_secs;
+            {
+                let mut prog = state.current_progress.write().await;
+                *prog = Some(TransferProgress::new(
+                    filename.clone(),
+                    bytes_transferred,
+                    total_size,
+                    speed,
+                    "incoming".to_string(),
+                    sender_id.to_string(),
+                    peer_name.clone(),
+                ));
+            }
+            if let Some(handle) = state.app_handle.read().await.as_ref() {
+                let prog = state.current_progress.read().await.clone();
+                let _ = handle.emit("progress-update", &prog);
+            }
+        }
     }
 
     let actual_name = final_path
@@ -698,6 +780,36 @@ async fn handle_upload(
         .and_then(|s| s.to_str())
         .unwrap_or(&filename)
         .to_string();
+
+    // 100% completion progress
+    {
+        let mut prog = state.current_progress.write().await;
+        *prog = Some(TransferProgress::new(
+            actual_name.clone(),
+            bytes_transferred,
+            bytes_transferred.max(total_size),
+            0.0,
+            "incoming".to_string(),
+            sender_id.to_string(),
+            peer_name.clone(),
+        ));
+    }
+    if let Some(handle) = state.app_handle.read().await.as_ref() {
+        let prog = state.current_progress.read().await.clone();
+        let _ = handle.emit("progress-update", &prog);
+    }
+
+    // Keep completed state visible for 600ms so the user perceives the success
+    tokio::time::sleep(std::time::Duration::from_millis(600)).await;
+
+    // Clear progress
+    {
+        let mut prog = state.current_progress.write().await;
+        *prog = None;
+    }
+    if let Some(handle) = state.app_handle.read().await.as_ref() {
+        let _ = handle.emit("progress-update", &None::<TransferProgress>);
+    }
 
     // Add to history
     let now = SystemTime::now()
@@ -717,6 +829,7 @@ async fn handle_upload(
     };
 
     state.history.write().await.push(history_entry);
+    state.emit_status_changed().await;
     state.logger.info("Engine", &format!("Received file: {} ({} bytes)", actual_name, bytes_transferred), None);
 
     // Show native notification if enabled

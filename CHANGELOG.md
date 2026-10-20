@@ -2,6 +2,23 @@
 
 Все важные изменения проекта MacDrop фиксируются в этом файле.
 
+## [fix/tauri-bounded-dropzone-and-bidirectional-progress] - 2026-10-20
+
+### Ограниченная зона сброса, нижний модуль передачи и двусторонний прогресс
+- **Строгое ограничение зоны сброса файлов** ([src/renderer/src/hooks/useStableDropZone.ts](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/hooks/useStableDropZone.ts), [src/renderer/src/components/NativeDropZone.tsx](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/components/NativeDropZone.tsx)):
+  - Сброс файлов больше не перехватывает все окно целиком.
+  - Геометрический хит-тестинг (`checkInsideZone`) строго проверяет попадание курсора в прямоугольник зоны сброса (или на карточку пира в боковой панели).
+  - Сброс в любую другую область окна (список истории, тулбар, пустое пространство) полностью игнорируется без ложных срабатываний передачи.
+  - Добавлены модульные тесты в [useStableDropZone.test.ts](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/hooks/useStableDropZone.test.ts) для подтверждения отсечения дропов вне зоны.
+- **Модуль передачи перемещен в нижнюю часть главного экрана** ([src/renderer/src/designs/classic-native/index.tsx](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/designs/classic-native/index.tsx)):
+  - Секция «Передачи и активность» теперь занимает верхнюю гибкую область экрана (`flex-1 min-h-0`).
+  - Модуль передачи с зоной сброса и кнопкой «Выбрать файлы» закреплен в нижней части экрана (`h-[165px] shrink-0 border-t border-white/[0.08]`).
+- **Двустороннее отображение прогресса на передающей и принимающей сторонах** ([src-tauri/src/engine.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/engine.rs), [src-tauri/src/transfer.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/transfer.rs), [src/renderer/src/designs/classic-native/index.tsx](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/designs/classic-native/index.tsx)):
+  - В `TransferProgress` добавлены поля `percent` и `bytes_per_second` с конструктором `TransferProgress::new`.
+  - В Axum `handle_upload` на принимающей стороне интегрирован стриминг с расчетом скорости (байт/сек), процента завершения и отправкой события `progress-update` в окно каждые 50 мс.
+  - При завершении передачи статус 100% отображается 600 мс с моментальным обновлением истории через `emit_status_changed()`.
+  - В строке активной передачи в UI добавлены динамические бейджи и анимации: изумрудный индикатор получения и синий индикатор отправки, расчет оставшегося времени (ETA), точный размер и скорость передачи.
+
 ## [fix/tauri-window-wide-drop-and-transfer-retry] - 2026-10-20
 
 ### Полнооконный Drag-and-Drop и улучшенная диагностика передачи

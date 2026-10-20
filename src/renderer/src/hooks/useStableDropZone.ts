@@ -31,6 +31,40 @@ function isPointInsideRect(x: number, y: number, rect: DOMRect, buffer: number =
   );
 }
 
+function checkInsideZone(
+  rawX: number,
+  rawY: number,
+  isCssPixel: boolean,
+  zoneEl: HTMLElement | null,
+  buffer: number = 0
+): boolean {
+  if (!zoneEl) return false;
+  const dpr = typeof window !== 'undefined' ? (window.devicePixelRatio || 1) : 1;
+  const zoneRect = zoneEl.getBoundingClientRect();
+
+  // Test DPR scaled coords
+  const x1 = isCssPixel ? rawX : rawX / dpr;
+  const y1 = isCssPixel ? rawY : rawY / dpr;
+  if (isPointInsideRect(x1, y1, zoneRect, buffer)) return true;
+
+  // Test unscaled coords (if already CSS coords)
+  if (!isCssPixel && isPointInsideRect(rawX, rawY, zoneRect, buffer)) return true;
+
+  // Test DOM element check
+  if (typeof document !== 'undefined' && typeof document.elementFromPoint === 'function') {
+    try {
+      const el1 = document.elementFromPoint(x1, y1);
+      if (el1 && (zoneEl === el1 || zoneEl.contains(el1))) return true;
+      if (!isCssPixel) {
+        const el2 = document.elementFromPoint(rawX, rawY);
+        if (el2 && (zoneEl === el2 || zoneEl.contains(el2))) return true;
+      }
+    } catch {}
+  }
+
+  return false;
+}
+
 /**
  * Robust Drag & Drop Hook:
  * - Native Tauri Webview DragDrop integration (WebKit on macOS does not provide file paths in DOM).
@@ -108,14 +142,9 @@ export function useStableDropZone({
     const x = rawX / dpr;
     const y = rawY / dpr;
 
-    // 1. Geometric hit-testing for central dropzone
+    // 1. Geometric hit-testing for central dropzone (strictly inside dropzone element)
     const zoneEl = zoneRef.current;
-    let insideZone = false;
-    if (zoneEl) {
-      const zoneRect = zoneEl.getBoundingClientRect();
-      const buffer = isOverZoneRef.current ? hysteresisBuffer : 0;
-      insideZone = isPointInsideRect(x, y, zoneRect, buffer);
-    }
+    const insideZone = checkInsideZone(rawX, rawY, isCssPixel, zoneEl, isOverZoneRef.current ? hysteresisBuffer : 0);
 
     if (insideZone !== isOverZoneRef.current) {
       isOverZoneRef.current = insideZone;
@@ -181,12 +210,23 @@ export function useStableDropZone({
         }
       } else if (payload.type === 'drop') {
         clearWatchdog();
+        let droppedInside = isOverZoneRef.current;
+        if (payload.position) {
+          droppedInside = checkInsideZone(
+            payload.position.x,
+            payload.position.y,
+            false,
+            zoneRef.current,
+            hysteresisBuffer
+          );
+        }
         const targetId = hoveredTargetIdRef.current || undefined;
         const paths = (payload.paths && payload.paths.length > 0) ? payload.paths : cachedPathsRef.current;
 
         resetDragState();
 
-        if (paths && paths.length > 0) {
+        // ONLY trigger transfer if the drop happened strictly over the dropzone or a target device
+        if ((droppedInside || targetId) && paths && paths.length > 0) {
           await onDropFilesRef.current(paths, targetId);
         }
       } else if (payload.type === 'leave') {
@@ -200,7 +240,7 @@ export function useStableDropZone({
     return () => {
       unlisten();
     };
-  }, [clearWatchdog, debounceMs, resetDragState, updateCoordinates]);
+  }, [clearWatchdog, debounceMs, resetDragState, updateCoordinates, hysteresisBuffer, zoneRef]);
 
   // ==================== 2. HTML5 DOM FALLBACK ====================
   useEffect(() => {
@@ -253,12 +293,14 @@ export function useStableDropZone({
         return;
       }
 
+      const droppedInside = checkInsideZone(e.clientX, e.clientY, true, zoneRef.current, hysteresisBuffer);
       const targetId = hoveredTargetIdRef.current || undefined;
       const files = Array.from(e.dataTransfer?.files || []);
 
       resetDragState();
 
-      if (files.length > 0) {
+      // ONLY trigger transfer if dropped inside dropzone or on a target device
+      if ((droppedInside || targetId) && files.length > 0) {
         const filePaths = files
           .map((f: any) => {
             if (window.macdrop?.getPathForFile) {

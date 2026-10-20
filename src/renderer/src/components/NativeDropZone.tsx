@@ -110,6 +110,7 @@ export const NativeDropZone: React.FC<NativeDropZoneProps> = ({
       */}
       <div
         ref={containerRef}
+        data-drop-zone="true"
         className={`h-[120px] mt-1 rounded-[6px] relative select-none overflow-hidden transition-colors duration-150 ${
           isOverZone
             ? 'border-[1.5px] border-[#007AFF] bg-[#007AFF]/15 shadow-[0_0_16px_rgba(0,122,255,0.2)]'

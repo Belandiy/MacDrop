@@ -149,4 +149,58 @@ describe('useStableDropZone', () => {
     expect(result.current.isDragging).toBe(false);
     expect(result.current.isOverZone).toBe(false);
   });
+
+  it('should REJECT drops outside the drop zone boundary', async () => {
+    const zoneRef = createMockZoneRef({ left: 100, top: 100, right: 300, bottom: 200, width: 200, height: 100 });
+    const onDropFiles = vi.fn();
+
+    const { result } = renderHook(() =>
+      useStableDropZone({
+        zoneRef,
+        onDropFiles
+      })
+    );
+
+    // Drop outside the zone
+    await act(async () => {
+      const dropEvent = new Event('drop') as any;
+      dropEvent.preventDefault = vi.fn();
+      dropEvent.dataTransfer = {
+        files: [{ path: '/test/photo.jpg', name: 'photo.jpg' }]
+      };
+      dropEvent.clientX = 50; // Outside (zone starts at 100)
+      dropEvent.clientY = 50;
+      window.dispatchEvent(dropEvent);
+    });
+
+    expect(onDropFiles).not.toHaveBeenCalled();
+    expect(result.current.isDragging).toBe(false);
+  });
+
+  it('should ACCEPT drops inside the drop zone boundary', async () => {
+    const zoneRef = createMockZoneRef({ left: 100, top: 100, right: 300, bottom: 200, width: 200, height: 100 });
+    const onDropFiles = vi.fn();
+
+    const { result } = renderHook(() =>
+      useStableDropZone({
+        zoneRef,
+        onDropFiles
+      })
+    );
+
+    // Drop inside the zone
+    await act(async () => {
+      const dropEvent = new Event('drop') as any;
+      dropEvent.preventDefault = vi.fn();
+      dropEvent.dataTransfer = {
+        files: [{ path: '/test/document.pdf', name: 'document.pdf' }]
+      };
+      dropEvent.clientX = 150; // Inside zone (100..300, 100..200)
+      dropEvent.clientY = 150;
+      window.dispatchEvent(dropEvent);
+    });
+
+    expect(onDropFiles).toHaveBeenCalledWith(['/test/document.pdf'], undefined);
+    expect(result.current.isDragging).toBe(false);
+  });
 });

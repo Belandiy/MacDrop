@@ -418,9 +418,10 @@ export const DropZone: React.FC<DropZoneProps> = React.memo(({
 
     const handleWindowDrop = (e: DragEvent): void => {
       e.preventDefault();
+      const wasInside = isInsideZone(e);
       forceReset();
 
-      if (e.dataTransfer?.files.length) {
+      if (wasInside && e.dataTransfer?.files.length) {
         const files = Array.from(e.dataTransfer.files);
         const paths = files
           .map((f: any) => {

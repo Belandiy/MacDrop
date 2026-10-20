@@ -100,15 +100,15 @@ pub async fn execute_peer_transfer(
             // Simulate progress update for UI feedback
             {
                 let mut prog = state.current_progress.write().await;
-                *prog = Some(TransferProgress {
-                    filename: send_filename.clone(),
-                    bytes_transferred: total_size,
-                    total_bytes: total_size,
-                    speed_bps: total_size as f64,
-                    direction: "outgoing".to_string(),
-                    peer_device_id: "mobile-web".to_string(),
-                    peer_name: "Телефон (Web Drop)".to_string(),
-                });
+                *prog = Some(TransferProgress::new(
+                    send_filename.clone(),
+                    total_size,
+                    total_size,
+                    total_size as f64,
+                    "outgoing".to_string(),
+                    "mobile-web".to_string(),
+                    "Телефон (Web Drop)".to_string(),
+                ));
             }
 
             if let Some(handle) = state.app_handle.read().await.as_ref() {
@@ -204,15 +204,15 @@ pub async fn execute_peer_transfer(
         // Update initial progress
         {
             let mut prog = state.current_progress.write().await;
-            *prog = Some(TransferProgress {
-                filename: send_filename.clone(),
-                bytes_transferred: 0,
-                total_bytes: total_size,
-                speed_bps: 0.0,
-                direction: "outgoing".to_string(),
-                peer_device_id: peer_id.clone(),
-                peer_name: peer_name.clone(),
-            });
+            *prog = Some(TransferProgress::new(
+                send_filename.clone(),
+                0,
+                total_size,
+                0.0,
+                "outgoing".to_string(),
+                peer_id.clone(),
+                peer_name.clone(),
+            ));
         }
 
         if let Some(handle) = state.app_handle.read().await.as_ref() {
@@ -302,6 +302,26 @@ pub async fn execute_peer_transfer(
             }
         };
 
+        if success {
+            {
+                let mut prog = state.current_progress.write().await;
+                *prog = Some(TransferProgress::new(
+                    send_filename.clone(),
+                    total_size,
+                    total_size,
+                    0.0,
+                    "outgoing".to_string(),
+                    peer_id.clone(),
+                    peer_name.clone(),
+                ));
+            }
+            if let Some(handle) = state.app_handle.read().await.as_ref() {
+                let prog = state.current_progress.read().await.clone();
+                let _ = handle.emit("progress-update", &prog);
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(600)).await;
+        }
+
         // Clear progress
         {
             let mut prog = state.current_progress.write().await;
@@ -329,6 +349,7 @@ pub async fn execute_peer_transfer(
         };
 
         state.history.write().await.push(entry);
+        state.emit_status_changed().await;
 
         if is_temp {
             let _ = fs::remove_file(&send_path);
