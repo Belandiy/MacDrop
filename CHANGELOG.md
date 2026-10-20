@@ -2,6 +2,20 @@
 
 Все важные изменения проекта MacDrop фиксируются в этом файле.
 
+## [fix/windows-firewall-auto-rules] - 2026-10-20
+
+### Автоматическое открытие портов Windows Firewall
+- **Новый модуль `firewall.rs`** ([src-tauri/src/firewall.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/firewall.rs)):
+  - При запуске на Windows автоматически проверяет наличие правил Windows Firewall для TCP (52520, 8384) и UDP (8385).
+  - Если правил нет — добавляет через `netsh advfirewall`. Идемпотентно (не дублирует существующие правила).
+  - При отсутствии прав администратора не крашит приложение — логирует предупреждение с инструкцией.
+- **NSIS Installer hooks** ([src-tauri/nsis-hooks.nsi](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/nsis-hooks.nsi)):
+  - При установке через NSIS-инсталлер правила firewall добавляются автоматически (инсталлер запускается с правами админа).
+  - При удалении — правила удаляются.
+- **Улучшено сообщение об ошибке pair** ([src-tauri/src/commands.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/commands.rs)):
+  - В ошибку подключения добавлена явная подсказка про Windows Firewall и номера портов.
+- **Причина бага**: Windows Firewall по умолчанию блокирует все входящие подключения для нового приложения. Без явных правил: Windows не получает UDP discovery (не видит Mac), а Mac не может подключиться к Windows по TCP (pair/upload).
+
 ## [fix/tauri-cross-platform-discovery-and-pairing] - 2026-10-20
 
 ### Полный паритет сетевого обнаружения и сопряжения с Electron

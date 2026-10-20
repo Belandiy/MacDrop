@@ -403,7 +403,10 @@ pub async fn pair_device(
                 let source_msg = std::error::Error::source(&err)
                     .map(|s| format!(" | cause: {}", s))
                     .unwrap_or_default();
-                format!("Не удалось подключиться к {}:{}. Проверьте доступность устройства в сети ({}{}).", target_ip, actual_port, err, source_msg)
+                format!(
+                    "Не удалось подключиться к {}:{}. Убедитесь, что MacDrop запущен на удалённом устройстве и Windows Firewall не блокирует порты 52520/8384 (TCP) и 8385 (UDP). ({}{})",
+                    target_ip, actual_port, err, source_msg
+                )
             };
             state.logger.error("Pairing", &msg, None);
             return Ok(serde_json::json!({

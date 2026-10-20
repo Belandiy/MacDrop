@@ -3,6 +3,8 @@ pub mod commands;
 pub mod config;
 pub mod discovery;
 pub mod engine;
+#[cfg(target_os = "windows")]
+pub mod firewall;
 pub mod logger;
 pub mod mobile_web;
 pub mod net_utils;
@@ -24,6 +26,13 @@ pub fn run() {
     }
     let app_logger = AppLogger::new();
     let engine_state = Arc::new(EngineState::new(cfg, app_logger.clone()));
+
+    // On Windows, ensure firewall rules exist for UDP discovery and TCP HTTP API
+    #[cfg(target_os = "windows")]
+    {
+        let logger = engine_state.logger.clone();
+        crate::firewall::ensure_firewall_rules(&logger);
+    }
 
     // Launch background HTTP server
     let server_state = engine_state.clone();
