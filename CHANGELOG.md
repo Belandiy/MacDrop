@@ -2,6 +2,17 @@
 
 Все важные изменения проекта MacDrop фиксируются в этом файле.
 
+## [fix/tauri-transfer-resilience-and-notifications] - 2026-10-20
+
+### Повышение отказоустойчивости сетевой передачи и нативные уведомления
+- **Динамическое разрешение IP/порта пиров** ([src-tauri/src/transfer.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/transfer.rs)):
+  - При отправке файлов проверяется таблица обнаруженных пиров (`discovered_peers`), чтобы всегда использовать свежий локальный IP и порт пира, даже если устройство переподключилось с другим IP по DHCP.
+- **Повторная попытка (Retry Backoff) и таймаут подключения** ([src-tauri/src/transfer.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/transfer.rs)):
+  - В `reqwest::Client` добавлен `connect_timeout(5s)` для предотвращения зависаний при недоступных хостах.
+  - При сбое подключения (`res.is_err()`) добавлена быстрая повторная попытка через 400 мс на основной порт, что сглаживает кратковременные разрывы или фазу запуска удаленного сокета до переключения на альтернативный порт (8384).
+- **Нативные системные уведомления для исходящей передачи** ([src-tauri/src/transfer.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/transfer.rs)):
+  - При успешной передаче или ошибке отправки вызывается нативное macOS/Windows уведомление через `notify_rust` (при включенной опции уведомлений в настройках).
+
 ## [fix/tauri-bounded-dropzone-and-bidirectional-progress] - 2026-10-20
 
 ### Ограниченная зона сброса, нижний модуль передачи и двусторонний прогресс
