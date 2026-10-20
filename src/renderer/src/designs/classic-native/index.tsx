@@ -467,8 +467,8 @@ export default function ClassicNativeDesign(props: DesignProps) {
 
         {/* ================= RIGHT MAIN AREA ================= */}
         <main className="flex-1 bg-transparent flex flex-col min-w-0 overflow-hidden select-none">
-          {/* Top Section: Send / Drop Zone Module */}
-          <section className="p-[14px_16px] shrink-0 border-b border-white/[0.08]">
+          {/* Top Section: Send / Drop Zone Module (Takes the upper flexible space, bounded zone) */}
+          <section className="flex-1 p-[14px_16px] flex flex-col min-h-0 overflow-hidden">
             <NativeDropZone
               devices={devices}
               targetDevice={targetDevice}
@@ -476,21 +476,22 @@ export default function ClassicNativeDesign(props: DesignProps) {
               onChooseFiles={handleChooseFiles}
               onChooseFolder={handleChooseFolder}
               onHoveredTargetChange={setDropHoveredDeviceId}
+              className="h-full"
             />
           </section>
 
-          {/* Bottom Section: Transfers & Activity (Journal) */}
-          <section className="flex-1 p-[14px_16px] flex flex-col overflow-hidden min-h-0">
+          {/* Bottom Section: Transfers & Activity (Journal) - НИЗКИЙ (Compact low height on both platforms) */}
+          <section className="h-[145px] shrink-0 p-[10px_16px] border-t border-white/[0.08] flex flex-col overflow-hidden bg-black/15 backdrop-blur-sm">
             {/* Section Header Row */}
-            <div className="flex items-center justify-between mb-2.5 shrink-0">
-              <span className="text-[13px] font-semibold text-[#F2F2F7]">{t('transfers.title')}</span>
+            <div className="flex items-center justify-between mb-1.5 shrink-0">
+              <span className="text-[12px] font-semibold text-[#8E8E93] uppercase tracking-wider">{t('transfers.title')}</span>
 
               <div className="flex items-center gap-2">
-                {/* macOS Segmented Control */}
-                <div className="inline-flex p-0.5 rounded-[6px] bg-white/[0.06] border border-white/[0.08] text-[11px]">
+                {/* Segmented Control */}
+                <div className="inline-flex p-0.5 rounded-[5px] bg-white/[0.06] border border-white/[0.08] text-[10px]">
                   <button
                     onClick={() => setTransferFilter('all')}
-                    className={`px-2.5 py-0.5 rounded-[4px] font-medium transition-all cursor-pointer ${
+                    className={`px-2 py-0.5 rounded-[3px] font-medium transition-all cursor-pointer ${
                       transferFilter === 'all'
                         ? 'bg-white/20 text-white shadow-sm'
                         : 'text-[#8E8E93] hover:text-[#E5E5EA]'
@@ -500,7 +501,7 @@ export default function ClassicNativeDesign(props: DesignProps) {
                   </button>
                   <button
                     onClick={() => setTransferFilter('active')}
-                    className={`px-2.5 py-0.5 rounded-[4px] font-medium transition-all cursor-pointer ${
+                    className={`px-2 py-0.5 rounded-[3px] font-medium transition-all cursor-pointer ${
                       transferFilter === 'active'
                         ? 'bg-[#3A3A3E] text-white shadow-sm'
                         : 'text-[#8E8E93] hover:text-[#E5E5EA]'
@@ -510,7 +511,7 @@ export default function ClassicNativeDesign(props: DesignProps) {
                   </button>
                   <button
                     onClick={() => setTransferFilter('completed')}
-                    className={`px-2.5 py-0.5 rounded-[4px] font-medium transition-all cursor-pointer ${
+                    className={`px-2 py-0.5 rounded-[3px] font-medium transition-all cursor-pointer ${
                       transferFilter === 'completed'
                         ? 'bg-[#3A3A3E] text-white shadow-sm'
                         : 'text-[#8E8E93] hover:text-[#E5E5EA]'
@@ -617,32 +618,32 @@ export default function ClassicNativeDesign(props: DesignProps) {
                   <div
                     key={item.id}
                     onClick={() => handleOpenFolder()}
-                    className="h-11 flex items-center justify-between py-1 hover:bg-[#1A1A1A] px-1 rounded transition-colors cursor-pointer group"
+                    className="h-9 flex items-center justify-between py-0.5 hover:bg-[#1A1A1A] px-1 rounded transition-colors cursor-pointer group"
                   >
                     {/* Left: File Metadata */}
                     <div className="flex items-center gap-2.5 min-w-0 pr-3">
                       {/* Image/File Icon */}
-                      <div className="w-6 h-6 rounded bg-[#20252D] border border-[#2D343F] flex items-center justify-center shrink-0 text-[#8E8E93]">
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" viewBox="0 0 24 24">
+                      <div className="w-5 h-5 rounded bg-[#20252D] border border-[#2D343F] flex items-center justify-center shrink-0 text-[#8E8E93]">
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" viewBox="0 0 24 24">
                           <rect height="18" rx="2" ry="2" width="18" x="3" y="3"></rect>
                           <circle cx="8.5" cy="8.5" r="1.5"></circle>
                           <polyline points="21 15 16 10 5 21"></polyline>
                         </svg>
                       </div>
                       <div className="truncate">
-                        <div className="text-[12px] font-medium text-[#F2F2F7] leading-tight truncate group-hover:text-[#007AFF] transition-colors">
+                        <div className="text-[11px] font-medium text-[#F2F2F7] leading-tight truncate group-hover:text-[#007AFF] transition-colors">
                           {item.filename}
                         </div>
-                        <div className="text-[11px] text-[#8E8E93] leading-tight font-mono">
+                        <div className="text-[10px] text-[#8E8E93] leading-tight font-mono">
                           {formatBytes(item.size)} • {timeAgo(item.timestamp)}
                         </div>
                       </div>
                     </div>
 
                     {/* Center & Right: Completed Status Badge + Action Button */}
-                    <div className="flex items-center gap-4 shrink-0">
-                      <div className="flex items-center gap-1 text-[11px] text-[#34C759] font-medium">
-                        <Check className="w-3.5 h-3.5 stroke-[2]" />
+                    <div className="flex items-center gap-3 shrink-0">
+                      <div className="flex items-center gap-1 text-[10px] text-[#34C759] font-medium">
+                        <Check className="w-3 h-3 stroke-[2]" />
                         <span>{t('transfers.completed')}</span>
                       </div>
                       <button
@@ -650,9 +651,9 @@ export default function ClassicNativeDesign(props: DesignProps) {
                           e.stopPropagation();
                           handleOpenFolder();
                         }}
-                        className="text-[11px] text-[#8E8E93] hover:text-[#007AFF] flex items-center gap-1 transition-colors cursor-pointer"
+                        className="text-[10px] text-[#8E8E93] hover:text-[#007AFF] flex items-center gap-1 transition-colors cursor-pointer"
                       >
-                        <Search className="w-3.5 h-3.5" />
+                        <Search className="w-3 h-3" />
                         <span>{t('transfers.showInFinder')}</span>
                       </button>
                     </div>
@@ -662,7 +663,7 @@ export default function ClassicNativeDesign(props: DesignProps) {
 
               {/* Empty state if nothing to show */}
               {!hasActiveTransfer && (!showCompletedRows || recentHistory.length === 0) && (
-                <div className="h-full flex items-center justify-center text-[#8E8E93] text-[12px] py-8">
+                <div className="h-full flex items-center justify-center text-[#8E8E93] text-[11px] py-3">
                   {t('transfers.noTransfers')}
                 </div>
               )}

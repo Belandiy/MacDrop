@@ -62,12 +62,12 @@ export const NativeDropZone: React.FC<NativeDropZoneProps> = ({
   };
 
   return (
-    <div className={`w-full flex flex-col justify-center select-none ${className}`}>
+    <div className={`w-full h-full flex flex-col min-h-0 select-none ${className}`}>
       {/* 
         Sending To Bar:
         Fixed min-h-[20px] ensures zero layout jump when dragging begins
       */}
-      <div className="flex items-center justify-between text-[13px] text-[#E5E5EA] min-h-[20px] mb-1">
+      <div className="flex items-center justify-between text-[13px] text-[#E5E5EA] min-h-[20px] mb-2 shrink-0">
         {!isDragging ? (
           <div className="flex items-center gap-2">
             <span>
@@ -105,13 +105,13 @@ export const NativeDropZone: React.FC<NativeDropZoneProps> = ({
       </div>
 
       {/* 
-        Fixed 120px Drop Box Target:
-        Both Layer 1 (Idle) and Layer 2 (Multi-target) remain mounted for Chromium drag stability
+        Drop Box Target:
+        Bounded rectangle with clear margin, taking main flexible height
       */}
       <div
         ref={containerRef}
         data-drop-zone="true"
-        className={`h-[120px] mt-1 rounded-[6px] relative select-none overflow-hidden transition-colors duration-150 ${
+        className={`flex-1 min-h-[130px] rounded-[8px] relative select-none overflow-hidden transition-colors duration-150 ${
           isOverZone
             ? 'border-[1.5px] border-[#007AFF] bg-[#007AFF]/15 shadow-[0_0_16px_rgba(0,122,255,0.2)]'
             : isDragging
