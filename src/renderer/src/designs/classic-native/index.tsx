@@ -467,7 +467,19 @@ export default function ClassicNativeDesign(props: DesignProps) {
 
         {/* ================= RIGHT MAIN AREA ================= */}
         <main className="flex-1 bg-transparent flex flex-col min-w-0 overflow-hidden select-none">
-          {/* Top Section: Transfers & Activity (Takes upper flexible space) */}
+          {/* Top Section: Send / Drop Zone Module */}
+          <section className="p-[14px_16px] shrink-0 border-b border-white/[0.08]">
+            <NativeDropZone
+              devices={devices}
+              targetDevice={targetDevice}
+              onFilesDropped={handleFilesDropped}
+              onChooseFiles={handleChooseFiles}
+              onChooseFolder={handleChooseFolder}
+              onHoveredTargetChange={setDropHoveredDeviceId}
+            />
+          </section>
+
+          {/* Bottom Section: Transfers & Activity (Journal) */}
           <section className="flex-1 p-[14px_16px] flex flex-col overflow-hidden min-h-0">
             {/* Section Header Row */}
             <div className="flex items-center justify-between mb-2.5 shrink-0">
@@ -655,18 +667,6 @@ export default function ClassicNativeDesign(props: DesignProps) {
                 </div>
               )}
             </div>
-          </section>
-
-          {/* Bottom Section: Send / Drop Module situated at the bottom of the main screen */}
-          <section className="h-[165px] shrink-0 p-3.5 border-t border-white/[0.08] flex flex-col box-border justify-center bg-black/20 backdrop-blur-sm">
-            <NativeDropZone
-              devices={devices}
-              targetDevice={targetDevice}
-              onFilesDropped={handleFilesDropped}
-              onChooseFiles={handleChooseFiles}
-              onChooseFolder={handleChooseFolder}
-              onHoveredTargetChange={setDropHoveredDeviceId}
-            />
           </section>
         </main>
       </div>

@@ -10,9 +10,9 @@
   - Геометрический хит-тестинг (`checkInsideZone`) строго проверяет попадание курсора в прямоугольник зоны сброса (или на карточку пира в боковой панели).
   - Сброс в любую другую область окна (список истории, тулбар, пустое пространство) полностью игнорируется без ложных срабатываний передачи.
   - Добавлены модульные тесты в [useStableDropZone.test.ts](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/hooks/useStableDropZone.test.ts) для подтверждения отсечения дропов вне зоны.
-- **Модуль передачи перемещен в нижнюю часть главного экрана** ([src/renderer/src/designs/classic-native/index.tsx](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/designs/classic-native/index.tsx)):
-  - Секция «Передачи и активность» теперь занимает верхнюю гибкую область экрана (`flex-1 min-h-0`).
-  - Модуль передачи с зоной сброса и кнопкой «Выбрать файлы» закреплен в нижней части экрана (`h-[165px] shrink-0 border-t border-white/[0.08]`).
+- **Размещение элементов на главном экране** ([src/renderer/src/designs/classic-native/index.tsx](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/designs/classic-native/index.tsx)):
+  - Модуль передачи с зоной сброса и кнопкой «Выбрать файлы» расположен в верхней части экрана (`shrink-0 border-b border-white/[0.08]`).
+  - Журнал передач и активности («Передачи и активность») расположен ниже и занимает всё оставшееся гибкое пространство экрана (`flex-1 min-h-0`).
 - **Двустороннее отображение прогресса на передающей и принимающей сторонах** ([src-tauri/src/engine.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/engine.rs), [src-tauri/src/transfer.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/transfer.rs), [src/renderer/src/designs/classic-native/index.tsx](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/designs/classic-native/index.tsx)):
   - В `TransferProgress` добавлены поля `percent` и `bytes_per_second` с конструктором `TransferProgress::new`.
   - В Axum `handle_upload` на принимающей стороне интегрирован стриминг с расчетом скорости (байт/сек), процента завершения и отправкой события `progress-update` в окно каждые 50 мс.
