@@ -122,32 +122,34 @@ export const NativeDropZone: React.FC<NativeDropZoneProps> = ({
         {/* ==================== LAYER 1: IDLE / RESTING ==================== */}
         <div
           onClick={() => onChooseFiles(activeTarget?.id)}
-          className={`absolute inset-0 w-full h-full flex flex-col items-center justify-center gap-1 transition-opacity duration-150 cursor-pointer group ${
+          className={`absolute inset-0 w-full h-full flex flex-col items-center justify-center gap-2 p-6 transition-opacity duration-150 cursor-pointer group ${
             isDragging ? 'opacity-0 pointer-events-none' : 'opacity-100 pointer-events-auto'
           }`}
         >
           {/* Upload tray icon */}
-          <svg
-            className="w-[18px] h-[18px] text-[#8E8E93] group-hover:text-[#E5E5EA] transition-colors pointer-events-none"
-            fill="none"
-            stroke="currentColor"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="1.8"
-            viewBox="0 0 24 24"
-          >
-            <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"></path>
-            <polyline points="7 9 12 4 17 9"></polyline>
-            <line x1="12" x2="12" y1="4" y2="16"></line>
-          </svg>
+          <div className="w-12 h-12 rounded-full bg-white/[0.04] border border-white/[0.08] flex items-center justify-center text-[#8E8E93] group-hover:text-white group-hover:bg-[#007AFF]/15 group-hover:border-[#007AFF]/40 group-hover:scale-105 transition-all duration-200 pointer-events-none shadow-sm">
+            <svg
+              className="w-5 h-5 pointer-events-none"
+              fill="none"
+              stroke="currentColor"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="1.8"
+              viewBox="0 0 24 24"
+            >
+              <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"></path>
+              <polyline points="7 9 12 4 17 9"></polyline>
+              <line x1="12" y1="4" x2="12" y2="16"></line>
+            </svg>
+          </div>
 
           {/* Primary Text */}
-          <span className="text-[13px] font-medium text-[#E5E5EA] pointer-events-none">
+          <span className="text-[14px] font-semibold text-[#F2F2F7] pointer-events-none tracking-tight">
             {t('dropzone.dropFilesHereToSend')}
           </span>
 
           {/* Secondary Hint */}
-          <span className="text-[11px] text-[#8E8E93] pointer-events-none">
+          <span className="text-[12px] text-[#8E8E93] pointer-events-none">
             {t('dropzone.orClickToSelectFiles')}
           </span>
 
@@ -158,7 +160,7 @@ export const NativeDropZone: React.FC<NativeDropZoneProps> = ({
               e.stopPropagation();
               onChooseFiles(activeTarget?.id);
             }}
-            className="mt-1 px-3.5 py-1 text-[12px] font-medium bg-[#2C2C2E] hover:bg-[#38383A] text-[#F2F2F7] border border-[#3A3A3C] rounded-[5px] shadow-[0_0.5px_1px_rgba(0,0,0,0.4)] transition-colors cursor-pointer flex items-center gap-1.5"
+            className="mt-2 px-4 py-1.5 text-[12px] font-medium bg-[#2C2C2E] hover:bg-[#38383A] text-[#F2F2F7] border border-[#3A3A3C] rounded-[6px] shadow-[0_1px_2px_rgba(0,0,0,0.4)] transition-all cursor-pointer flex items-center gap-1.5 group-hover:border-white/30"
           >
             <svg className="w-3.5 h-3.5 text-[#007AFF]" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>

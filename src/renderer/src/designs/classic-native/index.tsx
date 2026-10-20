@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
 import {
   X,
-  Check,
-  Search,
   MoreHorizontal,
-  Ban
+  Ban,
+  Folder
 } from 'lucide-react';
 import { DesignProps } from '../types';
 import { PairedDevice } from '../../vite-env';
@@ -92,8 +91,6 @@ export default function ClassicNativeDesign(props: DesignProps) {
     handleDeviceRemoved?.(device.id);
   };
 
-  // Filter state for transfers: All | Active | Completed
-  const [transferFilter, setTransferFilter] = useState<'all' | 'active' | 'completed'>('all');
 
   // Resizable sidebar width (min: 170px, max: 340px, default: 220px)
   const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
@@ -178,18 +175,6 @@ export default function ClassicNativeDesign(props: DesignProps) {
       : 0,
   } : null;
 
-  const recentHistory = status.recentHistory || [];
-
-  const timeAgo = (timestamp: number): string => {
-    const seconds = Math.floor((Date.now() - timestamp) / 1000);
-    if (seconds < 60) return t('history.justNow');
-    const minutes = Math.floor(seconds / 60);
-    if (minutes < 60) return t('history.minAgo', { min: minutes });
-    const hours = Math.floor(minutes / 60);
-    if (hours < 24) return t('history.hrAgo', { hr: hours });
-    return new Date(timestamp).toLocaleDateString();
-  };
-
   // Calculate ETA for active transfer
   const getEtaString = () => {
     if (!currentProgress || !currentProgress.speedBps || currentProgress.speedBps === 0) {
@@ -201,10 +186,6 @@ export default function ClassicNativeDesign(props: DesignProps) {
     if (seconds < 60) return t('transfers.secLeft', { sec: seconds });
     return t('transfers.minLeft', { min: Math.ceil(seconds / 60) });
   };
-
-  const hasActiveTransfer = Boolean(currentProgress);
-  const showActiveRow = hasActiveTransfer && (transferFilter === 'all' || transferFilter === 'active');
-  const showCompletedRows = transferFilter === 'all' || transferFilter === 'completed';
 
   return (
     <div className="w-full h-full bg-transparent text-[#F2F2F7] flex flex-col overflow-hidden select-none font-sans antialiased">
@@ -466,9 +447,9 @@ export default function ClassicNativeDesign(props: DesignProps) {
         </div>
 
         {/* ================= RIGHT MAIN AREA ================= */}
-        <main className="flex-1 bg-transparent flex flex-col min-w-0 overflow-hidden select-none">
-          {/* Top Section: Send / Drop Zone Module (Takes the upper flexible space, bounded zone) */}
-          <section className="flex-1 p-[14px_16px] flex flex-col min-h-0 overflow-hidden">
+        <main className="flex-1 bg-transparent flex flex-col min-w-0 overflow-hidden select-none p-[14px_16px] gap-2.5">
+          {/* Main Drop Zone Module (Stretches down to fill available space) */}
+          <div className="flex-1 min-h-0 flex flex-col">
             <NativeDropZone
               devices={devices}
               targetDevice={targetDevice}
@@ -477,198 +458,109 @@ export default function ClassicNativeDesign(props: DesignProps) {
               onChooseFolder={handleChooseFolder}
               onHoveredTargetChange={setDropHoveredDeviceId}
               className="h-full"
-            />
-          </section>
-
-          {/* Bottom Section: Transfers & Activity (Journal) - НИЗКИЙ (Compact low height on both platforms) */}
-          <section className="h-[145px] shrink-0 p-[10px_16px] border-t border-white/[0.08] flex flex-col overflow-hidden bg-black/15 backdrop-blur-sm">
-            {/* Section Header Row */}
-            <div className="flex items-center justify-between mb-1.5 shrink-0">
-              <span className="text-[12px] font-semibold text-[#8E8E93] uppercase tracking-wider">{t('transfers.title')}</span>
-
-              <div className="flex items-center gap-2">
-                {/* Segmented Control */}
-                <div className="inline-flex p-0.5 rounded-[5px] bg-white/[0.06] border border-white/[0.08] text-[10px]">
+              headerRight={
+                <div className="flex items-center gap-2">
                   <button
-                    onClick={() => setTransferFilter('all')}
-                    className={`px-2 py-0.5 rounded-[3px] font-medium transition-all cursor-pointer ${
-                      transferFilter === 'all'
-                        ? 'bg-white/20 text-white shadow-sm'
-                        : 'text-[#8E8E93] hover:text-[#E5E5EA]'
-                    }`}
+                    onClick={() => handleOpenFolder()}
+                    className="text-[11px] text-[#8E8E93] hover:text-[#007AFF] flex items-center gap-1 transition-colors cursor-pointer"
+                    title={t('transfers.showInFinder')}
                   >
-                    {t('transfers.all')}
+                    <Folder className="w-3.5 h-3.5" />
+                    <span>{t('transfers.showInFinder')}</span>
                   </button>
-                  <button
-                    onClick={() => setTransferFilter('active')}
-                    className={`px-2 py-0.5 rounded-[3px] font-medium transition-all cursor-pointer ${
-                      transferFilter === 'active'
-                        ? 'bg-[#3A3A3E] text-white shadow-sm'
-                        : 'text-[#8E8E93] hover:text-[#E5E5EA]'
-                    }`}
-                  >
-                    {t('transfers.active')}
-                  </button>
-                  <button
-                    onClick={() => setTransferFilter('completed')}
-                    className={`px-2 py-0.5 rounded-[3px] font-medium transition-all cursor-pointer ${
-                      transferFilter === 'completed'
-                        ? 'bg-[#3A3A3E] text-white shadow-sm'
-                        : 'text-[#8E8E93] hover:text-[#E5E5EA]'
-                    }`}
-                  >
-                    {t('transfers.completed')}
-                  </button>
+                  {!isMac && (
+                    <button
+                      type="button"
+                      data-no-drag
+                      onClick={() => handleOpenSettings('general')}
+                      className="w-5 h-5 flex items-center justify-center rounded text-[#8E8E93] hover:text-[#FFFFFF] hover:bg-[#2C2C2E] transition-colors cursor-pointer ml-1"
+                      title={t('window.settings')}
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="3"></circle>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                      </svg>
+                    </button>
+                  )}
                 </div>
+              }
+            />
+          </div>
 
-                {!isMac && (
-                  <button
-                    type="button"
-                    data-no-drag
-                    onClick={() => handleOpenSettings('general')}
-                    className="w-5 h-5 flex items-center justify-center rounded text-[#8E8E93] hover:text-[#FFFFFF] hover:bg-[#2C2C2E] transition-colors cursor-pointer"
-                    title={t('window.settings')}
-                  >
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" viewBox="0 0 24 24">
-                      <circle cx="12" cy="12" r="3"></circle>
-                      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-                    </svg>
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Clean Tabular Transfer List */}
-            <div className="flex-1 overflow-y-auto divide-y divide-[#242426]">
-              {/* Row 1: Active Transfer (if present) */}
-              {showActiveRow && currentProgress && (
-                <div className="min-h-12 flex items-center justify-between py-2 px-2.5 bg-white/[0.04] border border-white/[0.08] rounded-[8px] mb-2 shadow-sm animate-in fade-in duration-150">
-                  {/* Left: File Metadata & Direction Icon */}
-                  <div className="flex items-center gap-2.5 min-w-0 pr-3">
-                    <div className={`w-7 h-7 rounded-[6px] border flex items-center justify-center shrink-0 ${
-                      currentProgress.direction === 'incoming'
-                        ? 'bg-[#1C3524] border-[#2A5235] text-[#34C759]'
-                        : 'bg-[#202838] border-[#2D3850] text-[#007AFF]'
-                    }`}>
-                      {currentProgress.direction === 'incoming' ? (
-                        <svg className="w-4 h-4 animate-bounce" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24">
-                          <line x1="12" y1="4" x2="12" y2="16"></line>
-                          <polyline points="7 11 12 16 17 11"></polyline>
-                        </svg>
-                      ) : (
-                        <svg className="w-4 h-4 animate-pulse" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24">
-                          <line x1="12" y1="16" x2="12" y2="4"></line>
-                          <polyline points="7 9 12 4 17 9"></polyline>
-                        </svg>
-                      )}
-                    </div>
-                    <div className="truncate">
-                      <div className="flex items-center gap-1.5 truncate">
-                        <span className="text-[12px] font-semibold text-[#F2F2F7] leading-tight truncate">
-                          {currentProgress.filename}
-                        </span>
-                        <span className={`text-[9px] px-1 py-0.2 rounded font-medium ${
-                          currentProgress.direction === 'incoming'
-                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                            : 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
-                        }`}>
-                          {currentProgress.direction === 'incoming' ? 'Получение' : 'Отправка'}
-                        </span>
-                        {currentProgress.peerName && (
-                          <span className="text-[10px] text-[#8E8E93] truncate">
-                            • {currentProgress.peerName}
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-[11px] text-[#8E8E93] leading-tight font-mono mt-0.5">
-                        {formatBytes(currentProgress.bytesTransferred)} из {formatBytes(currentProgress.totalBytes)} • {formatBytes(currentProgress.speedBps)}/s {getEtaString() && `• ${getEtaString()}`}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Center & Right: Native Linear Progress Bar & Readout */}
-                  <div className="flex items-center gap-3 shrink-0">
-                    <div className="w-[140px] h-1.5 bg-[#2C2C2E] rounded-full overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all duration-150 ${
-                          currentProgress.direction === 'incoming' ? 'bg-[#34C759]' : 'bg-[#007AFF]'
-                        }`}
-                        style={{ width: `${currentProgress.percent}%` }}
-                      ></div>
-                    </div>
-                    <span className="text-[11px] text-[#F2F2F7] font-mono w-9 text-right font-semibold">
-                      {Math.round(currentProgress.percent)}%
-                    </span>
-                    {currentProgress.direction === 'outgoing' && (
-                      <button
-                        onClick={() => window.macdrop?.cancelTransfer?.()}
-                        className="w-4 h-4 rounded-full bg-[#2C2C2E] hover:bg-[#3A3A3C] text-[#8E8E93] hover:text-[#F2F2F7] flex items-center justify-center transition-colors cursor-pointer"
-                        title={t('transfers.cancel')}
-                      >
-                        <X className="w-2.5 h-2.5" />
-                      </button>
+          {/* Active Transfer Process Tile (appears at the bottom of the drop zone when transferring) */}
+          {currentProgress && (
+            <div className="shrink-0 p-3 bg-[#1C1C1E]/95 border border-white/[0.12] rounded-[10px] shadow-xl backdrop-blur-md animate-in fade-in slide-in-from-bottom-2 duration-200">
+              <div className="flex items-center justify-between gap-3">
+                {/* Left: Direction icon + File metadata */}
+                <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                  <div className={`w-8 h-8 rounded-[8px] border flex items-center justify-center shrink-0 ${
+                    currentProgress.direction === 'incoming'
+                      ? 'bg-[#1C3524] border-[#2A5235] text-[#34C759]'
+                      : 'bg-[#202838] border-[#2D3850] text-[#007AFF]'
+                  }`}>
+                    {currentProgress.direction === 'incoming' ? (
+                      <svg className="w-4 h-4 animate-bounce" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24">
+                        <line x1="12" y1="4" x2="12" y2="16"></line>
+                        <polyline points="7 11 12 16 17 11"></polyline>
+                      </svg>
+                    ) : (
+                      <svg className="w-4 h-4 animate-pulse" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24">
+                        <line x1="12" y1="16" x2="12" y2="4"></line>
+                        <polyline points="7 9 12 4 17 9"></polyline>
+                      </svg>
                     )}
                   </div>
-                </div>
-              )}
 
-              {/* Row 2+: Completed Transfers */}
-              {showCompletedRows && recentHistory.length > 0 ? (
-                recentHistory.map((item: any) => (
-                  <div
-                    key={item.id}
-                    onClick={() => handleOpenFolder()}
-                    className="h-9 flex items-center justify-between py-0.5 hover:bg-[#1A1A1A] px-1 rounded transition-colors cursor-pointer group"
-                  >
-                    {/* Left: File Metadata */}
-                    <div className="flex items-center gap-2.5 min-w-0 pr-3">
-                      {/* Image/File Icon */}
-                      <div className="w-5 h-5 rounded bg-[#20252D] border border-[#2D343F] flex items-center justify-center shrink-0 text-[#8E8E93]">
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" viewBox="0 0 24 24">
-                          <rect height="18" rx="2" ry="2" width="18" x="3" y="3"></rect>
-                          <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                          <polyline points="21 15 16 10 5 21"></polyline>
-                        </svg>
-                      </div>
-                      <div className="truncate">
-                        <div className="text-[11px] font-medium text-[#F2F2F7] leading-tight truncate group-hover:text-[#007AFF] transition-colors">
-                          {item.filename}
-                        </div>
-                        <div className="text-[10px] text-[#8E8E93] leading-tight font-mono">
-                          {formatBytes(item.size)} • {timeAgo(item.timestamp)}
-                        </div>
-                      </div>
+                  <div className="truncate">
+                    <div className="flex items-center gap-1.5 truncate">
+                      <span className="text-[12px] font-semibold text-[#F2F2F7] leading-tight truncate">
+                        {currentProgress.filename}
+                      </span>
+                      <span className={`text-[9px] px-1.5 py-0.5 rounded font-medium ${
+                        currentProgress.direction === 'incoming'
+                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                          : 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
+                      }`}>
+                        {currentProgress.direction === 'incoming' ? 'Получение' : 'Отправка'}
+                      </span>
+                      {currentProgress.peerName && (
+                        <span className="text-[10px] text-[#8E8E93] truncate">
+                          • {currentProgress.peerName}
+                        </span>
+                      )}
                     </div>
-
-                    {/* Center & Right: Completed Status Badge + Action Button */}
-                    <div className="flex items-center gap-3 shrink-0">
-                      <div className="flex items-center gap-1 text-[10px] text-[#34C759] font-medium">
-                        <Check className="w-3 h-3 stroke-[2]" />
-                        <span>{t('transfers.completed')}</span>
-                      </div>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleOpenFolder();
-                        }}
-                        className="text-[10px] text-[#8E8E93] hover:text-[#007AFF] flex items-center gap-1 transition-colors cursor-pointer"
-                      >
-                        <Search className="w-3 h-3" />
-                        <span>{t('transfers.showInFinder')}</span>
-                      </button>
+                    <div className="text-[11px] text-[#8E8E93] leading-tight font-mono mt-0.5">
+                      {formatBytes(currentProgress.bytesTransferred)} из {formatBytes(currentProgress.totalBytes)} • {formatBytes(currentProgress.speedBps)}/s {getEtaString() && `• ${getEtaString()}`}
                     </div>
                   </div>
-                ))
-              ) : null}
-
-              {/* Empty state if nothing to show */}
-              {!hasActiveTransfer && (!showCompletedRows || recentHistory.length === 0) && (
-                <div className="h-full flex items-center justify-center text-[#8E8E93] text-[11px] py-3">
-                  {t('transfers.noTransfers')}
                 </div>
-              )}
+
+                {/* Right: Progress bar & Cancel button */}
+                <div className="flex items-center gap-3 shrink-0">
+                  <div className="w-[140px] h-1.5 bg-[#2C2C2E] rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all duration-150 ${
+                        currentProgress.direction === 'incoming' ? 'bg-[#34C759]' : 'bg-[#007AFF]'
+                      }`}
+                      style={{ width: `${currentProgress.percent}%` }}
+                    />
+                  </div>
+                  <span className="text-[11px] text-[#F2F2F7] font-mono w-9 text-right font-semibold">
+                    {Math.round(currentProgress.percent)}%
+                  </span>
+                  {currentProgress.direction === 'outgoing' && (
+                    <button
+                      onClick={() => window.macdrop?.cancelTransfer?.()}
+                      className="w-5 h-5 rounded-full bg-[#2C2C2E] hover:bg-[#3A3A3C] text-[#8E8E93] hover:text-[#F2F2F7] flex items-center justify-center transition-colors cursor-pointer"
+                      title={t('transfers.cancel')}
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
-          </section>
+          )}
         </main>
       </div>
 
