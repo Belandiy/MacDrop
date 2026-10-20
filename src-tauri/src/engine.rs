@@ -835,10 +835,7 @@ async fn handle_upload(
     // Show native notification if enabled
     let cfg = state.config.read().await;
     if cfg.notifications {
-        let _ = notify_rust::Notification::new()
-            .summary("MacDrop: Файл получен!")
-            .body(&format!("{} сохранён в папку", actual_name))
-            .show();
+        show_desktop_notification("MacDrop: Файл получен!", &format!("{} сохранён в папку", actual_name));
     }
 
     Ok(Json(serde_json::json!({
@@ -846,6 +843,30 @@ async fn handle_upload(
         "filename": actual_name,
         "bytesReceived": bytes_transferred
     })))
+}
+
+pub fn show_desktop_notification(title: &str, body: &str) {
+    #[cfg(target_os = "macos")]
+    {
+        let escaped_title = title.replace('\\', "\\\\").replace('"', "\\\"");
+        let escaped_body = body.replace('\\', "\\\\").replace('"', "\\\"");
+        let script = format!(
+            "display notification \"{}\" with title \"{}\"",
+            escaped_body, escaped_title
+        );
+        let _ = std::process::Command::new("osascript")
+            .arg("-e")
+            .arg(script)
+            .spawn();
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = notify_rust::Notification::new()
+            .summary(title)
+            .body(body)
+            .show();
+    }
 }
 
 fn urlencoding_decode(s: &str) -> String {

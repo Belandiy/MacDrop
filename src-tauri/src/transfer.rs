@@ -356,15 +356,15 @@ pub async fn execute_peer_transfer(
             let cfg = state.config.read().await;
             if cfg.notifications {
                 if success {
-                    let _ = notify_rust::Notification::new()
-                        .summary("MacDrop: Файл отправлен")
-                        .body(&format!("\"{}\" успешно передан на {}", send_filename, peer_name))
-                        .show();
+                    crate::engine::show_desktop_notification(
+                        "MacDrop: Файл отправлен",
+                        &format!("\"{}\" успешно передан на {}", send_filename, peer_name),
+                    );
                 } else {
-                    let _ = notify_rust::Notification::new()
-                        .summary("MacDrop: Ошибка передачи")
-                        .body(&format!("Не удалось отправить \"{}\" на {}. Проверьте, что приложение включено.", send_filename, peer_name))
-                        .show();
+                    crate::engine::show_desktop_notification(
+                        "MacDrop: Ошибка передачи",
+                        &format!("Не удалось отправить \"{}\" на {}. Проверьте, что приложение включено.", send_filename, peer_name),
+                    );
                 }
             }
         }

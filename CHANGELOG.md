@@ -10,8 +10,9 @@
 - **Повторная попытка (Retry Backoff) и таймаут подключения** ([src-tauri/src/transfer.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/transfer.rs)):
   - В `reqwest::Client` добавлен `connect_timeout(5s)` для предотвращения зависаний при недоступных хостах.
   - При сбое подключения (`res.is_err()`) добавлена быстрая повторная попытка через 400 мс на основной порт, что сглаживает кратковременные разрывы или фазу запуска удаленного сокета до переключения на альтернативный порт (8384).
-- **Нативные системные уведомления для исходящей передачи** ([src-tauri/src/transfer.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/transfer.rs)):
-  - При успешной передаче или ошибке отправки вызывается нативное macOS/Windows уведомление через `notify_rust` (при включенной опции уведомлений в настройках).
+- **Устранение модального окна macOS «Where is use_default?»** ([src-tauri/src/engine.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/engine.rs), [src-tauri/src/transfer.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/transfer.rs)):
+  - Крейт `notify-rust` на macOS использует зависимость `mac-notification-sys`, которая при вызове уведомления обращается к AppleScript `get id of application "use_default"`. Из-за этого система считала, что требуется запустить приложение `use_default`, и открывала окно выбора приложений `Choose Application`.
+  - Добавлена функция `show_desktop_notification`, которая на macOS напрямую отправляет уведомление через нативный `osascript display notification` без использования устаревших хаков Swizzling, а на остальных ОС использует `notify-rust`.
 
 ## [fix/tauri-bounded-dropzone-and-bidirectional-progress] - 2026-10-20
 
