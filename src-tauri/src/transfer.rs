@@ -147,19 +147,29 @@ pub async fn execute_peer_transfer(
     }
     let (target_ip, target_port, auth_token, peer_name, peer_id) = {
         let cfg = state.config.read().await;
+        let discovered = state.discovered_peers.read().await;
+
         if let Some(ref tid) = target_device_id {
             if let Some(paired) = cfg.paired_devices.iter().find(|d| &d.id == tid) {
-                (paired.ip.clone(), paired.port, paired.auth_token.clone(), paired.custom_name.clone(), paired.id.clone())
-            } else {
-                let discovered = state.discovered_peers.read().await;
-                if let Some(peer) = discovered.get(tid) {
-                    (peer.ip.clone(), peer.port, None, peer.name.clone(), peer.id.clone())
+                // If peer is actively discovered, prefer latest live IP and port
+                let (ip, port) = if let Some(disc) = discovered.get(tid) {
+                    (disc.ip.clone(), disc.port)
                 } else {
-                    return Err("Целевое устройство не найдено".to_string());
-                }
+                    (paired.ip.clone(), paired.port)
+                };
+                (ip, port, paired.auth_token.clone(), paired.custom_name.clone(), paired.id.clone())
+            } else if let Some(peer) = discovered.get(tid) {
+                (peer.ip.clone(), peer.port, None, peer.name.clone(), peer.id.clone())
+            } else {
+                return Err("Целевое устройство не найдено".to_string());
             }
         } else if let Some(first_paired) = cfg.paired_devices.first() {
-            (first_paired.ip.clone(), first_paired.port, first_paired.auth_token.clone(), first_paired.custom_name.clone(), first_paired.id.clone())
+            let (ip, port) = if let Some(disc) = discovered.get(&first_paired.id) {
+                (disc.ip.clone(), disc.port)
+            } else {
+                (first_paired.ip.clone(), first_paired.port)
+            };
+            (ip, port, first_paired.auth_token.clone(), first_paired.custom_name.clone(), first_paired.id.clone())
         } else {
             return Err("Нет подключенных устройств для передачи".to_string());
         }
@@ -167,6 +177,7 @@ pub async fn execute_peer_transfer(
 
     let client = reqwest::Client::builder()
         .no_proxy()
+        .connect_timeout(std::time::Duration::from_secs(5))
         .timeout(std::time::Duration::from_secs(3600))
         .build()
         .map_err(|e| e.to_string())?;
@@ -236,37 +247,55 @@ pub async fn execute_peer_transfer(
 
         // Fallback between standard ports 52520 and 8384 if initial connection fails
         if res.is_err() {
-            let alt_port = if target_port == 52520 { 8384 } else { 52520 };
-            let alt_url = format!("http://{}:{}/api/upload", target_ip, alt_port);
-            state.logger.info("Transfer", &format!("Upload to port {} failed, trying alternative port {}:{}", target_port, target_ip, alt_port), None);
-            let mut alt_req = client
-                .post(&alt_url)
+            // Retry once after 400ms on primary port (handles waking sockets / brief app restart)
+            tokio::time::sleep(std::time::Duration::from_millis(400)).await;
+            let mut retry_req = client
+                .post(&url)
                 .header("x-device-id", &our_device_id)
                 .header("x-filename", urlencoding::encode(&send_filename).as_ref())
                 .header("content-length", total_size.to_string())
-                .body(buffer);
+                .body(buffer.clone());
 
             if let Some(ref tok) = auth_token {
-                alt_req = alt_req.header("x-auth-token", tok);
+                retry_req = retry_req.header("x-auth-token", tok);
             }
 
-            let alt_res = alt_req.send().await;
-            if alt_res.is_ok() {
-                res = alt_res;
-                let mut cfg = state.config.write().await;
-                if let Some(p) = cfg.paired_devices.iter_mut().find(|d| d.id == peer_id) {
-                    p.port = alt_port;
-                    crate::config::save_config(&cfg);
+            let retry_res = retry_req.send().await;
+            if retry_res.is_ok() {
+                res = retry_res;
+            } else {
+                let alt_port = if target_port == 52520 { 8384 } else { 52520 };
+                let alt_url = format!("http://{}:{}/api/upload", target_ip, alt_port);
+                state.logger.info("Transfer", &format!("Upload to port {} failed, trying alternative port {}:{}", target_port, target_ip, alt_port), None);
+                let mut alt_req = client
+                    .post(&alt_url)
+                    .header("x-device-id", &our_device_id)
+                    .header("x-filename", urlencoding::encode(&send_filename).as_ref())
+                    .header("content-length", total_size.to_string())
+                    .body(buffer);
+
+                if let Some(ref tok) = auth_token {
+                    alt_req = alt_req.header("x-auth-token", tok);
                 }
-            } else if let Err(ref e) = alt_res {
-                let source_msg = std::error::Error::source(e)
-                    .map(|s| format!(" | cause: {}", s))
-                    .unwrap_or_default();
-                state.logger.warn(
-                    "Transfer",
-                    &format!("Upload to alternative port {} also failed: {}{}", alt_port, e, source_msg),
-                    Some(format!("Target: {}:{}", target_ip, alt_port)),
-                );
+
+                let alt_res = alt_req.send().await;
+                if alt_res.is_ok() {
+                    res = alt_res;
+                    let mut cfg = state.config.write().await;
+                    if let Some(p) = cfg.paired_devices.iter_mut().find(|d| d.id == peer_id) {
+                        p.port = alt_port;
+                        crate::config::save_config(&cfg);
+                    }
+                } else if let Err(ref e) = alt_res {
+                    let source_msg = std::error::Error::source(e)
+                        .map(|s| format!(" | cause: {}", s))
+                        .unwrap_or_default();
+                    state.logger.warn(
+                        "Transfer",
+                        &format!("Upload to alternative port {} also failed: {}{}", alt_port, e, source_msg),
+                        Some(format!("Target: {}:{}", target_ip, alt_port)),
+                    );
+                }
             }
         }
 
@@ -320,6 +349,24 @@ pub async fn execute_peer_transfer(
                 let _ = handle.emit("progress-update", &prog);
             }
             tokio::time::sleep(std::time::Duration::from_millis(600)).await;
+        }
+
+        // Show native notification if enabled in settings
+        {
+            let cfg = state.config.read().await;
+            if cfg.notifications {
+                if success {
+                    let _ = notify_rust::Notification::new()
+                        .summary("MacDrop: Файл отправлен")
+                        .body(&format!("\"{}\" успешно передан на {}", send_filename, peer_name))
+                        .show();
+                } else {
+                    let _ = notify_rust::Notification::new()
+                        .summary("MacDrop: Ошибка передачи")
+                        .body(&format!("Не удалось отправить \"{}\" на {}. Проверьте, что приложение включено.", send_filename, peer_name))
+                        .show();
+                }
+            }
         }
 
         // Clear progress
