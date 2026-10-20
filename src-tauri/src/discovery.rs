@@ -71,11 +71,15 @@ pub async fn start_peer_discovery(state: Arc<EngineState>) {
 
     state.logger.info("Discovery", "UDP Peer Discovery running on port 8385", None);
 
-    // Initial background subnet sweep after 2.5 seconds to populate discovered peers
-    let init_state = state.clone();
+    // Periodic background subnet sweep: initial sweep after 2.5s, then every 30s
+    let sweep_state = state.clone();
     tokio::spawn(async move {
         tokio::time::sleep(Duration::from_millis(2500)).await;
-        probe_subnet(init_state).await;
+        probe_subnet(sweep_state.clone()).await;
+        loop {
+            tokio::time::sleep(Duration::from_secs(30)).await;
+            probe_subnet(sweep_state.clone()).await;
+        }
     });
 
     // 1. Background task for broadcasting presence
@@ -289,12 +293,29 @@ pub async fn probe_subnet(state: Arc<EngineState>) {
         return;
     }
 
+    // Add common neighboring subnets as secondary (matching Electron discovery)
+    let mut secondary = Vec::new();
+    for p in &subnets {
+        if p == "192.168.0" && !subnets.contains(&"192.168.1".to_string()) {
+            secondary.push("192.168.1".to_string());
+        }
+        if p == "192.168.1" && !subnets.contains(&"192.168.0".to_string()) {
+            secondary.push("192.168.0".to_string());
+        }
+    }
+    for s in secondary {
+        if !subnets.contains(&s) {
+            subnets.push(s);
+        }
+    }
+
     let our_id = {
         let cfg = state.config.read().await;
         cfg.device_id.clone()
     };
 
     let client = match reqwest::Client::builder()
+        .no_proxy()
         .timeout(Duration::from_millis(350))
         .build()
     {

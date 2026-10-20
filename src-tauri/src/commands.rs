@@ -296,6 +296,30 @@ pub async fn pair_device(
         }
     }
 
+    // If not in cache, actively trigger fast subnet probe (matching Electron)
+    if target_ip.is_empty() {
+        state.logger.info("Pairing", &format!("Device \"{}\" not in UDP discovery cache. Scanning local subnet...", clean), None);
+        crate::discovery::probe_subnet(state.inner().clone()).await;
+
+        let peers = state.discovered_peers.read().await;
+        let clean_upper = clean.to_uppercase();
+        let matched = peers.values().find(|p| {
+            let p_id = p.device_id.to_uppercase();
+            p.device_id.eq_ignore_ascii_case(clean)
+                || p.id.eq_ignore_ascii_case(clean)
+                || p.device_name.eq_ignore_ascii_case(clean)
+                || p.name.eq_ignore_ascii_case(clean)
+                || p.ip == clean
+                || p_id.ends_with(&format!("-{}", clean_upper))
+                || p_id.replace("MAC-", "").replace("PC-", "") == clean_upper
+        });
+
+        if let Some(p) = matched {
+            target_ip = p.ip.clone();
+            target_port = p.port;
+        }
+    }
+
     if target_ip.is_empty() {
         return Ok(serde_json::json!({
             "success": false,
@@ -315,7 +339,11 @@ pub async fn pair_device(
         token_bytes.iter().map(|b| format!("{:02x}", b)).collect()
     };
 
-    let our_ip = local_ip_address::local_ip().map(|ip| ip.to_string()).unwrap_or_default();
+    let our_ip = crate::net_utils::get_local_network_ips()
+        .first()
+        .cloned()
+        .or_else(|| local_ip_address::local_ip().ok().map(|ip| ip.to_string()))
+        .unwrap_or_default();
 
     let payload = serde_json::json!({
         "deviceId": device_id,
@@ -328,6 +356,7 @@ pub async fn pair_device(
     });
 
     let client = reqwest::Client::builder()
+        .no_proxy()
         .timeout(Duration::from_secs(35))
         .build()
         .map_err(|e| e.to_string())?;

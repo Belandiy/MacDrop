@@ -166,6 +166,7 @@ pub async fn execute_peer_transfer(
     };
 
     let client = reqwest::Client::builder()
+        .no_proxy()
         .timeout(std::time::Duration::from_secs(3600))
         .build()
         .map_err(|e| e.to_string())?;

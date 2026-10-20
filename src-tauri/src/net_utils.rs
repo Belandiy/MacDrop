@@ -34,6 +34,15 @@ pub fn get_local_network_ips() -> Vec<String> {
                 || name_lower.starts_with("bridge")
                 || name_lower.starts_with("vmnet")
                 || name_lower.starts_with("vboxnet")
+                || name_lower.starts_with("vethernet")
+                || name_lower.starts_with("hyper-v")
+                || name_lower.starts_with("wsl")
+                || name_lower.starts_with("virtualbox")
+                || name_lower.starts_with("tailscale")
+                || name_lower.starts_with("zerotier")
+                || name_lower.starts_with("tap")
+                || name_lower.starts_with("tun")
+                || name_lower.starts_with("npcap")
                 || name_lower.starts_with("p2p")
                 || name_lower.starts_with("awdl")
                 || name_lower.starts_with("llw")
@@ -51,8 +60,19 @@ pub fn get_local_network_ips() -> Vec<String> {
                 score += 90;
             } else if name_lower.starts_with("en") {
                 score += 80;
-            } else if name_lower.starts_with("eth") || name_lower.starts_with("wlan") {
-                score += 70;
+            } else if name_lower.contains("wi-fi")
+                || name_lower.contains("wifi")
+                || name_lower.contains("wireless")
+                || name_lower.contains("беспроводн")
+            {
+                // High priority for Windows/Linux Wi-Fi adapters
+                score += 95;
+            } else if name_lower.starts_with("eth")
+                || name_lower.starts_with("wlan")
+                || name_lower == "ethernet"
+                || name_lower.starts_with("ethernet")
+            {
+                score += 85;
             }
 
             // Common private network address blocks
