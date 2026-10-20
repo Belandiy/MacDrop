@@ -1,6 +1,6 @@
 use axum::{
     body::Body,
-    extract::{ConnectInfo, Path as AxumPath, Query, State},
+    extract::{ConnectInfo, DefaultBodyLimit, Path as AxumPath, Query, State},
     http::{header, HeaderMap, StatusCode},
     response::{Html, IntoResponse, Response},
     routing::{get, post},
@@ -1003,6 +1003,7 @@ pub async fn start_http_server(state: Arc<EngineState>) {
         .route("/api/mobile/upload", post(handle_mobile_upload))
         .route("/api/mobile/files", get(handle_mobile_files))
         .route("/api/mobile/download/{filename}", get(handle_mobile_download))
+        .layer(DefaultBodyLimit::disable())
         .layer(CorsLayer::permissive())
         .with_state(state.clone());
 

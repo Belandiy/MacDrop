@@ -2,6 +2,15 @@
 
 Все важные изменения проекта MacDrop фиксируются в этом файле.
 
+## [fix/tauri-unlimited-file-transfer-size] - 2026-10-20
+
+### Снятие ограничения на размер передаваемых файлов и детальная диагностика
+- **Отключение лимита тела запроса в Axum (`DefaultBodyLimit::disable()`)** ([src-tauri/src/engine.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/engine.rs)):
+  - По умолчанию Axum ограничивает входящие HTTP-запросы лимитом 2 МБ. При передаче любых файлов или архивов больше этого размера сервер аварийно сбрасывал соединение (`413 Payload Too Large`), что приводило к ошибке «Failed to send file».
+  - Теперь лимит полностью отключен — файлы любого размера (гигабайты) корректно принимаются потоком напрямую на диск.
+- **Информативная диагностика передачи файлов** ([src-tauri/src/transfer.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/transfer.rs)):
+  - Добавлено подробное логирование HTTP-кодов ответа сервера (включая тело ошибки) и сетевых причин сбоев (причина в цепочке `std::error::Error::source`).
+
 ## [fix/tauri-sync-bridge-and-window-focus] - 2026-10-20
 
 ### Синхронная инициализация моста и надежное отображение запроса сопряжения

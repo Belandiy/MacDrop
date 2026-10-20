@@ -266,9 +266,29 @@ pub async fn execute_peer_transfer(
         }
 
         let success = match res {
-            Ok(resp) => resp.status().is_success(),
+            Ok(resp) => {
+                let st = resp.status();
+                if st.is_success() {
+                    true
+                } else {
+                    let err_body = resp.text().await.unwrap_or_default();
+                    state.logger.error(
+                        "Transfer",
+                        &format!("Server rejected upload: HTTP {} ({})", st, err_body),
+                        Some(format!("Target: {}:{}", target_ip, target_port)),
+                    );
+                    false
+                }
+            }
             Err(e) => {
-                state.logger.error("Transfer", "Failed to send file", Some(e.to_string()));
+                let source_msg = std::error::Error::source(&e)
+                    .map(|s| format!(" | cause: {}", s))
+                    .unwrap_or_default();
+                state.logger.error(
+                    "Transfer",
+                    &format!("Failed to send file: {}{}", e, source_msg),
+                    Some(format!("Target: {}:{}", target_ip, target_port)),
+                );
                 false
             }
         };
