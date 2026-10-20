@@ -320,6 +320,7 @@ struct PairingPayload {
     wan_ip: Option<String>,
     #[serde(rename = "remotePort")]
     remote_port: Option<u16>,
+    platform: Option<String>,
 }
 
 async fn handle_status(State(state): State<Arc<EngineState>>) -> impl IntoResponse {
@@ -388,6 +389,47 @@ async fn handle_pair(
             save_config(&cfg);
             (cfg.device_id.clone(), cfg.device_name.clone())
         };
+
+        // Keep discovered_peers in sync so the device is immediately visible on radar / pairing UI
+        {
+            let mut peers = state.discovered_peers.write().await;
+            peers.insert(
+                payload.device_id.clone(),
+                DiscoveredPeer {
+                    id: payload.device_id.clone(),
+                    name: payload.device_name.clone(),
+                    device_id: payload.device_id.clone(),
+                    device_name: payload.device_name.clone(),
+                    ip: effective_ip.clone(),
+                    port: payload.port.unwrap_or(52520),
+                    platform: payload.platform.clone().or_else(|| Some(crate::discovery::guess_platform_from_name(&payload.device_name).to_string())),
+                    last_seen: now,
+                    is_paired: true,
+                },
+            );
+        }
+
+        if let Some(handle) = state.app_handle.read().await.as_ref() {
+            let all_peers: Vec<DiscoveredPeer> = {
+                let peers = state.discovered_peers.read().await;
+                peers.values().cloned().collect()
+            };
+            let _ = handle.emit("peers-update", &all_peers);
+        }
+
+        // Reciprocal ping: notify the remote device that we are reachable and active
+        let ping_ip = effective_ip.clone();
+        let ping_port = payload.port.unwrap_or(52520);
+        tokio::spawn(async move {
+            let client = reqwest::Client::builder()
+                .no_proxy()
+                .timeout(std::time::Duration::from_millis(500))
+                .build();
+            if let Ok(c) = client {
+                let url = format!("http://{}:{}/api/ping", ping_ip, ping_port);
+                let _ = c.get(&url).send().await;
+            }
+        });
 
         state.logger.info("Pairing", &format!("Re-paired with existing device \"{}\" ({})", payload.device_name, effective_ip), None);
 
@@ -470,6 +512,33 @@ async fn handle_pair(
                 save_config(&cfg);
                 (cfg.device_id.clone(), cfg.device_name.clone())
             };
+
+            // Keep discovered_peers in sync
+            {
+                let mut peers = state.discovered_peers.write().await;
+                peers.insert(
+                    device_id.clone(),
+                    DiscoveredPeer {
+                        id: device_id.clone(),
+                        name: device_name.clone(),
+                        device_id: device_id.clone(),
+                        device_name: device_name.clone(),
+                        ip: effective_ip.clone(),
+                        port: peer_port,
+                        platform: Some(crate::discovery::guess_platform_from_name(&device_name).to_string()),
+                        last_seen: now,
+                        is_paired: true,
+                    },
+                );
+            }
+
+            if let Some(handle) = state.app_handle.read().await.as_ref() {
+                let all_peers: Vec<DiscoveredPeer> = {
+                    let peers = state.discovered_peers.read().await;
+                    peers.values().cloned().collect()
+                };
+                let _ = handle.emit("peers-update", &all_peers);
+            }
 
             state.logger.info("Pairing", &format!("Device \"{}\" successfully paired and saved", device_name), None);
 

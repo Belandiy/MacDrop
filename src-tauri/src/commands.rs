@@ -352,7 +352,8 @@ pub async fn pair_device(
         "ip": our_ip,
         "port": our_port,
         "wanIp": wan_ip,
-        "remotePort": our_port
+        "remotePort": our_port,
+        "platform": if cfg!(target_os = "macos") { "darwin" } else { "win32" }
     });
 
     let client = reqwest::Client::builder()

@@ -2,6 +2,16 @@
 
 Все важные изменения проекта MacDrop фиксируются в этом файле.
 
+## [fix/tauri-pairing-bidirectional-sync] - 2026-10-20
+
+### Взаимная синхронизация сопряжения и кэша обнаружения
+- **Немедленное обновление `discovered_peers` при сопряжении** ([src-tauri/src/engine.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/engine.rs)):
+  - При получении запроса `/api/pair` (как при повторном сопряжении Re-pairing, так и при новом) устройство теперь сразу добавляется в кэш `discovered_peers` и вызывается событие `peers-update`. Это гарантирует, что даже если входящий UDP был заблокирован фаерволом, устройство сразу появится на радаре и в окне сопряжения.
+- **Взаимный обратный пинг (Reciprocal Ping)** ([src-tauri/src/engine.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/engine.rs)):
+  - После завершения сопряжения сервер асинхронно отправляет `/api/ping` на удаленное устройство, чтобы обе стороны синхронно перевели статус соединения в `local`.
+- **Передача информации о платформе** ([src-tauri/src/commands.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/commands.rs)):
+  - В тело запроса сопряжения добавлено поле `platform` (`darwin` / `win32`) для корректного отображения системных иконок.
+
 ## [fix/windows-firewall-auto-rules] - 2026-10-20
 
 ### Автоматическое открытие портов Windows Firewall
