@@ -367,6 +367,19 @@ pub async fn pair_device(
 
     let mut resp = client.post(&url).json(&payload).send().await;
 
+    // Retry up to 2 times with 350ms delay if connection failed and was not a timeout
+    if resp.is_err() && !resp.as_ref().err().map(|e| e.is_timeout()).unwrap_or(false) {
+        for attempt in 1..=2 {
+            tokio::time::sleep(Duration::from_millis(350)).await;
+            state.logger.info("Pairing", &format!("Retrying handshake with {}:{} (attempt {})", target_ip, actual_port, attempt + 1), None);
+            let retry_res = client.post(&url).json(&payload).send().await;
+            if retry_res.is_ok() {
+                resp = retry_res;
+                break;
+            }
+        }
+    }
+
     // Automatic fallback between standard ports 52520 <-> 8384 if initial connection failed and was not a timeout
     if resp.is_err() && !resp.as_ref().err().map(|e| e.is_timeout()).unwrap_or(false) {
         if actual_port == 52520 || actual_port == 8384 {
@@ -387,7 +400,10 @@ pub async fn pair_device(
             let msg = if err.is_timeout() {
                 "Таймаут подключения: удаленное устройство не ответило вовремя или отклонило запрос".to_string()
             } else {
-                format!("Не удалось подключиться к {}:{}. Проверьте доступность устройства в сети ({}).", target_ip, actual_port, err)
+                let source_msg = std::error::Error::source(&err)
+                    .map(|s| format!(" | cause: {}", s))
+                    .unwrap_or_default();
+                format!("Не удалось подключиться к {}:{}. Проверьте доступность устройства в сети ({}{}).", target_ip, actual_port, err, source_msg)
             };
             state.logger.error("Pairing", &msg, None);
             return Ok(serde_json::json!({

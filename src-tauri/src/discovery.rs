@@ -142,9 +142,45 @@ pub async fn start_peer_discovery(state: Arc<EngineState>) {
 
             let mut status_changed = false;
             {
+                let mut devices_to_ping = Vec::new();
+                {
+                    let cfg = prune_state.config.read().await;
+                    for device in &cfg.paired_devices {
+                        if (now - device.last_seen) > 8000 && !device.ip.is_empty() {
+                            devices_to_ping.push((device.id.clone(), device.ip.clone(), device.port));
+                        }
+                    }
+                }
+
+                if !devices_to_ping.is_empty() {
+                    let ping_client = reqwest::Client::builder()
+                        .no_proxy()
+                        .timeout(Duration::from_millis(400))
+                        .build()
+                        .ok();
+
+                    if let Some(c) = ping_client {
+                        for (d_id, d_ip, d_port) in devices_to_ping {
+                            let ping_url = format!("http://{}:{}/api/ping", d_ip, d_port);
+                            if let Ok(resp) = c.get(&ping_url).send().await {
+                                if resp.status().is_success() {
+                                    let mut cfg = prune_state.config.write().await;
+                                    if let Some(d) = cfg.paired_devices.iter_mut().find(|d| d.id == d_id) {
+                                        d.last_seen = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_millis() as i64;
+                                        if d.connection_mode.as_deref() != Some("local") {
+                                            d.connection_mode = Some("local".to_string());
+                                            status_changed = true;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
                 let mut cfg = prune_state.config.write().await;
                 for device in cfg.paired_devices.iter_mut() {
-                    if (now - device.last_seen) > 8000 {
+                    if (now - device.last_seen) > 15000 {
                         if device.connection_mode.as_deref() != Some("offline") {
                             device.connection_mode = Some("offline".to_string());
                             status_changed = true;
@@ -381,6 +417,23 @@ pub async fn probe_subnet(state: Arc<EngineState>) {
                                             {
                                                 let mut peers = state.discovered_peers.write().await;
                                                 peers.insert(peer_id.to_string(), peer);
+                                            }
+
+                                            let mut status_changed = false;
+                                            {
+                                                let mut cfg = state.config.write().await;
+                                                if let Some(p) = cfg.paired_devices.iter_mut().find(|d| d.id == peer_id) {
+                                                    p.ip = target_ip.clone();
+                                                    p.port = port;
+                                                    p.last_seen = now;
+                                                    if p.connection_mode.as_deref() != Some("local") {
+                                                        p.connection_mode = Some("local".to_string());
+                                                        status_changed = true;
+                                                    }
+                                                }
+                                            }
+                                            if status_changed {
+                                                state.emit_status_changed().await;
                                             }
 
                                             let all_peers: Vec<DiscoveredPeer> = {
