@@ -2,6 +2,15 @@
 
 Все важные изменения проекта MacDrop фиксируются в этом файле.
 
+## [fix/tauri-window-wide-drop-and-transfer-retry] - 2026-10-20
+
+### Полнооконный Drag-and-Drop и улучшенная диагностика передачи
+- **Снятие ограничения геометрии дропа файлов** ([src/renderer/src/hooks/useStableDropZone.ts](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/hooks/useStableDropZone.ts), [src/renderer/src/components/DropZone.tsx](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/components/DropZone.tsx)):
+  - Ранее сброс файлов срабатывал строго при попадании курсора внутрь прямоугольника зоны сброса (`wasOverZone`), из-за чего при перетаскивании на нижнюю половину окна (список истории) или при погрешностях DPR на Retina-дисплеях событие сброса полностью игнорировалось.
+  - Теперь файлы, сброшенные в любую область окна MacDrop, гарантированно отправляются выбранному устройству (или конкретной карточке пира, если курсор был наведен на нее).
+- **Диагностика резервного порта** ([src-tauri/src/transfer.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/transfer.rs)):
+  - При неудачной попытке передачи на альтернативный порт (8384 / 52520) теперь логируется точная сетевая причина ошибки (`std::error::Error::source`).
+
 ## [fix/tauri-unlimited-file-transfer-size] - 2026-10-20
 
 ### Снятие ограничения на размер передаваемых файлов и детальная диагностика

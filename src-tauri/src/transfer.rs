@@ -258,6 +258,15 @@ pub async fn execute_peer_transfer(
                     p.port = alt_port;
                     crate::config::save_config(&cfg);
                 }
+            } else if let Err(ref e) = alt_res {
+                let source_msg = std::error::Error::source(e)
+                    .map(|s| format!(" | cause: {}", s))
+                    .unwrap_or_default();
+                state.logger.warn(
+                    "Transfer",
+                    &format!("Upload to alternative port {} also failed: {}{}", alt_port, e, source_msg),
+                    Some(format!("Target: {}:{}", target_ip, alt_port)),
+                );
             }
         }
 

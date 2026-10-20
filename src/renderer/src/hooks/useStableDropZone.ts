@@ -181,13 +181,12 @@ export function useStableDropZone({
         }
       } else if (payload.type === 'drop') {
         clearWatchdog();
-        const wasOverZone = isOverZoneRef.current;
         const targetId = hoveredTargetIdRef.current || undefined;
         const paths = (payload.paths && payload.paths.length > 0) ? payload.paths : cachedPathsRef.current;
 
         resetDragState();
 
-        if ((wasOverZone || targetId) && paths && paths.length > 0) {
+        if (paths && paths.length > 0) {
           await onDropFilesRef.current(paths, targetId);
         }
       } else if (payload.type === 'leave') {
@@ -254,13 +253,12 @@ export function useStableDropZone({
         return;
       }
 
-      const wasOverZone = isOverZoneRef.current;
       const targetId = hoveredTargetIdRef.current || undefined;
       const files = Array.from(e.dataTransfer?.files || []);
 
       resetDragState();
 
-      if ((wasOverZone || targetId) && files.length > 0) {
+      if (files.length > 0) {
         const filePaths = files
           .map((f: any) => {
             if (window.macdrop?.getPathForFile) {
