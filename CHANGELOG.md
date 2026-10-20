@@ -2,6 +2,16 @@
 
 Все важные изменения проекта MacDrop фиксируются в этом файле.
 
+## [fix/tauri-sync-bridge-and-window-focus] - 2026-10-20
+
+### Синхронная инициализация моста и надежное отображение запроса сопряжения
+- **Синхронный мост Tauri (`bridge/index.ts`)** ([src/renderer/src/bridge/index.ts](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src/renderer/src/bridge/index.ts)):
+  - Ранее `initTauriBridge()` был асинхронным с отложенным `await import('@tauri-apps/api')`. Из-за этого при первом монтировании React `window.macdrop` был `undefined`, и хуки `useEffect` не регистрировали слушатели событий (`onPairingRequest`, `onStatusUpdate`, `onPeersUpdate`).
+  - Теперь `@tauri-apps/api/core` и `@tauri-apps/api/event` импортируются статически, а `window.macdrop` создается синхронно с первой миллисекунды работы приложения.
+- **Разворачивание окна и фокус при сопряжении** ([src-tauri/src/engine.rs](file:///Users/andrey/Developer/active/project-macdrop/MacDrop/src-tauri/src/engine.rs)):
+  - При поступлении входящего запроса на сопряжение окно Windows автоматически восстанавливается из свернутого состояния (`unminimize`), отображается (`show`) и переводится в фокус (`set_focus`), чтобы диалоговое окно подтверждения сразу появлялось перед пользователем.
+  - Событие `pairing-request` отправляется как в окно `main`, так и в общий `app_handle`.
+
 ## [fix/tauri-pairing-bidirectional-sync] - 2026-10-20
 
 ### Взаимная синхронизация сопряжения и кэша обнаружения

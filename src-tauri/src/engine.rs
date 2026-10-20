@@ -15,7 +15,7 @@ use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 use tokio::sync::RwLock;
 use tower_http::cors::CorsLayer;
 
@@ -461,6 +461,29 @@ async fn handle_pair(
         None
     );
 
+    // Also register peer immediately in discovered_peers so UI radar sees it
+    {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis() as i64;
+        let mut peers = state.discovered_peers.write().await;
+        peers.insert(
+            payload.device_id.clone(),
+            DiscoveredPeer {
+                id: payload.device_id.clone(),
+                name: payload.device_name.clone(),
+                device_id: payload.device_id.clone(),
+                device_name: payload.device_name.clone(),
+                ip: effective_ip.clone(),
+                port: peer_port,
+                platform: payload.platform.clone().or_else(|| Some(crate::discovery::guess_platform_from_name(&payload.device_name).to_string())),
+                last_seen: now,
+                is_paired: false,
+            },
+        );
+    }
+
     if let Some(handle) = state.app_handle.read().await.as_ref() {
         let event = serde_json::json!({
             "requestId": request_id.clone(),
@@ -469,7 +492,22 @@ async fn handle_pair(
             "ip": effective_ip.clone(),
             "port": peer_port,
         });
+
+        // Unminimize, show and focus window so the user clearly sees the incoming approval dialog
+        if let Some(win) = handle.get_webview_window("main") {
+            let _ = win.unminimize();
+            let _ = win.show();
+            let _ = win.set_focus();
+            let _ = win.emit("pairing-request", &event);
+        }
         let _ = handle.emit("pairing-request", &event);
+
+        // Update radar peer list in UI
+        let all_peers: Vec<DiscoveredPeer> = {
+            let peers = state.discovered_peers.read().await;
+            peers.values().cloned().collect()
+        };
+        let _ = handle.emit("peers-update", &all_peers);
     }
 
     let device_id = payload.device_id.clone();

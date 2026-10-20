@@ -1,4 +1,6 @@
 import type { MacDropApi, LogEntry, UpdateProgressInfo, UpdateStateInfo } from '../vite-env';
+import * as tauriCore from '@tauri-apps/api/core';
+import * as tauriEvent from '@tauri-apps/api/event';
 
 // Checks if running inside Tauri webview
 export const isTauri = (): boolean => {
@@ -31,22 +33,10 @@ const DEFAULT_STATUS = {
   deviceName: 'MacDrop'
 };
 
-export async function initTauriBridge(): Promise<void> {
+export function initTauriBridge(): void {
   // If already set by Electron preload, keep it
   if (window.macdrop && !isTauri()) {
     return;
-  }
-
-  let tauriCore: any = null;
-  let tauriEvent: any = null;
-
-  if (isTauri()) {
-    try {
-      tauriCore = await import('@tauri-apps/api/core');
-      tauriEvent = await import('@tauri-apps/api/event');
-    } catch (e) {
-      console.warn('[Bridge] Tauri modules dynamic import failed:', e);
-    }
   }
 
   const invokeTauri = async (cmd: string, args?: Record<string, any>, fallback?: any) => {
